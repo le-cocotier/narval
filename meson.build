@@ -1,5 +1,5 @@
 project('beluga', 'c',
-  version : '3.4',
+  version : '3.5',
   default_options : [
     'c_std=c99'
   ]

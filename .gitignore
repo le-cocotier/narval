@@ -1,6 +1,7 @@
 build/*
 build-windows/*
 doc/*
+homebrew-beluga/*
 beluga.wiki
 # Editor and tool state. (This was ".*/*", which also ignored new files
 # under .gitea/ — a new workflow would never get added.)

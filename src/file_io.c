@@ -1,6 +1,6 @@
 /**
  * @file file_io.c
- * @brief File I/O operations module for the Beluga text editor
+ * @brief File I/O operations module for the Narval text editor
  * @details Handles file loading, saving, searching, and buffer management.
  * Provides functionality for opening/closing files, persisting changes to disk,
  * and searching for text patterns within the document.
@@ -59,10 +59,10 @@ extern EditorConfig E;
  * width loop) has any idea a raw 0x09 can occupy more than the one column
  * everything else assumes — but a real terminal expands it to the next
  * tab stop, anywhere from 1 to TAB_LENGTH columns depending on where it
- * lands. The gap between what beluga budgeted and what the terminal
+ * lands. The gap between what narval budgeted and what the terminal
  * actually consumed compounds across a row and, once it's enough to
  * exceed the pane's width, corrupts every row below it as the terminal's
- * own auto-wrap kicks in somewhere beluga never intended a line break.
+ * own auto-wrap kicks in somewhere narval never intended a line break.
  *
  * Expanding at load time — rather than teaching every column-position
  * consumer (cursor movement, undo, the syntax highlighter, selection
@@ -363,7 +363,7 @@ void editorSave() {
 
   // Written next to the file, then renamed over it (os_replace_file()): a
   // crash or a full disk halfway through used to leave a truncated file.
-  tmp_path = utilFormat("%s.beluga-save", string_path);
+  tmp_path = utilFormat("%s.narval-save", string_path);
   if (!tmp_path) {
     editorSetStatusMessage("Can't save: out of memory");
     gfree(string_path);

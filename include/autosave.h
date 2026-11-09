@@ -6,7 +6,7 @@ struct buffer_t;
 /**
  * Autosave: every AUTOSAVE-INTERVAL seconds (init.lisp, default 15, 0 turns
  * it off), each file buffer with unsaved changes is written to
- * ~/.beluga/autosave/, under its full path with the separators replaced by
+ * ~/.narval/autosave/, under its full path with the separators replaced by
  * '!'. Saving the buffer, or killing it after confirming, removes the copy;
  * a crash, a closed terminal or a quit that discards changes leaves it, and
  * opening the file again offers to recover it.

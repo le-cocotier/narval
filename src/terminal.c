@@ -94,7 +94,7 @@ void enableRawMode()
     if (os_term_enter_raw() == -1)
     {
         // Not a terminal, or (Windows) one too old for VT sequences.
-        fprintf(stderr, "beluga: this terminal can't be put in raw mode%s\n",
+        fprintf(stderr, "narval: this terminal can't be put in raw mode%s\n",
                 strcmp(os_name(), "windows") == 0 ? " (Windows 10 1809 or later needed)" : "");
         exit(1);
     }
@@ -468,18 +468,18 @@ int getWindowSize(int* rows, int* cols)
 
 #ifdef APP_DEBUG
 /**
- * @brief ~/.beluga/debug.log, where appDebug() writes.
+ * @brief ~/.narval/debug.log, where appDebug() writes.
  */
 static const char *debugLogPath(void)
 {
     static char path[PATH_MAX];
     if (!path[0])
-        snprintf(path, sizeof(path), "%s/debug.log", utilBelugaDir());
+        snprintf(path, sizeof(path), "%s/debug.log", utilNarvalDir());
     return path;
 }
 
 /**
- * @brief Opens (once) and returns the debug log file at ~/.beluga/debug.log.
+ * @brief Opens (once) and returns the debug log file at ~/.narval/debug.log.
  * @details Never stderr: this process's stderr is the same raw terminal
  * it's drawing its UI onto, so anything written there directly corrupts
  * the screen instead of scrolling by underneath it — which is exactly

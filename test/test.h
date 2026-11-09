@@ -1,5 +1,5 @@
-#ifndef BELUGA_TEST_H_
-#define BELUGA_TEST_H_
+#ifndef NARVAL_TEST_H_
+#define NARVAL_TEST_H_
 
 // A minimal test harness: CHECK* record a failure and keep going, and
 // testDone() turns the count into the exit status meson test reads.
@@ -47,4 +47,4 @@ Buffer *testBufferFromText(const char *text);
 // The buffer's text in the same form (caller frees with gfree).
 char *testBufferText(Buffer *buf);
 
-#endif // BELUGA_TEST_H_
+#endif // NARVAL_TEST_H_

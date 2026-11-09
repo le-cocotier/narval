@@ -5,7 +5,7 @@
 
 // ─── Packages ────────────────────────────────────────────────────────────────
 // Loading a package: (add-package "name" ["dir"]) evaluates dir/init.lisp
-// (by default <beluga dir>/packages/name) once per session, after loading
+// (by default <narval dir>/packages/name) once per session, after loading
 // what its optional package.lisp manifest requires. Installing, updating
 // and removing packages is Lisp, in the bundled "package" package; this is
 // only what has to be C: load order, the per-package state, and version
@@ -22,9 +22,9 @@ Lisp addPackage(Lisp args, LispError *e, LispContext ctx);
 Lisp packageLoaded(Lisp args, LispError *e, LispContext ctx);
 Lisp l_packageState(Lisp args, LispError *e, LispContext ctx);
 Lisp l_packageVersion(Lisp args, LispError *e, LispContext ctx);
-Lisp l_belugaVersion(Lisp args, LispError *e, LispContext ctx);
+Lisp l_narvalVersion(Lisp args, LispError *e, LispContext ctx);
 Lisp l_versionCompare(Lisp args, LispError *e, LispContext ctx);
-Lisp l_belugaDirectory(Lisp args, LispError *e, LispContext ctx);
+Lisp l_narvalDirectory(Lisp args, LispError *e, LispContext ctx);
 Lisp l_packageDirectory(Lisp args, LispError *e, LispContext ctx);
 Lisp l_bundledPackageDirectory(Lisp args, LispError *e, LispContext ctx);
 Lisp l_readDataFile(Lisp args, LispError *e, LispContext ctx);

@@ -1,20 +1,20 @@
-#ifndef BELUGA_PROJECT_H_
-#define BELUGA_PROJECT_H_
+#ifndef NARVAL_PROJECT_H_
+#define NARVAL_PROJECT_H_
 
 #include "data.h"
 
 // ─── Projects ───────────────────────────────────────────────────────────────
 // A project is the nearest directory above a file that holds one of the
-// project markers (.beluga, .git, compile_commands.json, plus whatever
-// (project-add-marker ...) adds). Every project beluga has seen is
-// remembered in ~/.beluga/projects, most recently used first.
+// project markers (.narval, .git, compile_commands.json, plus whatever
+// (project-add-marker ...) adds). Every project narval has seen is
+// remembered in ~/.narval/projects, most recently used first.
 //
 // The list of projects belongs to the whole process; which one is
 // "current" follows the active pane's buffer. A buffer without a project
 // (a terminal, *search*, a file outside any project) leaves the current
 // project as it was.
 //
-// A project may carry its own config, <root>/.beluga/init.lisp. It is
+// A project may carry its own config, <root>/.narval/init.lisp. It is
 // only evaluated once the project is trusted (project-trust), since a
 // cloned repository could otherwise run any Lisp, shell-run included. It
 // runs in its own environment on top of the global one: a (define ...)
@@ -22,14 +22,17 @@
 // of the project's buffers is active.
 
 // The directory holding a project's own config, and the file inside it.
-#define PROJECT_CONFIG_DIR ".beluga"
+#define PROJECT_CONFIG_DIR ".narval"
 #define PROJECT_CONFIG_FILE "init.lisp"
+// Its name before the editor was renamed from beluga: still a project
+// marker, and its init.lisp is read when there's no .narval/init.lisp.
+#define PROJECT_LEGACY_CONFIG_DIR ".beluga"
 
 // Registers the project-* builtins. Called from initBuiltins(), before
 // init.lisp loads, so the global config can already add markers.
 void projectRegisterBuiltins(void);
 
-// Loads ~/.beluga/projects and makes the working directory's project
+// Loads ~/.narval/projects and makes the working directory's project
 // current. Called once init.lisp has been evaluated and E.constantes read.
 void projectInit(void);
 
@@ -58,7 +61,7 @@ void projectSwapLastBuffer(int *other);
 int projectLspRoot(Buffer *buffer, const char *server, char *out,
                    size_t out_size);
 
-// Remembers in ~/.beluga/lsp-roots that `server` starts at `lsp_root` in
+// Remembers in ~/.narval/lsp-roots that `server` starts at `lsp_root` in
 // `buffer`'s project, or with NULL that it doesn't. Nothing for a file
 // outside any project.
 void projectLspRemember(Buffer *buffer, const char *server,
@@ -74,4 +77,4 @@ const char *projectCurrentRoot(void);
 // start from.
 char *projectRootOrCwd(void);
 
-#endif // BELUGA_PROJECT_H_
+#endif // NARVAL_PROJECT_H_

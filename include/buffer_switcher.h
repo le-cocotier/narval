@@ -1,5 +1,5 @@
-#ifndef BELUGA_BUFFER_SWITCHER_H
-#define BELUGA_BUFFER_SWITCHER_H
+#ifndef NARVAL_BUFFER_SWITCHER_H
+#define NARVAL_BUFFER_SWITCHER_H
 
 #include "data.h"
 #include "append_buffer.h"
@@ -14,4 +14,4 @@ int bufferSwitcherHandleKey(const Utf8Char *key);
 // Call from editorRefreshScreen() — appends the popup to abuf when visible.
 void bufferSwitcherDraw(struct abuf *ab);
 
-#endif //BELUGA_BUFFER_SWITCHER_H
+#endif //NARVAL_BUFFER_SWITCHER_H

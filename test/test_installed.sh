@@ -1,15 +1,15 @@
 #!/bin/sh
-# An installed beluga (Homebrew, a .deb, winget's zip): its first start
-# sets up ~/.beluga from the install's data directory, never overwriting,
+# An installed narval (Homebrew, a .deb, winget's zip): its first start
+# sets up ~/.narval from the install's data directory, never overwriting,
 # and loads the bundled packages from the install rather than copying them.
-# BELUGA_DATA_DIR stands in for <prefix>/share/beluga: the source tree has
+# NARVAL_DATA_DIR stands in for <prefix>/share/narval: the source tree has
 # the same config/, packages/ and assets/.
 #
-# Usage: test/test_installed.sh <beluga binary> <source root>
+# Usage: test/test_installed.sh <narval binary> <source root>
 
-beluga="$1"
+narval="$1"
 root="$2"
-[ -x "$beluga" ] && [ -f "$root/config/init.lisp" ] || { echo "usage: $0 <beluga> <source root>" >&2; exit 2; }
+[ -x "$narval" ] && [ -f "$root/config/init.lisp" ] || { echo "usage: $0 <narval> <source root>" >&2; exit 2; }
 command -v git >/dev/null || { echo "git not found: skipping"; exit 77; }
 
 tmp=$(mktemp -d) || exit 2
@@ -18,15 +18,15 @@ failures=0
 fail() { echo "FAIL: $*"; failures=$((failures + 1)); }
 pass() { echo "ok: $*"; }
 
-run() { HOME="$tmp/home" BELUGA_HOME= BELUGA_DATA_DIR="$root" "$beluga" --sync-packages >"$tmp/out" 2>&1; }
+run() { HOME="$tmp/home" NARVAL_HOME= BELUGA_HOME= BELUGA_DATA_DIR= NARVAL_DATA_DIR="$root" "$narval" --sync-packages >"$tmp/out" 2>&1; }
 
 mkdir -p "$tmp/home"
 run || { cat "$tmp/out"; fail "first start exits with an error"; }
-b="$tmp/home/.beluga"
+b="$tmp/home/.narval"
 cmp -s "$root/config/init.lisp" "$b/config/init.lisp" && pass "default config set up" || fail "no config/init.lisp"
 cmp -s "$root/config/personal-config.lisp" "$b/packages/personal-config/init.lisp" &&
   pass "personal-config set up" || fail "no personal-config"
-[ -f "$b/assets/beluga.txt" ] && pass "splash screen set up" || fail "no assets/beluga.txt"
+[ -f "$b/assets/narval.txt" ] && pass "splash screen set up" || fail "no assets/narval.txt"
 [ -d "$b/packages/git" ] && fail "bundled packages were copied" || pass "bundled packages not copied"
 
 # The bundled packages load from the install, and the user's own copy of

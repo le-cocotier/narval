@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Headless tests that look at beluga's screen: the editor runs in a
+"""Headless tests that look at narval's screen: the editor runs in a
 pseudo-terminal (tools/pty_harness.py) and pyte emulates the terminal.
 
-    tools/pty_tests.py BELUGA_BINARY REPO_DIR [TEST...]
+    tools/pty_tests.py NARVAL_BINARY REPO_DIR [TEST...]
     tools/pty_tests.py --list
 
 POSIX only. Exits 77 (meson's "skipped") when pyte isn't installed
@@ -19,7 +19,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pty_harness  # noqa: E402
-from pty_harness import Beluga, Skip, run_tests  # noqa: E402
+from pty_harness import Narval, Skip, run_tests  # noqa: E402
 
 CTRL_X = '\x18'
 DOWN = '\x1b[B'
@@ -53,7 +53,7 @@ def shell(ed, command):
 def tab_completion_list(binary, repo):
     """Several matches: the panel lists them, and TAB steps through them
     with the one in the prompt highlighted."""
-    with Beluga(binary, repo) as ed:
+    with Narval(binary, repo) as ed:
         for name in ('alpha1.txt', 'alpha2.txt', 'alpha3.txt', 'beta.txt'):
             with open(ed.path(name), 'w') as f:
                 f.write('x\n')
@@ -88,7 +88,7 @@ def terminal_alternate_screen(binary, repo):
     quitting, the shell's screen comes back as it was."""
     if not shutil.which('less'):
         raise Skip('no less')
-    with Beluga(binary, repo) as ed:
+    with Narval(binary, repo) as ed:
         with open(ed.path('long.txt'), 'w') as f:
             f.write(''.join('line %d\n' % i for i in range(1, 201)))
         ed.start()
@@ -118,7 +118,7 @@ def terminal_vim(binary, repo):
     vim = shutil.which('vim') or shutil.which('vim.tiny')
     if not vim:
         raise Skip('no vim')
-    with Beluga(binary, repo) as ed:
+    with Narval(binary, repo) as ed:
         with open(ed.path('v.txt'), 'w') as f:
             f.write(''.join('row %02d\n' % i for i in range(1, 61)))
         ed.start()
@@ -152,7 +152,7 @@ def terminal_vim(binary, repo):
 
 def terminal_colors(binary, repo):
     """256-colour and truecolour SGR reach the screen."""
-    with Beluga(binary, repo) as ed:
+    with Narval(binary, repo) as ed:
         ed.start()
         open_terminal(ed)
         shell(ed, r"printf '\033[38;5;208mORANGE\033[0m \033[48;2;10;20;30mDEEP\033[0m\n'")
@@ -170,7 +170,7 @@ def terminal_wrap(binary, repo):
     """Output wider than the pane wraps onto the next line instead of
     being cut at the pane's edge, and a line that exactly fills it leaves
     no blank line after it."""
-    with Beluga(binary, repo) as ed:
+    with Narval(binary, repo) as ed:
         ed.start()
         open_terminal(ed)
         shell(ed, "printf 'W%.0s' $(seq 1 130); echo; "
@@ -186,7 +186,7 @@ def terminal_wrap(binary, repo):
 def terminal_wide_characters(binary, repo):
     """The shell moving the cursor on a line with wide characters lands
     where the terminal shows it."""
-    with Beluga(binary, repo) as ed:
+    with Narval(binary, repo) as ed:
         ed.start()
         open_terminal(ed)
         # Two wide characters, back to the line's start, then 5 columns on.
@@ -198,7 +198,7 @@ def terminal_wide_characters(binary, repo):
 def terminal_fast_typing(binary, repo):
     """A line typed into the terminal pane in one burst arrives whole (the
     keystroke loss in TODO.md doesn't reproduce here)."""
-    with Beluga(binary, repo) as ed:
+    with Narval(binary, repo) as ed:
         ed.start()
         open_terminal(ed)
         shell(ed, 'cat > typed.txt')
@@ -222,7 +222,7 @@ def terminal_long_burst(binary, repo):
     whole: more than macOS's ~1 KB pty input queue between the harness and
     the editor. (Not into `cat`: a canonical-mode line longer than 1024
     bytes is discarded by the macOS tty itself, editor or not.)"""
-    with Beluga(binary, repo) as ed:
+    with Narval(binary, repo) as ed:
         ed.start()
         open_terminal(ed)
         line = ''.join(chr(ord('a') + i % 26) for i in range(2000))
@@ -242,7 +242,7 @@ def terminal_long_burst(binary, repo):
 def breakpoint_gutter(binary, repo):
     """CTRL-x B b puts a breakpoint in the gutter; it moves down with a
     line inserted above it, and CTRL-x B b again takes it away."""
-    with Beluga(binary, repo) as ed:
+    with Narval(binary, repo) as ed:
         with open(ed.path('t.c'), 'w') as f:
             f.write(DEBUGGEE)
         ed.start('t.c')
@@ -264,7 +264,7 @@ def pane_cursors(binary, repo):
     """Two panes on the same file each keep their own cursor: moving in one
     doesn't move the other, and lines inserted above a pane's cursor carry
     it down with its line."""
-    with Beluga(binary, repo, rows=30, cols=100) as ed:
+    with Narval(binary, repo, rows=30, cols=100) as ed:
         with open(ed.path('p.txt'), 'w') as f:
             f.write(''.join('line %d\n' % i for i in range(1, 41)))
         ed.start('p.txt')
@@ -302,7 +302,7 @@ def mouse_wheel_and_click(binary, repo):
     lines with the cursor kept on screen; a click past a line's end puts
     the cursor at its end, one on the gutter at its start; nothing of a
     report is ever typed. Quitting turns the reports off again."""
-    with Beluga(binary, repo) as ed:
+    with Narval(binary, repo) as ed:
         with open(ed.path('m.txt'), 'w') as f:
             f.write(''.join('line %d\n' % i for i in range(1, 101)))
         ed.start('m.txt')
@@ -329,7 +329,7 @@ def mouse_wheel_and_click(binary, repo):
 def mouse_split_panes(binary, repo):
     """A click in the other pane gives it focus and its cursor goes where
     clicked; the wheel scrolls the pane under the pointer only."""
-    with Beluga(binary, repo, rows=30, cols=100) as ed:
+    with Narval(binary, repo, rows=30, cols=100) as ed:
         with open(ed.path('p.txt'), 'w') as f:
             f.write(''.join('line %d\n' % i for i in range(1, 101)))
         ed.start('p.txt')
@@ -349,7 +349,7 @@ def daemon_mouse(binary, repo):
     """A daemon window gets mouse reports too: the request goes out with
     what the daemon draws, and the client turns it off when it closes."""
     name = daemon_name('mouse')
-    with Beluga(binary, repo) as ed:
+    with Narval(binary, repo) as ed:
         try:
             with open(ed.path('m.txt'), 'w') as f:
                 f.write(''.join('line %d\n' % i for i in range(1, 101)))
@@ -380,12 +380,12 @@ def debug_session(binary, repo, config):
     sets up: stop at a breakpoint, see the stack and the variables, step,
     evaluate, run to the end. The files are reached through HOME, which on
     macOS is under /var, a link to /private/var."""
-    with Beluga(binary, repo, rows=30, cols=120) as ed:
+    with Narval(binary, repo, rows=30, cols=120) as ed:
         with open(ed.path('t.c'), 'w') as f:
             f.write(DEBUGGEE)
         subprocess.run(['cc', '-g', '-O0', '-o', ed.path('t'), ed.path('t.c')],
                        check=True)
-        with open(ed.path('.beluga/packages/personal-config/init.lisp'), 'a') as f:
+        with open(ed.path('.narval/packages/personal-config/init.lisp'), 'a') as f:
             f.write('\n' + config + '\n')
         ed.start('t.c')
         ed.wait_for('square')
@@ -452,12 +452,12 @@ def debugger_attach(binary, repo):
         raise Skip('gdb on macOS needs code signing to run programs')
     if not gdb_with_dap():
         raise Skip('needs gdb 14 or later and cc')
-    with Beluga(binary, repo, rows=30, cols=120) as ed:
+    with Narval(binary, repo, rows=30, cols=120) as ed:
         with open(ed.path('t.c'), 'w') as f:
             f.write(ATTACHEE)
         subprocess.run(['cc', '-g', '-O0', '-o', ed.path('t'), ed.path('t.c')],
                        check=True)
-        with open(ed.path('.beluga/packages/personal-config/init.lisp'), 'a') as f:
+        with open(ed.path('.narval/packages/personal-config/init.lisp'), 'a') as f:
             f.write('\n(dap-adapter "c" "gdb" "-q" "-i" "dap")\n')
         program = subprocess.Popen([ed.path('t')], stdout=subprocess.PIPE)
         try:
@@ -499,12 +499,12 @@ def debugger_python_in_terminal(binary, repo):
     if subprocess.run([sys.executable, '-c', 'import debugpy'],
                       capture_output=True).returncode != 0:
         raise Skip('no debugpy (pip install debugpy)')
-    with Beluga(binary, repo, rows=30, cols=120) as ed:
+    with Narval(binary, repo, rows=30, cols=120) as ed:
         with open(ed.path('t.py'), 'w') as f:
             f.write("name = input('name? ')\n"
                     "total = len(name)\n"
                     "print('hello', name, total)\n")
-        with open(ed.path('.beluga/packages/personal-config/init.lisp'), 'a') as f:
+        with open(ed.path('.narval/packages/personal-config/init.lisp'), 'a') as f:
             f.write('\n(dap-adapter "py" "%s" "-m" "debugpy.adapter")\n'
                     '(define (debug-in-terminal) (debug-start \'(("program" . "%s")'
                     ' ("console" . "integratedTerminal"))))\n'
@@ -535,14 +535,14 @@ def debugger_logpoints(binary, repo):
     if subprocess.run([sys.executable, '-c', 'import debugpy'],
                       capture_output=True).returncode != 0:
         raise Skip('no debugpy (pip install debugpy)')
-    with Beluga(binary, repo, rows=30, cols=120) as ed:
+    with Narval(binary, repo, rows=30, cols=120) as ed:
         with open(ed.path('t.py'), 'w') as f:
             f.write("total = 0\n"
                     "for i in range(5):\n"
                     "    total += i\n"
                     "    total += 0\n"
                     "print('total', total)\n")
-        with open(ed.path('.beluga/packages/personal-config/init.lisp'), 'a') as f:
+        with open(ed.path('.narval/packages/personal-config/init.lisp'), 'a') as f:
             f.write('\n(dap-adapter "py" "%s" "-m" "debugpy.adapter")\n'
                     '(define (debug-t) (debug-start \'(("program" . "%s"))))\n'
                     % (sys.executable, ed.path('t.py')))
@@ -581,14 +581,14 @@ def debugger_exceptions(binary, repo):
     if subprocess.run([sys.executable, '-c', 'import debugpy'],
                       capture_output=True).returncode != 0:
         raise Skip('no debugpy (pip install debugpy)')
-    with Beluga(binary, repo, rows=30, cols=140) as ed:
+    with Narval(binary, repo, rows=30, cols=140) as ed:
         with open(ed.path('t.py'), 'w') as f:
             f.write("try:\n"
                     "    raise ValueError('boom')\n"
                     "except ValueError:\n"
                     "    pass\n"
                     "print('done')\n")
-        with open(ed.path('.beluga/packages/personal-config/init.lisp'), 'a') as f:
+        with open(ed.path('.narval/packages/personal-config/init.lisp'), 'a') as f:
             f.write('\n(dap-adapter "py" "%s" "-m" "debugpy.adapter")\n'
                     '(define (debug-t) (debug-start \'(("program" . "%s"))))\n'
                     % (sys.executable, ed.path('t.py')))
@@ -623,13 +623,13 @@ def debugger_watches(binary, repo):
     if subprocess.run([sys.executable, '-c', 'import debugpy'],
                       capture_output=True).returncode != 0:
         raise Skip('no debugpy (pip install debugpy)')
-    with Beluga(binary, repo, rows=30, cols=120) as ed:
+    with Narval(binary, repo, rows=30, cols=120) as ed:
         with open(ed.path('t.py'), 'w') as f:
             f.write("total = 0\n"
                     "for i in range(3):\n"
                     "    total += i\n"
                     "print('total', total)\n")
-        with open(ed.path('.beluga/packages/personal-config/init.lisp'), 'a') as f:
+        with open(ed.path('.narval/packages/personal-config/init.lisp'), 'a') as f:
             f.write('\n(dap-adapter "py" "%s" "-m" "debugpy.adapter")\n'
                     '(define (debug-t) (debug-start \'(("program" . "%s"))))\n'
                     % (sys.executable, ed.path('t.py')))
@@ -677,7 +677,7 @@ def python_session(ed, adapter_lisp):
                 "for i in range(3):\n"
                 "    total += i\n"
                 "print('total', total)\n")
-    with open(ed.path('.beluga/packages/personal-config/init.lisp'), 'a') as f:
+    with open(ed.path('.narval/packages/personal-config/init.lisp'), 'a') as f:
         f.write('\n(dap-adapter "py" %s)\n'
                 '(define (debug-t) (debug-start \'(("program" . "%s"))))\n'
                 % (adapter_lisp, ed.path('t.py')))
@@ -698,15 +698,15 @@ def python_session(ed, adapter_lisp):
 
 
 def debugger_over_tcp(binary, repo):
-    """An adapter that listens on a port: started by beluga with {port}
+    """An adapter that listens on a port: started by narval with {port}
     in its arguments, or already running and named as tcp:HOST:PORT."""
     if subprocess.run([sys.executable, '-c', 'import debugpy'],
                       capture_output=True).returncode != 0:
         raise Skip('no debugpy (pip install debugpy)')
-    with Beluga(binary, repo, rows=30, cols=120) as ed:
+    with Narval(binary, repo, rows=30, cols=120) as ed:
         python_session(ed, '"%s" "-m" "debugpy.adapter" "--host" "127.0.0.1" "--port" "{port}"'
                        % sys.executable)
-    with Beluga(binary, repo, rows=30, cols=120) as ed:
+    with Narval(binary, repo, rows=30, cols=120) as ed:
         with socket.socket() as probe:
             probe.bind(('127.0.0.1', 0))
             port = probe.getsockname()[1]
@@ -723,8 +723,8 @@ def debugger_over_tcp(binary, repo):
 def terminal_app_shift_function_keys(binary, repo):
     """Terminal.app sends Shift+F5-F12 as the VT220's F13-F20 codes
     (ESC [25~ ... ESC [34~); xterm and iTerm2 send ESC [15;2~."""
-    with Beluga(binary, repo) as ed:
-        with open(ed.path('.beluga/packages/personal-config/init.lisp'), 'a') as f:
+    with Narval(binary, repo) as ed:
+        with open(ed.path('.narval/packages/personal-config/init.lisp'), 'a') as f:
             f.write('\n(map-key "SHIFT-F5" \'(editor-insert-char "A") "no-prefix")'
                     '\n(map-key "SHIFT-F11" \'(editor-insert-char "B") "no-prefix")'
                     '\n(map-key "SHIFT-F12" \'(editor-insert-char "C") "no-prefix")\n')
@@ -741,8 +741,8 @@ def modified_keys(binary, repo):
     """Alt/Option and Ctrl combinations bind under any of their names
     (OPTION-q is ALT-q); an unbound Alt+letter still types the letter; the
     editor asks for modifyOtherKeys and turns it off on the way out."""
-    with Beluga(binary, repo) as ed:
-        with open(ed.path('.beluga/packages/personal-config/init.lisp'), 'a') as f:
+    with Narval(binary, repo) as ed:
+        with open(ed.path('.narval/packages/personal-config/init.lisp'), 'a') as f:
             f.write('\n(map-key "OPTION-q" \'(editor-insert-char "A") "no-prefix")'
                     '\n(map-key "CTRL-1" \'(editor-insert-char "B") "no-prefix")'
                     '\n(map-key "CTRL-ARROW-UP" \'(editor-insert-char "C") "no-prefix")'
@@ -771,7 +771,7 @@ def terminal_modified_keys(binary, repo):
     """A terminal pane's program gets modified keys as xterm sends them."""
     if not shutil.which('od'):
         raise Skip('no od')
-    with Beluga(binary, repo) as ed:
+    with Narval(binary, repo) as ed:
         ed.start()
         open_terminal(ed)
         shell(ed, "stty raw -echo; head -c 20 | od -An -c; stty sane")
@@ -788,10 +788,10 @@ def daemon_name(tag):
 
 
 def daemon_in_background(binary, repo):
-    """beluga --daemon returns at once, the daemon going on in the
+    """narval --daemon returns at once, the daemon going on in the
     background; a second one is refused; -c opens a window on it."""
     name = daemon_name('bg')
-    with Beluga(binary, repo) as ed:
+    with Narval(binary, repo) as ed:
         try:
             rc, out = ed.run('--daemon=' + name)
             assert rc == 0 and 'started' in out, (rc, out)
@@ -808,9 +808,9 @@ def daemon_in_background(binary, repo):
 
 
 def daemon_started_by_client(binary, repo):
-    """beluga -c with no daemon running starts one."""
+    """narval -c with no daemon running starts one."""
     name = daemon_name('auto')
-    with Beluga(binary, repo) as ed:
+    with Narval(binary, repo) as ed:
         try:
             ed.start('-c', '--name=' + name)
             ed.wait_for('closes this window')
@@ -822,10 +822,10 @@ def daemon_started_by_client(binary, repo):
 
 
 def daemon_window_directory(binary, repo):
-    """Each daemon window works from the directory its beluga -c ran in:
+    """Each daemon window works from the directory its narval -c ran in:
     the open-file prompt starts there, and so does a terminal pane."""
     name = daemon_name('cwd')
-    with Beluga(binary, repo) as ed:
+    with Narval(binary, repo) as ed:
         try:
             os.makedirs(ed.path('proj/sub'))
             rc, out = ed.run('--daemon=' + name)
@@ -849,7 +849,7 @@ def daemon_prompt_other_windows(binary, repo):
     holds. A second prompt opened in it closes first; then the first
     window's keys are read again."""
     name = daemon_name('prompt')
-    with Beluga(binary, repo) as a:
+    with Narval(binary, repo) as a:
         try:
             with open(a.path('a.txt'), 'w') as f:
                 f.write('alpha\n')
@@ -859,7 +859,7 @@ def daemon_prompt_other_windows(binary, repo):
             assert rc == 0, out
             a.start('-c', '--name=' + name, 'a.txt')
             a.wait_for('alpha')
-            with Beluga(binary, repo, home=a.home) as b:
+            with Narval(binary, repo, home=a.home) as b:
                 b.start('-c', '--name=' + name, 'b.txt')
                 b.wait_for('beta')
                 a.keys(CTRL_X, 'f', delay=0.5)       # A: the open-file prompt
@@ -902,13 +902,13 @@ def daemon_stop_signals(binary, repo):
     it, keeping the changes in autosave and taking the socket away. A
     closed terminal (SIGHUP) stops one at once."""
     name = daemon_name('sig')
-    with Beluga(binary, repo) as daemon:
+    with Narval(binary, repo) as daemon:
         try:
             with open(daemon.path('u.txt'), 'w') as f:
                 f.write('text\n')
             daemon.start('--daemon=' + name, '--foreground')
             daemon.wait_for('daemon "%s" running' % name)
-            with Beluga(binary, repo, home=daemon.home) as window:
+            with Narval(binary, repo, home=daemon.home) as window:
                 window.start('-c', '--name=' + name, 'u.txt')
                 window.wait_for('text')
                 window.keys('X', delay=0.3)  # unsaved now
@@ -920,14 +920,14 @@ def daemon_stop_signals(binary, repo):
             os.kill(daemon.pid, signal.SIGINT)
             status = daemon.wait_exit(10)
             assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0, status
-            daemon.wait_for('~/.beluga/autosave')
-            saved = os.listdir(daemon.path('.beluga/autosave'))
+            daemon.wait_for('~/.narval/autosave')
+            saved = os.listdir(daemon.path('.narval/autosave'))
             assert any(entry.endswith('u.txt') for entry in saved), saved
             rc, out = daemon.run('--kill', '--name=' + name)
             assert rc == 1, 'still reachable: ' + out
         finally:
             daemon.run('--kill', '--force', '--name=' + name)
-    with Beluga(binary, repo) as daemon:
+    with Narval(binary, repo) as daemon:
         try:
             daemon.start('--daemon=' + name, '--foreground')
             daemon.wait_for('running')
@@ -946,7 +946,7 @@ def daemon_debug_per_project(binary, repo):
                       capture_output=True).returncode != 0:
         raise Skip('no debugpy (pip install debugpy)')
     name = daemon_name('dbg')
-    with Beluga(binary, repo, rows=30, cols=120) as ed:
+    with Narval(binary, repo, rows=30, cols=120) as ed:
         for proj in ('a', 'b'):
             os.makedirs(ed.path(proj + '/.git'))
             with open(ed.path(proj + '/t.py'), 'w') as f:
@@ -954,7 +954,7 @@ def daemon_debug_per_project(binary, repo):
                         "for i in range(3):\n"
                         "    total += i\n"
                         "print('%s total', total)\n" % proj)
-        with open(ed.path('.beluga/packages/personal-config/init.lisp'), 'a') as f:
+        with open(ed.path('.narval/packages/personal-config/init.lisp'), 'a') as f:
             f.write('\n(dap-adapter "py" "%s" "-m" "debugpy.adapter")\n' % sys.executable)
             for proj in ('a', 'b'):
                 f.write('(define (debug-%s) (debug-start \'(("program" . "%s"))))\n'
@@ -986,9 +986,9 @@ def daemon_debug_per_project(binary, repo):
 
 def project_root_start(binary, repo):
     """With a project open, the open-file prompt, dired's prompt and a new
-    terminal start at the project root, not where beluga was started.
+    terminal start at the project root, not where narval was started.
     Wide, so a long $TMPDIR (macOS) fits on the prompt line."""
-    with Beluga(binary, repo, cols=250) as ed:
+    with Narval(binary, repo, cols=250) as ed:
         os.makedirs(ed.path('proj/.git'))
         os.makedirs(ed.path('proj/sub'))
         os.makedirs(ed.path('elsewhere'))
@@ -1015,34 +1015,34 @@ def project_root_start(binary, repo):
 FAKE_SERVER_INSTALL = """printf 'Password: '
 read answer
 mkdir -p "$HOME/bin"
-printf '#!/bin/sh\\ncat >/dev/null\\n' > "$HOME/bin/beluga-fake-ls"
-chmod +x "$HOME/bin/beluga-fake-ls"
+printf '#!/bin/sh\\ncat >/dev/null\\n' > "$HOME/bin/narval-fake-ls"
+chmod +x "$HOME/bin/narval-fake-ls"
 echo "installed with $answer"
 """
 
 
 def lsp_install(binary, repo):
-    """A file whose language server isn't on PATH: beluga offers the
+    """A file whose language server isn't on PATH: narval offers the
     registered install command, runs it in *lsp-install* (where it can be
     answered), and once the server is there asks to start it."""
-    with Beluga(binary, repo, rows=30, cols=140) as ed:
+    with Narval(binary, repo, rows=30, cols=140) as ed:
         ed.extra_env = {'PATH': ed.path('bin') + ':' + os.environ.get('PATH', '')}
         with open(ed.path('install.sh'), 'w') as f:
             f.write(FAKE_SERVER_INSTALL)
         with open(ed.path('a.zz'), 'w') as f:
             f.write('hello\n')
-        with open(ed.path('.beluga/packages/personal-config/init.lisp'), 'a') as f:
-            f.write('\n(lsp-server "zz" "zz" "beluga-fake-ls")\n'
-                    '(lsp-server-install "beluga-fake-ls" "any" "beluga-no-such-tool x"'
+        with open(ed.path('.narval/packages/personal-config/init.lisp'), 'a') as f:
+            f.write('\n(lsp-server "zz" "zz" "narval-fake-ls")\n'
+                    '(lsp-server-install "narval-fake-ls" "any" "narval-no-such-tool x"'
                     ' "any" "sh install.sh")\n')
         ed.start('a.zz')
-        ed.wait_for("beluga-fake-ls isn't installed. Install it with `sh install.sh`? (y/n)")
+        ed.wait_for("narval-fake-ls isn't installed. Install it with `sh install.sh`? (y/n)")
         ed.write('y\r')
         ed.wait_for('Password:')
         ed.wait_for('$ sh install.sh')
         ed.write('hunter2\r')
         ed.wait_for('installed with hunter2')
-        ed.wait_for('Start the beluga-fake-ls language server for this project? (y/n)')
+        ed.wait_for('Start the narval-fake-ls language server for this project? (y/n)')
         ed.write('n\r')
         ed.pump(0.3)
         assert any('hello' in line for line in ed.text()), ed.text()
@@ -1053,19 +1053,19 @@ def lsp_install_declined(binary, repo):
     """Saying no to the install: nothing runs, and it isn't asked again
     for the next file of that server. With no command that can run, the
     message names what installing it needs."""
-    with Beluga(binary, repo, rows=30, cols=140) as ed:
+    with Narval(binary, repo, rows=30, cols=140) as ed:
         for name in ('a.zz', 'b.zz', 'c.yy'):
             with open(ed.path(name), 'w') as f:
                 f.write('x\n')
-        with open(ed.path('.beluga/packages/personal-config/init.lisp'), 'a') as f:
-            f.write('\n(lsp-server "zz" "zz" "beluga-fake-ls")\n'
-                    '(lsp-server-install "beluga-fake-ls" "any" "sh -c true")\n'
-                    '(lsp-server "yy" "yy" "beluga-other-ls")\n'
-                    '(lsp-server-install "beluga-other-ls" "any" "beluga-no-such-tool i")\n')
+        with open(ed.path('.narval/packages/personal-config/init.lisp'), 'a') as f:
+            f.write('\n(lsp-server "zz" "zz" "narval-fake-ls")\n'
+                    '(lsp-server-install "narval-fake-ls" "any" "sh -c true")\n'
+                    '(lsp-server "yy" "yy" "narval-other-ls")\n'
+                    '(lsp-server-install "narval-other-ls" "any" "narval-no-such-tool i")\n')
         ed.start('a.zz')
         ed.wait_for("Install it with `sh -c true`? (y/n)")
         ed.write('n\r')
-        ed.wait_for('Not installing beluga-fake-ls')
+        ed.wait_for('Not installing narval-fake-ls')
         ed.keys(CTRL_X, 'f', delay=0.4)
         ed.wait_for('Open :')
         ed.write('b.zz\r')
@@ -1075,7 +1075,7 @@ def lsp_install_declined(binary, repo):
         ed.keys(CTRL_X, 'f', delay=0.4)
         ed.wait_for('Open :')
         ed.write('c.yy\r')
-        ed.wait_for("beluga-other-ls isn't installed, and installing it needs beluga-no-such-tool")
+        ed.wait_for("narval-other-ls isn't installed, and installing it needs narval-no-such-tool")
         ed.quit()
 
 

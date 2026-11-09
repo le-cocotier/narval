@@ -1,11 +1,11 @@
 /**
  * @file os.h
- * @brief Everything beluga needs from the operating system — and the only
+ * @brief Everything narval needs from the operating system — and the only
  * way the editor reaches it.
- * @details Two libraries implement this header: libbeluga-os-posix
- * (src/os/os_posix.c: Linux, macOS, BSD) and libbeluga-os-win32
+ * @details Two libraries implement this header: libnarval-os-posix
+ * (src/os/os_posix.c: Linux, macOS, BSD) and libnarval-os-win32
  * (src/os/os_win32.c: Windows 10 1809+). meson.build links the one for the
- * target. Everything else in beluga is plain C99 plus this header: no
+ * target. Everything else in narval is plain C99 plus this header: no
  * <unistd.h>, no <windows.h>, no #ifdef per platform — a rule
  * tools/check_os_boundary.sh enforces in CI, and that compiling the core
  * with -std=c99 and no feature-test macros enforces for functions.
@@ -22,8 +22,8 @@
  *   so there is one key parser for every platform.
  * - Terminal output is UTF-8 text with ANSI/VT escape sequences.
  */
-#ifndef BELUGA_OS_H_
-#define BELUGA_OS_H_
+#ifndef NARVAL_OS_H_
+#define NARVAL_OS_H_
 
 #include <stddef.h>
 #include <stdio.h> // FILE, for os_file_flush()
@@ -264,7 +264,7 @@ typedef struct OsPty OsPty;
 /**
  * @brief Starts a shell attached to a new pseudo-terminal of rows×cols.
  * @param shell NULL: the user's shell ($SHELL, else zsh or /bin/sh on Unix;
- * $BELUGA_SHELL, then pwsh, then Windows PowerShell, then cmd.exe on
+ * $NARVAL_SHELL, then pwsh, then Windows PowerShell, then cmd.exe on
  * Windows).
  * @param cwd The directory it starts in; NULL: the editor's.
  */
@@ -306,7 +306,7 @@ void os_pty_close(OsPty *p);
  *
  **********************************************************************************************************************/
 
-// A byte stream between the beluga daemon and one of its clients, on this
+// A byte stream between the narval daemon and one of its clients, on this
 // machine and for this user only: a Unix domain socket in a private
 // directory on Unix, a named pipe that only the current user may open on
 // Windows. `name` picks one of several daemons ("server" by default).
@@ -467,4 +467,4 @@ char *os_clipboard_get(void);
 // 0 or -1.
 int os_clipboard_set(const char *text, size_t len);
 
-#endif // BELUGA_OS_H_
+#endif // NARVAL_OS_H_

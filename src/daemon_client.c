@@ -1,6 +1,6 @@
 /**
  * @file daemon_client.c
- * @brief `beluga -c`: a window on the beluga daemon.
+ * @brief `narval -c`: a window on the narval daemon.
  * @details A thin terminal proxy. It puts the terminal in raw mode, sends
  * the keys as they come and the size when it changes, and writes what the
  * daemon draws. Everything else (buffers, Lisp, the layout of this window)
@@ -55,7 +55,7 @@ int clientStartDaemon(const char *name) {
   char daemon_arg[256];
   char log_file[OS_PATH_MAX];
   const char *argv[4];
-  const char *dir = utilBelugaDir();
+  const char *dir = utilNarvalDir();
   char *exe;
   OsConn *conn;
   long long deadline;
@@ -63,12 +63,12 @@ int clientStartDaemon(const char *name) {
   conn = os_conn_connect(name, err, sizeof(err));
   if (conn) {
     os_conn_close(conn);
-    fprintf(stderr, "beluga: a daemon called \"%s\" is already running\n", name);
+    fprintf(stderr, "narval: a daemon called \"%s\" is already running\n", name);
     return 1;
   }
   exe = os_exe_path();
   if (!exe) {
-    fprintf(stderr, "beluga: can't tell where this program is, to start the daemon\n");
+    fprintf(stderr, "narval: can't tell where this program is, to start the daemon\n");
     return 1;
   }
   snprintf(daemon_arg, sizeof(daemon_arg), "--daemon=%s", name);
@@ -80,7 +80,7 @@ int clientStartDaemon(const char *name) {
   argv[3] = NULL;
   if (os_spawn_detached(argv, dir ? log_file : NULL, err, sizeof(err)) == -1) {
     gfree(exe);
-    fprintf(stderr, "beluga: couldn't start the daemon: %s\n", err);
+    fprintf(stderr, "narval: couldn't start the daemon: %s\n", err);
     return 1;
   }
   gfree(exe);
@@ -93,7 +93,7 @@ int clientStartDaemon(const char *name) {
     }
     os_sleep_ms(50);
   }
-  fprintf(stderr, "beluga: the daemon didn't start%s%s\n", dir ? "; see " : "",
+  fprintf(stderr, "narval: the daemon didn't start%s%s\n", dir ? "; see " : "",
           dir ? log_file : "");
   return 1;
 }
@@ -119,16 +119,16 @@ int clientMain(const char *name, char *const *files, const int n_files) {
   long n;
   int r;
 
-  // None running: start one, the way `beluga --daemon` does.
+  // None running: start one, the way `narval --daemon` does.
   conn = os_conn_connect(name, err, sizeof(err));
   if (!conn && clientStartDaemon(name) == 0)
     conn = os_conn_connect(name, err, sizeof(err));
   if (!conn) {
-    fprintf(stderr, "beluga: %s\n", err);
+    fprintf(stderr, "narval: %s\n", err);
     return 1;
   }
   if (os_term_enter_raw() == -1) {
-    fprintf(stderr, "beluga: this terminal can't be put in raw mode\n");
+    fprintf(stderr, "narval: this terminal can't be put in raw mode\n");
     os_conn_close(conn);
     return 1;
   }
@@ -187,7 +187,7 @@ int clientMain(const char *name, char *const *files, const int n_files) {
 
   terminalRestore();
   if (lost)
-    fprintf(stderr, "beluga: lost the connection to the daemon\n");
+    fprintf(stderr, "narval: lost the connection to the daemon\n");
   else if (message && message[0])
     fprintf(stderr, "%s\n", message);
   gfree(message);
@@ -208,7 +208,7 @@ int clientKill(const char *name, const int force) {
 
   conn = os_conn_connect(name, err, sizeof(err));
   if (!conn) {
-    fprintf(stderr, "beluga: %s\n", err);
+    fprintf(stderr, "narval: %s\n", err);
     return 1;
   }
   if (frameSend(conn, FRAME_KILL, force ? "force" : "", force ? 5 : 0) == 0) {

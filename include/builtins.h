@@ -177,7 +177,7 @@ void bFree_structs(void);
 //                                            (see bufferClose() in buffer.c)
 //   "project-open"  (root)                — a project became current for the
 //                                            first time this session, after
-//                                            its .beluga/init.lisp loaded
+//                                            its .narval/init.lisp loaded
 Lisp addHook(Lisp args, LispError *e, LispContext ctx);
 void runHooks(const char *event_name, Lisp args);
 

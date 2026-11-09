@@ -21,7 +21,7 @@
                     "linux"   "sudo zypper install -y clang-tools"
                     "windows" "winget install -e --id LLVM.LLVM --accept-source-agreements --accept-package-agreements")
 ;; /tmp and /var are links into /private on macOS: the debug info has the
-;; path a file was compiled by, beluga the real one, and lldb only places a
+;; path a file was compiled by, narval the real one, and lldb only places a
 ;; breakpoint where they match. The source map makes them the same.
 (define c--lldb-launch
   '(("sourceMap" ("/tmp" . "/private/tmp") ("/var" . "/private/var") ("/etc" . "/private/etc"))))
@@ -64,7 +64,7 @@
 (map-key "CTRL-d" c-toggle-comment "no-prefix" (list "c" "h"))
 
 ;; ─── Syntax highlighting ────────────────────────────────────────────────────
-;; The exact keyword and type lists beluga's own syntax highlighter used to
+;; The exact keyword and type lists narval's own syntax highlighter used to
 ;; hardcode in C, before highlighting itself became something packages
 ;; provide — every language, C included, now goes through the same
 ;; (syntax-define-language ...) + syntax-add-keyword/syntax-add-type

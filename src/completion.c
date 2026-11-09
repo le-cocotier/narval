@@ -1,6 +1,6 @@
 /**
  * @file completion.c
- * @brief LSP (Language Server Protocol) client implementation for Beluga
+ * @brief LSP (Language Server Protocol) client implementation for Narval
  */
 
 #include "../include/completion.h"
@@ -1737,7 +1737,7 @@ int lspStart(LspClient *lsp, const char *project_root, char *const server_argv[]
     // land on the terminal we're drawing on, and language servers log to
     // it freely (clangd emits a line per request at its default level): a
     // normal build discards it, an APP_DEBUG one appends it to the same
-    // ~/.beluga/debug.log appDebug() writes to, where it's readable.
+    // ~/.narval/debug.log appDebug() writes to, where it's readable.
     memset(&spawn, 0, sizeof(spawn));
     spawn.argv = (const char *const *) server_argv;
     spawn.stdin_pipe = 1;

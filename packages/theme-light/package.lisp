@@ -1,3 +1,3 @@
-;; Bundled with beluga: its version is the editor's.
+;; Bundled with narval: its version is the editor's.
 (define-package "theme-light"
-  (description "beluga's light palette"))
+  (description "narval's light palette"))

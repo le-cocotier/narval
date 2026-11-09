@@ -1,7 +1,7 @@
 /**
  * \file main.c
  * \author Arthur Barraux
- * \brief Base file of Beluga text editor. Contain functions for terminal
+ * \brief Base file of Narval text editor. Contain functions for terminal
  * interactions. \version 0.1 \date 21 septembre 2024
  */
 
@@ -31,14 +31,14 @@ int buffer_id = 0;
 #ifdef APP_DEBUG
 // Debug builds: whatever galloc still tracks once everything has been torn
 // down is a leak (or something deliberately kept to the end). Written to
-// ~/.beluga/memory-at-exit.log, with a one-line summary on the terminal.
+// ~/.narval/memory-at-exit.log, with a one-line summary on the terminal.
 static void reportMemoryAtExit(void) {
   char path[OS_PATH_MAX];
   FILE *out;
   int left;
   long long heap_blocks;
   long long heap_bytes;
-  snprintf(path, sizeof(path), "%s/memory-at-exit.log", utilBelugaDir());
+  snprintf(path, sizeof(path), "%s/memory-at-exit.log", utilNarvalDir());
   appDebugClose();
   out = fopen(path, "w");
   if (!out)
@@ -52,11 +52,11 @@ static void reportMemoryAtExit(void) {
               heap_bytes);
     else
       fprintf(out, "\nprocess heap: %lld bytes in use", heap_bytes);
-    fprintf(out, " (galloc's above included; the rest isn't beluga's own)\n");
+    fprintf(out, " (galloc's above included; the rest isn't narval's own)\n");
   }
   fclose(out);
   if (left > 0)
-    printf("beluga (debug): %d blocks still allocated at exit, see %s\n", left,
+    printf("narval (debug): %d blocks still allocated at exit, see %s\n", left,
            path);
 }
 #endif
@@ -89,7 +89,7 @@ static void editorTeardown(void) {
 }
 
 /**
- * @brief beluga --sync-packages: install what the config declares, without
+ * @brief narval --sync-packages: install what the config declares, without
  * opening the editor.
  * @details Loads the config as a normal start would, but with no screen
  * (E.batch): status messages are printed instead of drawn, and the package
@@ -110,14 +110,14 @@ static int syncPackages(void) {
   initEditor();
   sync = lisp_env_lookup(lisp_env(E.ctx), lisp_make_symbol("package-sync", E.ctx), &present);
   if (!present) {
-    printf("beluga: the \"package\" package isn't loaded by %s, so there is nothing to sync\n",
+    printf("narval: the \"package\" package isn't loaded by %s, so there is nothing to sync\n",
            E.init_file_path);
     ok = 0;
   } else {
     ok = lisp_is_true(lisp_eval(lisp_cons(sync, lisp_null(), E.ctx), &error, E.ctx)) &&
          error == LISP_ERROR_NONE;
     if (error != LISP_ERROR_NONE)
-      printf("beluga: package-sync failed: %s\n", lisp_error_string(error));
+      printf("narval: package-sync failed: %s\n", lisp_error_string(error));
   }
   editorTeardown();
   return ok ? 0 : 1;
@@ -140,18 +140,21 @@ int main(const int argc, char *argv[]) {
   int i;
   int rc;
   if (argc >= 2 && (!strcmp(argv[1], "--version") || !strcmp(argv[1], "-v"))) {
-    printf("Beluga %s\n", BELUGA_VERSION);
+    printf("Narval %s\n", NARVAL_VERSION);
     return 0;
   }
+  // Before anything uses ~/.narval: the first start after the rename from
+  // beluga moves ~/.beluga there.
+  utilNarvalDir();
   if (argc >= 2 && !strcmp(argv[1], "--sync-packages"))
     return syncPackages();
 
-  //   beluga [file]                       standalone, as always
-  //   beluga --daemon[=NAME]              the daemon (daemon.c), in the
+  //   narval [file]                       standalone, as always
+  //   narval --daemon[=NAME]              the daemon (daemon.c), in the
   //                                       background; --foreground keeps
   //                                       it in this terminal
-  //   beluga -c | --client[=NAME] [file...]   a window on it
-  //   beluga --kill[=NAME] [--force]      stops it
+  //   narval -c | --client[=NAME] [file...]   a window on it
+  //   narval --kill[=NAME] [--force]      stops it
   //   --name=NAME                         which daemon, for any of these
   files = argc > 1 ? (char **)argv + 1 : NULL;
   for (i = 1; i < argc; i++) {
@@ -190,9 +193,9 @@ int main(const int argc, char *argv[]) {
   if (daemon && !foreground) {
     rc = clientStartDaemon(name);
     if (rc == 0 && strcmp(name, DAEMON_DEFAULT_NAME) == 0)
-      printf("beluga daemon started. Open a window with: beluga -c [file]\n");
+      printf("narval daemon started. Open a window with: narval -c [file]\n");
     else if (rc == 0)
-      printf("beluga daemon \"%s\" started. Open a window with: beluga -c --name=%s [file]\n",
+      printf("narval daemon \"%s\" started. Open a window with: narval -c --name=%s [file]\n",
              name, name);
     return rc;
   }
@@ -205,7 +208,7 @@ int main(const int argc, char *argv[]) {
 
   splash_screen = gcalloc(PATH_MAX, sizeof(Utf8Char));
   active = NULL;
-  utf8Printf(splash_screen, PATH_MAX, "%s/assets/beluga.txt", utilBelugaDir());
+  utf8Printf(splash_screen, PATH_MAX, "%s/assets/narval.txt", utilNarvalDir());
 
   enableRawMode();
   initEditor();

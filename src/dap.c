@@ -1419,7 +1419,7 @@ static void onRequest(cJSON *request) {
   if (command && !strcmp(command, "runInTerminal"))
     runInTerminal(request);
   else
-    respond(request, 0, NULL, "not supported by beluga");
+    respond(request, 0, NULL, "not supported by narval");
 }
 
 /***********************************************************************************************************************
@@ -1749,8 +1749,8 @@ static const DapAdapter *findAdapter(const char *ext) {
 
 static void sendInitialize(void) {
   cJSON *args = cJSON_CreateObject();
-  cJSON_AddStringToObject(args, "clientID", "beluga");
-  cJSON_AddStringToObject(args, "clientName", "beluga");
+  cJSON_AddStringToObject(args, "clientID", "narval");
+  cJSON_AddStringToObject(args, "clientName", "narval");
   cJSON_AddStringToObject(args, "adapterID", s->adapter_id);
   cJSON_AddStringToObject(args, "pathFormat", "path");
   cJSON_AddBoolToObject(args, "linesStartAt1", 1);

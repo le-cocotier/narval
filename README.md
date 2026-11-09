@@ -1,32 +1,34 @@
-# Beluga
+# Narval
 
 **A terminal text editor written in C and configured in Lisp.** Language servers, a
 debugger, git, a package manager and terminal panes, in one small binary that runs the same
 on Linux, macOS and Windows.
 
-<!-- Not to be confused with the Beluga proof environment (logic/type theory), the
-     Beluga web framework, or the Airbus aircraft. -->
+> **Narval was called Beluga** (up to v3.5). Nothing to do by hand: on its first start
+> narval moves `~/.beluga` to `~/.narval`, the old `BELUGA_*` environment variables
+> and the `beluga-version` / `beluga-directory` Lisp functions still work, and a
+> project's `.beluga/init.lisp` is still read. The installers replace an installed `beluga`.
 
 <!-- TODO: a screenshot or GIF of an editing session (LSP completion, the *debug* panel),
      saved as docs/screenshot.png (not assets/, which is installed with the editor), then:
-![Beluga editing C, with LSP completion and the debugger panel](docs/screenshot.png)
+![Narval editing C, with LSP completion and the debugger panel](docs/screenshot.png)
 -->
 
 ```sh
-winget install ArthurBarraux.Beluga                    # Windows
-brew install beluga                                    # macOS, Linux (after the tap below)
-sudo apt install beluga / sudo dnf install beluga      # Debian, Ubuntu / Fedora (after adding the repository below)
-yay -S beluga-editor                                   # Arch Linux (AUR)
+winget install ArthurBarraux.Narval                    # Windows
+brew install narval                                    # macOS, Linux (after the tap below)
+sudo apt install narval / sudo dnf install narval      # Debian, Ubuntu / Fedora (after adding the repository below)
+yay -S narval-editor                                   # Arch Linux (AUR)
 ```
 
 ## Features
 
-- **Configured in Lisp.** `~/.beluga/config/init.lisp` is a program: settings, key bindings,
+- **Configured in Lisp.** `~/.narval/config/init.lisp` is a program: settings, key bindings,
   hooks and whole packages are Lisp. Errors in it are reported with file and line, and the rest
   still loads.
 - **Language servers (LSP)**: completion, signature help, go to definition, find references,
   diagnostics inline and as a list, document outline, project-wide symbols, inlay hints, sticky
-  scroll and breadcrumbs. One server per language, side by side; beluga offers to install a
+  scroll and breadcrumbs. One server per language, side by side; narval offers to install a
   missing one.
 - **Debugger (DAP)**: gdb, lldb-dap, debugpy or any Debug Adapter Protocol server.
   Breakpoints in the gutter that follow your edits, conditions, hit counts, logpoints, watches,
@@ -45,18 +47,18 @@ yay -S beluga-editor                                   # Arch Linux (AUR)
 ### macOS and Linux: Homebrew
 
 ```sh
-brew tap arthur/beluga https://git.giorgio-nas.fr/arthur/homebrew-beluga.git
-brew install beluga
+brew tap arthur/narval https://git.giorgio-nas.fr/arthur/homebrew-narval.git
+brew install narval
 ```
 
 ### Windows: winget
 
 ```powershell
-winget install ArthurBarraux.Beluga
+winget install ArthurBarraux.Narval
 ```
 
-Or download `beluga-<version>-windows-x64.zip` from the
-[Releases](https://git.giorgio-nas.fr/arthur/beluga/releases) page, unzip it and run
+Or download `narval-<version>-windows-x64.zip` from the
+[Releases](https://git.giorgio-nas.fr/arthur/narval/releases) page, unzip it and run
 `install.ps1` in it (right-click → *Run with PowerShell*). `README.txt` in the zip has the
 details.
 
@@ -64,70 +66,70 @@ details.
 
 ```sh
 sudo curl -fsSL https://git.giorgio-nas.fr/api/packages/arthur/debian/repository.key \
-     -o /etc/apt/keyrings/beluga.asc
-echo "deb [signed-by=/etc/apt/keyrings/beluga.asc] https://git.giorgio-nas.fr/api/packages/arthur/debian stable main" \
-  | sudo tee /etc/apt/sources.list.d/beluga.list
-sudo apt update && sudo apt install beluga
+     -o /etc/apt/keyrings/narval.asc
+echo "deb [signed-by=/etc/apt/keyrings/narval.asc] https://git.giorgio-nas.fr/api/packages/arthur/debian stable main" \
+  | sudo tee /etc/apt/sources.list.d/narval.list
+sudo apt update && sudo apt install narval
 ```
 
 ### Fedora, RHEL and openSUSE
 
 ```sh
-sudo curl -fsSL https://git.giorgio-nas.fr/api/packages/arthur/rpm.repo -o /etc/yum.repos.d/beluga.repo
-sudo dnf install beluga
-# openSUSE: sudo zypper addrepo https://git.giorgio-nas.fr/api/packages/arthur/rpm.repo && sudo zypper install beluga
+sudo curl -fsSL https://git.giorgio-nas.fr/api/packages/arthur/rpm.repo -o /etc/yum.repos.d/narval.repo
+sudo dnf install narval
+# openSUSE: sudo zypper addrepo https://git.giorgio-nas.fr/api/packages/arthur/rpm.repo && sudo zypper install narval
 ```
 
 The `.deb` and `.rpm` files are also attached to every
-[release](https://git.giorgio-nas.fr/arthur/beluga/releases), for x86_64.
+[release](https://git.giorgio-nas.fr/arthur/narval/releases), for x86_64.
 
 ### Arch Linux
 
-From the AUR, as `beluga-editor`:
+From the AUR, as `narval-editor`:
 
 ```sh
-yay -S beluga-editor     # or paru, or git clone https://aur.archlinux.org/beluga-editor.git && makepkg -si
+yay -S narval-editor     # or paru, or git clone https://aur.archlinux.org/narval-editor.git && makepkg -si
 ```
 
 ### From source
 
-You need **meson**, **ninja** and a **C compiler**. The install script builds beluga, installs it
-to `/usr/local/bin` and sets up `~/.beluga`, offering to install anything missing with your
+You need **meson**, **ninja** and a **C compiler**. The install script builds narval, installs it
+to `/usr/local/bin` and sets up `~/.narval`, offering to install anything missing with your
 package manager (Homebrew, apt, dnf, pacman, zypper or apk):
 
 ```sh
-git clone https://git.giorgio-nas.fr/arthur/beluga.git && cd beluga && ./install.sh
+git clone https://git.giorgio-nas.fr/arthur/narval.git && cd narval && ./install.sh
 ```
 
 - `./install.sh --help` lists its options (install location, non-interactive mode, skipping
   packages, debug builds, ...).
 - `./install.sh --update` pulls the latest version of your clone and installs it.
 - `./install.sh --uninstall` removes the binary but keeps your config and packages in
-  `~/.beluga`; add `--purge` to delete those too.
+  `~/.narval`; add `--purge` to delete those too.
 
-Or by hand: `meson setup build && meson compile -C build` gives `build/beluga`, and
+Or by hand: `meson setup build && meson compile -C build` gives `build/narval`, and
 `meson install -C build` installs it with its default config and packages (in
-`<prefix>/share/beluga`), like the packages above do.
+`<prefix>/share/narval`), like the packages above do.
 
 On Windows, from PowerShell in a clone: `powershell -ExecutionPolicy Bypass -File .\install.ps1`.
 It is the Windows counterpart of `install.sh` (`Get-Help .\install.ps1 -Detailed` lists its
 options) and offers to install what's missing with `winget`: [Meson](https://mesonbuild.com)
 (Ninja included) and MinGW-w64 gcc ([WinLibs](https://winlibs.com); MSYS2's UCRT64 gcc works
-too; MSVC isn't supported). Already have a `beluga.exe`, e.g. from CI?
-`.\install.ps1 -Binary path\to\beluga.exe` installs it without compiling anything.
+too; MSVC isn't supported). Already have a `narval.exe`, e.g. from CI?
+`.\install.ps1 -Binary path\to\narval.exe` installs it without compiling anything.
 
 ### Your configuration
 
-Whichever way you install it, the first start sets up `~/.beluga` (`%USERPROFILE%\.beluga` on
-Windows; `BELUGA_HOME` moves it). Put your own settings in
-`~/.beluga/packages/personal-config/init.lisp`: it is created once and never touched by updates.
-With a package manager, the bundled packages stay in the install and upgrade with beluga; a copy
-of one in `~/.beluga/packages/` takes precedence.
+Whichever way you install it, the first start sets up `~/.narval` (`%USERPROFILE%\.narval` on
+Windows; `NARVAL_HOME` moves it). Put your own settings in
+`~/.narval/packages/personal-config/init.lisp`: it is created once and never touched by updates.
+With a package manager, the bundled packages stay in the install and upgrade with narval; a copy
+of one in `~/.narval/packages/` takes precedence.
 
 ## Getting started
 
 ```sh
-beluga path/to/file
+narval path/to/file
 ```
 
 | keybind       | command                                         |
@@ -146,11 +148,11 @@ screen.
 ## Language servers
 
 Each language package (`c`, `python`, `rust`, ...) names its server. The first time you open a
-file of that language, beluga asks whether to start it. When the server isn't installed, it
+file of that language, narval asks whether to start it. When the server isn't installed, it
 offers to install it first, with the command the package registers for your system (for
 example `npm install -g pyright`, or `sudo apt-get install -y clangd`). The install runs in a
 terminal pane, `*lsp-install*`, where you can type a sudo password. Once it ends and the server
-is on PATH, beluga asks to start it. To use your own install command, put it in personal-config:
+is on PATH, narval asks to start it. To use your own install command, put it in personal-config:
 
 ```lisp
 (lsp-server-install "pyright-langserver" "any" "pipx install pyright")
@@ -162,35 +164,35 @@ The os is `"linux"`, `"darwin"`, `"windows"`, `"unix"` (everything but Windows) 
 ## Daemon mode: several windows on one editor
 
 ```
-beluga --daemon          # start the daemon in the background (--foreground: in this terminal)
-beluga -c [file]         # open a window on it, from any terminal (starts one if none runs)
-beluga --kill            # stop it (refused while a buffer is unsaved; --force to insist)
+narval --daemon          # start the daemon in the background (--foreground: in this terminal)
+narval -c [file]         # open a window on it, from any terminal (starts one if none runs)
+narval --kill            # stop it (refused while a buffer is unsaved; --force to insist)
 ```
 
-A daemon in the background writes what it has to say to `~/.beluga/daemon-server.log`
+A daemon in the background writes what it has to say to `~/.narval/daemon-server.log`
 (`daemon-NAME.log` for a named one). One in the foreground stops on Ctrl-C, but asks
 first when a buffer is unsaved: a second Ctrl-C within a few seconds stops it anyway. Closing
 its terminal, or SIGTERM, stops it at once. Either way the unsaved changes are kept in
-`~/.beluga/autosave` and offered back when the file is opened again.
+`~/.narval/autosave` and offered back when the file is opened again.
 
 Every window shares the daemon's buffers, Lisp config, language servers and terminal panes,
 and has its own splits (each pane with its own cursor, even on a file another window shows),
-popups, status line and working directory (where its `beluga -c` ran:
+popups, status line and working directory (where its `narval -c` ran:
 the open-file prompt, dired and new terminal panes start there
 when no project is open; with one, they start at the project root). Each project has its own debug
 session, so two projects can be debugged at once; a session's stops and output go to the window
 that last drove it. A prompt open in one window (open-file, M-x, a y/n question) doesn't stop
 the others; they just can't kill or edit the buffer it was asked about until it closes. Ctrl-x
 Ctrl-c in a window closes only that window. Several daemons can run side by side:
-`--daemon=work`, then `beluga -c --name=work`
-and `beluga --kill=work`. On Unix the windows reach the daemon through a socket in a private
-directory (`$XDG_RUNTIME_DIR/beluga/`, else `/tmp/beluga-<uid>/`); on Windows through a named
+`--daemon=work`, then `narval -c --name=work`
+and `narval --kill=work`. On Unix the windows reach the daemon through a socket in a private
+directory (`$XDG_RUNTIME_DIR/narval/`, else `/tmp/narval-<uid>/`); on Windows through a named
 pipe only the current user can open.
 
 
 ## Debugging
 
-Beluga talks the Debug Adapter Protocol, so it debugs with whatever adapter a language has:
+Narval talks the Debug Adapter Protocol, so it debugs with whatever adapter a language has:
 `gdb` 14 or later for C (`gdb -i dap`), `lldb-dap` on macOS, `debugpy` for Python. Each
 language package names its adapter, like it names its language server:
 
@@ -199,7 +201,7 @@ language package names its adapter, like it names its language server:
 ```
 
 An adapter that talks over TCP rather than stdio gets `{port}` where it is told which port to
-listen on; beluga picks a free one and connects to it. One that is already running is named by
+listen on; narval picks a free one and connects to it. One that is already running is named by
 its address instead of a command:
 
 ```lisp
@@ -240,10 +242,10 @@ up to the current one show the values of the variables they use (`(define DEBUG-
 #f)` hides them); the gutter shows `▶` on the
 current line, `●` on breakpoints, `◆` on those with a condition or a hit count and `◉` on
 logpoints, which follow the code as you edit. Breakpoints are kept
-in `~/.beluga/breakpoints` from one run to the next, and a session only gets those in its own
+in `~/.narval/breakpoints` from one run to the next, and a session only gets those in its own
 project (the files under its root, or under the working directory). For anything the
 Ctrl-x B c prompt doesn't cover, hand the adapter its own launch arguments, e.g. in a project's
-`.beluga/init.lisp`:
+`.narval/init.lisp`:
 
 ```lisp
 (define (debug-tests)
@@ -264,18 +266,18 @@ and `debug-frames`, `debug-breakpoints`, `debug-watches` and `debug-state` read 
 Everything beyond the core editor is a package: a folder with an `init.lisp`, loaded by
 `(add-package "name")`. The bundled ones (`packages/` here) are installed by `install.sh` /
 `install.ps1` and versioned with the editor. For other packages, declare them in
-`~/.beluga/packages/personal-config/init.lisp`:
+`~/.narval/packages/personal-config/init.lisp`:
 
 ```lisp
 (use-package "rainbow" "https://example.org/rainbow.git")           ; default branch
 (use-package "rainbow" "https://example.org/rainbow.git" "v1.2.0")  ; a tag, branch or commit
 (use-package "rainbow" "https://example.org/rainbow.git" "latest")  ; the highest version tag
-(use-package "mine" "~/code/beluga-mine")                           ; a folder, loaded in place
+(use-package "mine" "~/code/narval-mine")                           ; a folder, loaded in place
 ```
 
-A declared package that's missing is cloned when beluga starts, then loaded in the order the
+A declared package that's missing is cloned when narval starts, then loaded in the order the
 lines are written. The commit each one is at goes to `personal-config/packages.lock`; with that
-folder on another machine, `beluga --sync-packages` installs exactly the same commits without
+folder on another machine, `narval --sync-packages` installs exactly the same commits without
 opening the editor. `CTRL-x c l` lists every package (version, commit, loaded or not) and
 installs (`i`), updates after showing the new commits (`u`, `U` for all), rolls back (`r`) and
 removes (`d`) them. Updates apply at the next start.
@@ -286,42 +288,42 @@ A package can describe itself in a `package.lisp` next to its `init.lisp` (read,
 (define-package "git-blame"
   (version "1.2.0")
   (description "Blame annotations in the gutter")
-  (requires ("beluga" "3.4") ("git" "3.3"))
-  (sources ("git" "https://example.org/beluga-git.git")))
+  (requires ("narval" "3.4") ("git" "3.3"))
+  (sources ("git" "https://example.org/narval-git.git")))
 ```
 
-`add-package` then loads what it requires first and refuses it on an older beluga, and
+`add-package` then loads what it requires first and refuses it on an older narval, and
 installing it installs its missing requirements. `(define package-index-url "...")` points at a
 git repository whose `index.lisp` lists packages by name, for `use-package` without a URL and
 `M-x package-search`. All the details are at the top of
 [`packages/package/init.lisp`](packages/package/init.lisp).
 
-`BELUGA_HOME` moves `~/.beluga` elsewhere (tests, a portable copy). `meson test` runs the
+`NARVAL_HOME` moves `~/.narval` elsewhere (tests, a portable copy). `meson test` runs the
 package manager end to end against throwaway repositories (`test/test_packages.sh`).
 
 ## Windows notes
 
 Things that work differently on Windows:
 
-- **Your files** live in `%USERPROFILE%\.beluga`, the Windows equivalent of `~/.beluga`.
+- **Your files** live in `%USERPROFILE%\.narval`, the Windows equivalent of `~/.narval`.
 - **Terminal panes** run PowerShell (`pwsh` if installed, else Windows PowerShell). Set
-  `BELUGA_SHELL` to use another shell, e.g. `cmd.exe`.
+  `NARVAL_SHELL` to use another shell, e.g. `cmd.exe`.
 - **dired's `!`** (and `shell-run` in Lisp) runs its command in PowerShell rather than `sh`.
 - **Git integration** needs [Git for Windows](https://gitforwindows.org) (`winget install Git.Git`).
   Without it, project search and the file finder still work, on plain directories.
 - **Language servers** installed with npm (`typescript-language-server`, `pyright-langserver`, ...)
   are found as usual: their `.cmd` launchers work.
 
-## How beluga talks to the operating system
+## How narval talks to the operating system
 
-Everything beluga needs from the OS — the terminal, waiting for input, running programs,
+Everything narval needs from the OS — the terminal, waiting for input, running programs,
 terminal panes, files and directories, the clipboard, time — is declared in
 [`include/os.h`](include/os.h) and implemented by one of two small libraries:
 
 | Library               | Source                 | For                       |
 |-----------------------|------------------------|---------------------------|
-| `libbeluga-os-posix`  | `src/os/os_posix.c`    | Linux, macOS, BSD         |
-| `libbeluga-os-win32`  | `src/os/os_win32.c`    | Windows 10 (1809+) and 11 |
+| `libnarval-os-posix`  | `src/os/os_posix.c`    | Linux, macOS, BSD         |
+| `libnarval-os-win32`  | `src/os/os_win32.c`    | Windows 10 (1809+) and 11 |
 
 The rest of the editor is plain C99 plus `os.h`: no `<unistd.h>`, no `<windows.h>`, no
 `#ifdef _WIN32`. That's checked, not just intended — the editor is compiled without any
@@ -342,7 +344,7 @@ As a result, behaviour is the same everywhere:
 - Files using CRLF line endings are edited without stray `^M`s and saved back as CRLF; new
   files are saved with LF.
 
-Porting beluga to another system means writing one more `os_*.c` against `os.h` (and a line in
+Porting narval to another system means writing one more `os_*.c` against `os.h` (and a line in
 `meson.build` to pick it).
 
 ## Development
@@ -355,7 +357,7 @@ scripts and attaches them to a GitHub release (`.github/workflows/release.yml`).
 Homebrew formula, the winget manifest and the AUR PKGBUILD; [packaging/README.md](packaging/README.md)
 says where each goes.
 
-To cross-compile `beluga.exe` from Linux: `meson setup --cross-file cross/mingw-w64.ini build-windows && meson compile -C build-windows`
+To cross-compile `narval.exe` from Linux: `meson setup --cross-file cross/mingw-w64.ini build-windows && meson compile -C build-windows`
 (needs the `mingw-w64` package).
 Adding `--cross-file cross/wine.ini` to that setup lets `meson test -C build-windows` run the
 Windows test programs under Wine.
@@ -364,12 +366,12 @@ Windows test programs under Wine.
 `meson setup -Db_sanitize=address,undefined -Dbuildtype=debug build-asan && meson compile -C build-asan`.
 Everything outside `src/os/` is the same code on every platform, so Linux or macOS catches
 most problems. For the Windows layer, do the same from an MSYS2 **CLANG64** shell (gcc has no
-AddressSanitizer on Windows), and run `build-asan\beluga.exe` with `C:\msys64\clang64\bin` on
+AddressSanitizer on Windows), and run `build-asan\narval.exe` with `C:\msys64\clang64\bin` on
 `PATH` (the sanitizer runtime is a DLL). Dr. Memory doesn't start on Windows 11 24H2.
 Leaks: every `galloc` is tracked. `CTRL-x m` (memory inspector) lists the live blocks with
 the file and line that allocated them, and a debug build (`install.sh --debug`,
 `install.ps1 -DebugBuild`) writes what is still allocated at exit to
-`~/.beluga/memory-at-exit.log`, grouped by allocation site.
+`~/.narval/memory-at-exit.log`, grouped by allocation site.
 
 
 ## License

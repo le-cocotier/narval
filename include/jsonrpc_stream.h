@@ -1,5 +1,5 @@
-#ifndef BELUGA_JSONRPC_STREAM_H
-#define BELUGA_JSONRPC_STREAM_H
+#ifndef NARVAL_JSONRPC_STREAM_H
+#define NARVAL_JSONRPC_STREAM_H
 
 #include <stddef.h>
 
@@ -31,4 +31,4 @@ void jsonRpcStreamFree(JsonRpcStream *s);
 // `tag` ("LSP", "DAP") prefixes the copy appDebug() logs.
 void jsonRpcWrite(OsProc *proc, const char *json, const char *tag);
 
-#endif // BELUGA_JSONRPC_STREAM_H
+#endif // NARVAL_JSONRPC_STREAM_H

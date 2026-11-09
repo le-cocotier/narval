@@ -1,5 +1,5 @@
-#ifndef BELUGA_COMPLETION_H
-#define BELUGA_COMPLETION_H
+#ifndef NARVAL_COMPLETION_H
+#define NARVAL_COMPLETION_H
 #include "data.h"
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
@@ -144,4 +144,4 @@ void lspCompletionDebounceTick(void);
 // completion.c for why this exists separately from the completion debounce.
 void lspSyncDebounceTick(void);
 
-#endif //BELUGA_COMPLETION_H
+#endif //NARVAL_COMPLETION_H

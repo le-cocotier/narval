@@ -1,7 +1,7 @@
 /**
  * @file project.c
  * @brief Projects: finding a file's project root, remembering projects,
- * and each project's own .beluga/init.lisp. See project.h.
+ * and each project's own .narval/init.lisp. See project.h.
  */
 
 #include "../include/project.h"
@@ -26,18 +26,18 @@
 
 extern EditorConfig E;
 
-// ~/.beluga/projects keeps this many, most recently used first.
+// ~/.narval/projects keeps this many, most recently used first.
 #define PROJECTS_REMEMBERED 100
 
 // A directory holding any of these is a project root. The nearest one
 // above a file wins. (project-add-marker "Cargo.toml") adds to the list.
-static const char *const s_default_markers[] = {PROJECT_CONFIG_DIR, ".git",
-                                                "compile_commands.json", NULL};
+static const char *const s_default_markers[] = {PROJECT_CONFIG_DIR, PROJECT_LEGACY_CONFIG_DIR,
+                                                ".git", "compile_commands.json", NULL};
 static char **s_markers = NULL; // added ones, owned
 static int s_marker_count = 0;
 
 static long s_clock = 0;        // last_used stamps
-static int s_loaded = 0;        // projectInit() has read ~/.beluga/projects
+static int s_loaded = 0;        // projectInit() has read ~/.narval/projects
 static int s_last_buffer_id = -1; // what projectSyncActive() last saw
 static char s_notice[256];      // shown on the next tick, see setNotice()
 
@@ -175,12 +175,12 @@ static int addProject(const char *root, int trusted, long last_used) {
 
 static void projectsFilePath(char *out, size_t out_size) {
   char *home = os_home_dir();
-  snprintf(out, out_size, "%s/.beluga/projects", home ? home : ".");
+  snprintf(out, out_size, "%s/.narval/projects", home ? home : ".");
   gfree(home);
 }
 
 /**
- * @brief Reads ~/.beluga/projects: one project per line, most recently
+ * @brief Reads ~/.narval/projects: one project per line, most recently
  * used first, as "+ /root" when trusted and "- /root" otherwise.
  */
 static void loadProjects(void) {
@@ -273,12 +273,22 @@ static void setNotice(const char *fmt, ...) {
 }
 
 static void configPath(const Project *p, char *out, size_t out_size) {
+  OsFileInfo info;
+  snprintf(out, out_size, "%s/%s/%s", p->root, PROJECT_LEGACY_CONFIG_DIR,
+           PROJECT_CONFIG_FILE);
+  if (os_file_info(out, &info) == 0 && !info.is_dir) {
+    char current[OS_PATH_MAX];
+    snprintf(current, sizeof(current), "%s/%s/%s", p->root, PROJECT_CONFIG_DIR,
+             PROJECT_CONFIG_FILE);
+    if (os_file_info(current, &info) != 0)
+      return; // only the pre-rename .beluga/init.lisp: use it
+  }
   snprintf(out, out_size, "%s/%s/%s", p->root, PROJECT_CONFIG_DIR,
            PROJECT_CONFIG_FILE);
 }
 
 /**
- * @brief Evaluates the project's .beluga/init.lisp, if it has one and is
+ * @brief Evaluates the project's .narval/init.lisp, if it has one and is
  * trusted, and reads its settings.
  * @details In a fresh environment on top of the global one, holding
  * PROJECT-ROOT: what it defines shadows init.lisp only for this project.
@@ -347,7 +357,7 @@ static void activate(int index) {
 // ─── Language servers ─────────────────────────────────────────────────────
 // What you answered the first time one of a project's files wanted its
 // language server, so later sessions don't ask again. Kept in
-// ~/.beluga/lsp-roots, one per line: "+ server<TAB>project<TAB>root" to
+// ~/.narval/lsp-roots, one per line: "+ server<TAB>project<TAB>root" to
 // start it at root, "- server<TAB>project" not to start it.
 
 typedef struct {
@@ -361,7 +371,7 @@ static int s_lsp_choice_count = 0;
 
 static void lspChoicesPath(char *out, size_t out_size) {
   char *home = os_home_dir();
-  snprintf(out, out_size, "%s/.beluga/lsp-roots", home ? home : ".");
+  snprintf(out, out_size, "%s/.narval/lsp-roots", home ? home : ".");
   gfree(home);
 }
 
@@ -516,7 +526,7 @@ static int isDir(const char *path) {
 /**
  * @brief Drops the project's own config: its settings give way to
  * init.lisp's. What its init.lisp did to the editor as a whole (map-key,
- * add-hook) stays until beluga restarts.
+ * add-hook) stays until narval restarts.
  */
 static void unloadConfig(Project *p) {
   p->has_config_env = 0;
@@ -527,7 +537,7 @@ static void unloadConfig(Project *p) {
 
 /**
  * @brief Forgets E.projects[index]: it leaves the list and
- * ~/.beluga/projects, untrusted. Nothing on disk is touched, and opening
+ * ~/.narval/projects, untrusted. Nothing on disk is touched, and opening
  * a file in it again brings it back like a new one.
  * @details Marked rather than taken out of E.projects, since buffers and
  * daemon windows hold indexes into it.
@@ -562,7 +572,7 @@ void projectInit(void) {
   loadLspChoices();
   s_loaded = 1;
   // The working directory's project is current until a buffer says
-  // otherwise, so (beluga with no file) inside a project still gets it.
+  // otherwise, so (narval with no file) inside a project still gets it.
   cwd = os_getcwd();
   if (cwd) {
     index = projectForDir(cwd);
@@ -770,7 +780,7 @@ static Lisp l_projectAddMarker(Lisp args, LispError *e, LispContext ctx) {
 
 /**
  * @brief (project-trust) — trusts the current project, remembers it, and
- * (re)loads its .beluga/init.lisp.
+ * (re)loads its .narval/init.lisp.
  */
 static Lisp l_projectTrust(Lisp args, LispError *e, LispContext ctx) {
   Project *p;
@@ -792,13 +802,13 @@ static Lisp l_projectTrust(Lisp args, LispError *e, LispContext ctx) {
   if (!s_notice[0])
     setNotice(os_file_info(path, &info) == 0
                   ? "%s trusted, project config loaded"
-                  : "%s trusted (no .beluga/init.lisp yet)",
+                  : "%s trusted (no .narval/init.lisp yet)",
               baseName(p->root));
   return lisp_null();
 }
 
 /**
- * @brief Writes a new .beluga/init.lisp at `path`: a short header and
+ * @brief Writes a new .narval/init.lisp at `path`: a short header and
  * every setting as a commented-out placeholder. 0 if it can't be written.
  */
 static int writeConfigTemplate(const char *path) {
@@ -826,7 +836,7 @@ static int writeConfigTemplate(const char *path) {
 
 /**
  * @brief (project-open-config) — opens the current project's
- * .beluga/init.lisp, creating its .beluga directory if needed.
+ * .narval/init.lisp, creating its .narval directory if needed.
  * @details A config created this way is yours, so the project becomes
  * trusted; opening one that already exists doesn't trust it. A new one
  * starts with every setting as a commented-out placeholder.
@@ -899,7 +909,7 @@ static void openProjectPicker(const char *title, LispCFunc on_select,
 
 /**
  * @brief (project-untrust) — stops trusting the current project: its
- * .beluga/init.lisp no longer loads, and its settings give way to
+ * .narval/init.lisp no longer loads, and its settings give way to
  * init.lisp's.
  */
 static Lisp l_projectUntrust(Lisp args, LispError *e, LispContext ctx) {
@@ -955,9 +965,9 @@ static Lisp projectRemoveSelected(Lisp args, LispError *e, LispContext ctx) {
 
 /**
  * @brief (project-remove) or (project-remove "/root") — forgets a
- * project: it leaves project-switch and ~/.beluga/projects, and is no
+ * project: it leaves project-switch and ~/.narval/projects, and is no
  * longer trusted. Without an argument, picks it from the list (the
- * current one on top). Its files, .beluga included, are left alone.
+ * current one on top). Its files, .narval included, are left alone.
  */
 static Lisp l_projectRemove(Lisp args, LispError *e, LispContext ctx) {
   (void)e;

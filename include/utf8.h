@@ -2,8 +2,8 @@
 // Created by Giorgio on 01/05/2026.
 //
 
-#ifndef BELUGA_UTF8_H
-#define BELUGA_UTF8_H
+#ifndef NARVAL_UTF8_H
+#define NARVAL_UTF8_H
 #include <stdarg.h>   // va_list, used by utf8VaPrintf below
 #include <stdint.h>
 #include <stddef.h>
@@ -81,4 +81,4 @@ int utf8VaPrintf(Utf8Char * dest, size_t capacity, const char * format, va_list 
 
 int utf8IsPrintable(const Utf8Char* c);
 int utf8CreateChar(const unsigned char* string, Utf8Char* new_char);
-#endif //BELUGA_UTF8_H
+#endif //NARVAL_UTF8_H

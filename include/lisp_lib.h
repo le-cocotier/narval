@@ -701,7 +701,7 @@ static Lisp sch_list_copy(Lisp args, LispError* e, LispContext ctx) {
 
 static Lisp sch_append(Lisp args, LispError* e, LispContext ctx)
 {
-    // beluga: copies each list once (reversed onto l), where appending
+    // narval: copies each list once (reversed onto l), where appending
     // them one by one recopied everything gathered so far for each list.
     Lisp l = lisp_null();
     Lisp it;
@@ -1799,7 +1799,7 @@ static Lisp sch_is_cont(Lisp args, LispError* e, LispContext ctx)
     return lisp_make_bool(lisp_type(lisp_car(args)) == LISP_JUMP);
 }
 
-// ─── beluga: native list procedures ─────────────────────────────────────────
+// ─── narval: native list procedures ─────────────────────────────────────────
 // map, filter, assoc, sort, ... used to be Scheme in the library source
 // below, so every element cost a lambda call: a fresh environment table and
 // a few conses, all garbage for the collector. These do the same

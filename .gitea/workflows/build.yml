@@ -28,8 +28,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: beluga
-          path: build/beluga
+          name: narval
+          path: build/narval
 
   sanitizers:
     runs-on: giorgio-runner
@@ -71,7 +71,7 @@ jobs:
           sudo apt-get install -y meson ninja-build mingw-w64 wine
 
       # giorgio-runner is ARM64, and its Wine can't run x86_64 .exe files,
-      # so this job only builds beluga.exe and doesn't run the Windows
+      # so this job only builds narval.exe and doesn't run the Windows
       # tests (cross/wine.ini stays in the repo for running them locally).
       - name: Configure Meson (cross-compiling for Windows)
         run: meson setup --cross-file cross/mingw-w64.ini build-windows
@@ -85,5 +85,5 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: beluga-windows
-          path: build-windows/beluga.exe
+          name: narval-windows
+          path: build-windows/narval.exe

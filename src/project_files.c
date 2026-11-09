@@ -25,7 +25,8 @@ int projectIsGitRepo(const char *root)
 
 static int isPruned(const char *name)
 {
-    static const char *const pruned[] = {".git", "node_modules", "build", "dist", ".beluga", NULL};
+    static const char *const pruned[] = {".git", "node_modules", "build", "dist", ".narval",
+                                         ".beluga", NULL};
     int i;
     for (i = 0; pruned[i]; i++)
         if (strcmp(name, pruned[i]) == 0)

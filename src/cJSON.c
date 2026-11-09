@@ -155,7 +155,7 @@ typedef struct internal_hooks {
   void *(CJSON_CDECL *reallocate)(void *pointer, size_t size);
 } internal_hooks;
 
-/* beluga: the default hooks allocate through galloc (include/galloc.h), so
+/* narval: the default hooks allocate through galloc (include/galloc.h), so
  * cJSON's nodes and printed strings show up in the memory inspector and the
  * exit report like everything else, from the first parse on. galloc is a
  * macro, hence the wrappers. */

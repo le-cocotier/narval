@@ -1,5 +1,5 @@
-#ifndef BELUGA_LISP_GC_H
-#define BELUGA_LISP_GC_H
+#ifndef NARVAL_LISP_GC_H
+#define NARVAL_LISP_GC_H
 
 #include "data.h"
 
@@ -26,4 +26,4 @@ void lispGcMaybeCollect(void);
 // popup that isn't visible holds none; its stale values are cleared.
 void lispGcVisitListPopup(ListPopup *popup, LispRootVisitor visit, LispContext ctx);
 
-#endif // BELUGA_LISP_GC_H
+#endif // NARVAL_LISP_GC_H

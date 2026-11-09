@@ -34,7 +34,7 @@ static void testInitializeError(void) {
   char *status;
 
   // A "server" that answers the initialize request with that error, then
-  // keeps reading its stdin: only beluga killing it ends it.
+  // keeps reading its stdin: only narval killing it ends it.
   snprintf(script, sizeof(script),
            "printf 'Content-Length: %d\\r\\n\\r\\n%%s' '%s'; exec cat >/dev/null",
            (int)strlen(initError), initError);

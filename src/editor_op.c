@@ -42,7 +42,7 @@ void editorSetStatusMessage(const char *fmt, ...) {
   utf8VaPrintf(E.status_msg, PATH_MAX, fmt, ap);
   va_end(ap);
   E.status_msg_time = time(NULL);
-  // No screen in batch mode (beluga --sync-packages): print it instead.
+  // No screen in batch mode (narval --sync-packages): print it instead.
   if (E.batch && *E.status_msg[0].character) {
     msg = (char *)utf8ToString(E.status_msg);
     if (msg) {

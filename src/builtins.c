@@ -628,7 +628,7 @@ Lisp editorOpenFile(Lisp args, LispError *e, LispContext ctx) {
 
 /**
  * @brief Lisp function to jump straight to the editor's own config file
- * @details (editor-open-config) opens ~/.beluga/config/init.lisp (the
+ * @details (editor-open-config) opens ~/.narval/config/init.lisp (the
  * exact path E.init_file_path was already resolved to at startup) in
  * the active pane — no prompt, unlike editor-open-file.
  * @param args Lisp arguments (unused)
@@ -1839,7 +1839,7 @@ Lisp editorListPopup(Lisp args, LispError *e, LispContext ctx) {
  * (lsp-server "py" "python" "pyright-langserver" "--stdio"). The server is
  * only ever actually spawned for the first matching file opened in a
  * session (see bufferMaybeStartLsp) — registering it here just tells
- * beluga what to run and what LSP languageId to announce.
+ * narval what to run and what LSP languageId to announce.
  * @param args Lisp list: (extension language-id command args...)
  * @return lisp_null()
  * @note Updates global editor state E (lsp_servers array)
@@ -3080,7 +3080,7 @@ Lisp l_editorMessage(Lisp args, LispError *e, LispContext ctx) {
  * inside a long-running command, so a message set just before it shows.
  * @details While init.lisp is still loading there are no buffers to draw
  * yet: only the message line is drawn (the package manager's "Installing
- * …" at startup). In batch mode (beluga --sync-packages) messages go to
+ * …" at startup). In batch mode (narval --sync-packages) messages go to
  * stdout as they're set, and this does nothing.
  */
 Lisp l_editorRedisplay(Lisp args, LispError *e, LispContext ctx) {
@@ -3112,8 +3112,8 @@ Lisp l_editorInitialized(Lisp args, LispError *e, LispContext ctx) {
 }
 
 /**
- * @brief Lisp function: (editor-batch?) — #t when beluga runs without a
- * screen (beluga --sync-packages): nothing can be asked, and background
+ * @brief Lisp function: (editor-batch?) — #t when narval runs without a
+ * screen (narval --sync-packages): nothing can be asked, and background
  * processes would never report back.
  */
 Lisp l_editorBatch(Lisp args, LispError *e, LispContext ctx) {

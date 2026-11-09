@@ -1,5 +1,5 @@
-#ifndef BELUGA_DEBUG_UI_H
-#define BELUGA_DEBUG_UI_H
+#ifndef NARVAL_DEBUG_UI_H
+#define NARVAL_DEBUG_UI_H
 
 #include "data.h"
 
@@ -55,4 +55,4 @@ void debugUiShowOutput(void);
 // Frees the panel's row table, at exit.
 void debugUiFree(void);
 
-#endif // BELUGA_DEBUG_UI_H
+#endif // NARVAL_DEBUG_UI_H

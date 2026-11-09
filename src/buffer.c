@@ -781,7 +781,7 @@ int bufferFindByFilename(Utf8Char *filename) {
  * (see bufferCreate()), this is what keeps LSP sync correct: a server
  * only expects one textDocument/didOpen per URI (and, symmetrically,
  * exactly one didClose once every buffer viewing it is gone) — it has
- * no notion of "beluga has this file open twice." Both
+ * no notion of "narval has this file open twice." Both
  * bufferMaybeSyncLsp() and lspShutdown()'s didClose loop use this to
  * only actually notify the server on the first open / last close of a
  * given URI, regardless of how many buffers are viewing it or what

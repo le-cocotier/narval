@@ -1,5 +1,5 @@
-#ifndef BELUGA_BREAKPOINTS_H
-#define BELUGA_BREAKPOINTS_H
+#ifndef NARVAL_BREAKPOINTS_H
+#define NARVAL_BREAKPOINTS_H
 
 #include "data.h"
 
@@ -79,4 +79,4 @@ void breakpointsSetStore(const char *file);
 // buffer.
 char *breakpointsBufferPath(const struct buffer_t *buf);
 
-#endif // BELUGA_BREAKPOINTS_H
+#endif // NARVAL_BREAKPOINTS_H

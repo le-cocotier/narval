@@ -42,7 +42,7 @@ static Setting s_settings[] = {
     {"LSP-SIGNATURE-HELP", SETTING_BOOL, 1, 0, &E.constantes.LSP_SIGNATURE_HELP,
      "Show the called function's signature when \"(\" or \",\" is typed."},
     {"AUTOSAVE-INTERVAL", SETTING_INT, 15, 0, &E.constantes.AUTOSAVE_INTERVAL,
-     "Seconds between autosave copies of modified files (~/.beluga/autosave/); 0 turns it off."},
+     "Seconds between autosave copies of modified files (~/.narval/autosave/); 0 turns it off."},
     {"STICKY-SCROLL", SETTING_BOOL, 1, 0, &E.constantes.STICKY_SCROLL,
      "Pin the definitions enclosing the top of a pane (function, struct) to its first rows."},
     {"BREADCRUMBS", SETTING_BOOL, 1, 0, &E.constantes.BREADCRUMBS,

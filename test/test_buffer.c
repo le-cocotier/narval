@@ -114,15 +114,15 @@ static void testSetPath(void) {
   Buffer *buf = testBufferFromText("text");
   char expected[1024];
   char *s;
-  snprintf(expected, sizeof(expected), "%s/beluga-no-such-dir/new.c", os_home_dir());
-  CHECK_INT(bufferSetPath(buf, "~/beluga-no-such-dir/new.c"), 0);
+  snprintf(expected, sizeof(expected), "%s/narval-no-such-dir/new.c", os_home_dir());
+  CHECK_INT(bufferSetPath(buf, "~/narval-no-such-dir/new.c"), 0);
   s = (char *)utf8ToString(buf->filename);
   CHECK_STR(s, "new.c");
   gfree(s);
   s = (char *)utf8ToString(buf->fullname);
   CHECK_STR(s, expected);
   gfree(s);
-  snprintf(expected, sizeof(expected), "%s/beluga-no-such-dir", os_home_dir());
+  snprintf(expected, sizeof(expected), "%s/narval-no-such-dir", os_home_dir());
   s = (char *)utf8ToString(buf->path);
   CHECK_STR(s, expected);
   gfree(s);

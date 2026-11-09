@@ -271,7 +271,7 @@
 (define (git-status-dir dir) (git--open (expand-path dir)))
 
 ;; The current file's repository — or, when that file isn't in one (the
-;; splash screen lives in ~/.beluga/assets) or there's no file at all, the
+;; splash screen lives in ~/.narval/assets) or there's no file at all, the
 ;; working directory's, the same fallback dired uses.
 (define (git-status)
   (let* ((file (buffer-filename))
@@ -615,7 +615,7 @@
         (gitdir (git--run "rev-parse" "--absolute-git-dir")))
     (if (not patch)
         (editor-message "Not on a hunk: move the cursor into one (below its @@ line)")
-        (let ((file (string-append (car (git--lines (cdr gitdir))) "/beluga-hunk.patch")))
+        (let ((file (string-append (car (git--lines (cdr gitdir))) "/narval-hunk.patch")))
           (if (write-file file patch)
               (let ((result (apply git--run (append args (list file)))))
                 (begin

@@ -1,6 +1,6 @@
 /**
  * @file os_posix.c
- * @brief libbeluga-os-posix: include/os.h for Linux, macOS and the BSDs.
+ * @brief libnarval-os-posix: include/os.h for Linux, macOS and the BSDs.
  * @details Most of this is code that used to live in the editor itself —
  * raw mode from terminal.c, forkpty from pty_session.c, fork/exec/poll
  * from subprocess.c, async_process.c and completion.c, the clipboard from
@@ -1047,7 +1047,7 @@ static void setError(char *err, const size_t err_size, const char *what,
 
 /**
  * @brief The private directory the sockets live in, created if needed:
- * $XDG_RUNTIME_DIR/beluga, else $TMPDIR (or /tmp) /beluga-<uid> — the same
+ * $XDG_RUNTIME_DIR/narval, else $TMPDIR (or /tmp) /narval-<uid> — the same
  * scheme emacs uses. Refused unless it is a real directory that belongs to
  * us and nobody else can enter, since anyone who can reach the socket can
  * drive the editor.
@@ -1060,9 +1060,9 @@ static int socketDir(char *dir, const size_t size, char *err,
   size_t len;
 
   if (xdg && xdg[0] == '/')
-    snprintf(dir, size, "%s/beluga", xdg);
+    snprintf(dir, size, "%s/narval", xdg);
   else
-    snprintf(dir, size, "%s/beluga-%ld", (tmp && tmp[0] == '/') ? tmp : "/tmp",
+    snprintf(dir, size, "%s/narval-%ld", (tmp && tmp[0] == '/') ? tmp : "/tmp",
              (long)getuid());
   // $TMPDIR on macOS ends with a '/'.
   len = strlen(dir);
@@ -1149,7 +1149,7 @@ OsServer *os_server_listen(const char *name, char *err, const size_t err_size) {
       close(other);
       close(fd);
       if (err && err_size > 0)
-        snprintf(err, err_size, "a beluga daemon called \"%s\" is already running",
+        snprintf(err, err_size, "a narval daemon called \"%s\" is already running",
                  name);
       return NULL;
     }
@@ -1210,7 +1210,7 @@ OsConn *os_conn_connect(const char *name, char *err, const size_t err_size) {
   fd = connectTo(&addr);
   if (fd == -1) {
     if (err && err_size > 0)
-      snprintf(err, err_size, "no beluga daemon called \"%s\" is running (%s)",
+      snprintf(err, err_size, "no narval daemon called \"%s\" is running (%s)",
                name, addr.sun_path);
     return NULL;
   }

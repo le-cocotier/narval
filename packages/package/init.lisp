@@ -1,23 +1,23 @@
 ;; ─── Package ────────────────────────────────────────────────────────────────
 ;; (add-package "package") — installs, updates and removes packages.
-;; Loaded first by ~/.beluga/config/init.lisp, so (use-package ...) works
+;; Loaded first by ~/.narval/config/init.lisp, so (use-package ...) works
 ;; anywhere after it; your declarations belong in personal-config.
 ;;
-;; DECLARING (in ~/.beluga/packages/personal-config/init.lisp)
+;; DECLARING (in ~/.narval/packages/personal-config/init.lisp)
 ;;
 ;;   (use-package "outline")                        bundled, or already installed
 ;;   (use-package "rainbow" "https://host/rainbow.git")           default branch
 ;;   (use-package "rainbow" "https://host/rainbow.git" "v1.2.0")  tag, branch or commit
 ;;   (use-package "rainbow" "https://host/rainbow.git" "latest")  highest vX.Y.Z tag
-;;   (use-package "mine" "~/code/beluga-mine")      a local folder, loaded in place
+;;   (use-package "mine" "~/code/narval-mine")      a local folder, loaded in place
 ;;
-;; A declared package that isn't installed is cloned while beluga starts
+;; A declared package that isn't installed is cloned while narval starts
 ;; (it says "Installing …"), then loaded where it's declared, so the order
 ;; of your use-package lines is the load order. Nothing else at startup
 ;; touches the network. Without a URL, a package is looked up in the index
 ;; (package-index-url, below).
 ;;
-;; THE LOCKFILE: ~/.beluga/packages/personal-config/packages.lock
+;; THE LOCKFILE: ~/.narval/packages/personal-config/packages.lock
 ;;
 ;; Records the exact commit of every package installed from git. On another
 ;; machine with the same personal-config folder, the same commits are
@@ -31,14 +31,14 @@
 ;;   package-update     fetch, show the new commits, ask, check them out
 ;;   package-update-all the same for every git package, one question
 ;;   package-rollback   back to the commit before the last update
-;;   package-remove     move a package to ~/.beluga/packages.bak
+;;   package-remove     move a package to ~/.narval/packages.bak
 ;;   package-sync       install what's declared, move to the locked commits,
 ;;                      report packages nothing declares any more
 ;;   package-search     search the index, ENTER installs
 ;;   package-index-refresh   fetch the index again
 ;;
 ;; Updates, removals and rollbacks apply on the next start: a loaded
-;; package's keys and hooks can't be taken back. `beluga --sync-packages`
+;; package's keys and hooks can't be taken back. `narval --sync-packages`
 ;; runs package-sync without opening the editor.
 ;;
 ;; THE MANIFEST: package.lisp, next to a package's init.lisp, optional
@@ -46,11 +46,11 @@
 ;;   (define-package "git-blame"
 ;;     (version "1.2.0")
 ;;     (description "Blame annotations in the gutter")
-;;     (requires ("beluga" "3.4") ("git" "3.3"))
-;;     (sources ("git" "https://host/beluga-git.git")))
+;;     (requires ("narval" "3.4") ("git" "3.3"))
+;;     (sources ("git" "https://host/narval-git.git")))
 ;;
 ;; Read, never evaluated. add-package loads what `requires` names first and
-;; refuses a package needing a newer beluga; installing a package installs
+;; refuses a package needing a newer narval; installing a package installs
 ;; its missing requirements, from `sources` or the index.
 ;;
 ;; Everything that runs git is a chain of callbacks: in the background
@@ -102,7 +102,7 @@
 (define (package--remove-name name alist)
   (filter (lambda (entry) (not (string=? (car entry) name))) alist))
 
-;; Startup, and beluga --sync-packages: run git in the foreground.
+;; Startup, and narval --sync-packages: run git in the foreground.
 (define (package--foreground?)
   (or (editor-batch?) (not (editor-initialized?))))
 
@@ -141,7 +141,7 @@
 
 ;; ─── paths ──────────────────────────────────────────────────────────────────
 
-;; A beluga installed by a package manager (Homebrew, winget, a .deb, ...)
+;; A narval installed by a package manager (Homebrew, winget, a .deb, ...)
 ;; keeps its bundled packages in the install, read-only, and add-package
 ;; falls back to them; one in (package-directory) wins over it.
 (define (package--system-dir name)
@@ -151,9 +151,9 @@
   (and (not (file-attributes (package-directory name))) (package--system-dir name) #t))
 (define (package--dir name) (or (and (package--system? name) (package--system-dir name)) (package-directory name)))
 (define (package--staging-dir) (string-append (package-directory) "/.staging"))
-(define (package--backup-dir) (string-append (beluga-directory) "/packages.bak"))
+(define (package--backup-dir) (string-append (narval-directory) "/packages.bak"))
 (define (package--lock-path) (string-append (package-directory "personal-config") "/packages.lock"))
-(define (package--index-dir) (string-append (beluga-directory) "/index"))
+(define (package--index-dir) (string-append (narval-directory) "/index"))
 
 (define (package--exists? path) (if (file-attributes path) #t #f))
 (define (package--installed? name) (package--exists? (string-append (package--dir name) "/init.lisp")))
@@ -271,7 +271,7 @@
     (if (write-data-file (package--lock-path)
                          (map1 package--entry->form
                                (sort package--lock (lambda (a b) (string<? (car a) (car b)))))
-                         ";; Written by beluga's package manager: the exact commit of every package\n;; installed from git. Keep it with personal-config to get the same packages\n;; on another machine (beluga --sync-packages).\n")
+                         ";; Written by narval's package manager: the exact commit of every package\n;; installed from git. Keep it with personal-config to get the same packages\n;; on another machine (narval --sync-packages).\n")
         #t
         (package--fail (string-append "package: couldn't write " (package--lock-path))))))
 
@@ -328,9 +328,12 @@
   (let ((values (package--field manifest field)))
     (if (and (pair? values) (string? (car values))) (car values) #f)))
 
-;; ((dep min-version) ...), beluga itself left out.
+;; ((dep min-version) ...), narval itself left out (also under "beluga",
+;; its name before the rename, in older manifests).
 (define (package--requires name)
-  (filter (lambda (r) (and (pair? r) (string? (car r)) (not (string=? (car r) "beluga"))))
+  (filter (lambda (r) (and (pair? r) (string? (car r))
+                           (not (string=? (car r) "narval"))
+                           (not (string=? (car r) "beluga"))))
           (package--field (package--manifest name) 'requires)))
 
 (define (package--manifest-source name dep)
@@ -341,7 +344,7 @@
 ;; ─── the index ──────────────────────────────────────────────────────────────
 ;; package-index-url is a git repository holding an index.lisp of
 ;;   (package "name" (url "https://...") (description "..."))
-;; forms. It's cloned to ~/.beluga/index on first use.
+;; forms. It's cloned to ~/.narval/index on first use.
 
 (define (package--index)
   (let ((forms (read-data-file (string-append (package--index-dir) "/index.lisp"))))
@@ -546,7 +549,7 @@
           ((and url (not (package--foreground?))
                 (not (package--lock-get name 'url))
                 (not (package--confirm? (string-append "Install " name " from " url
-                                                       "? It's code that runs inside beluga"))))
+                                                       "? It's code that runs inside narval"))))
            (package--say "Not installed"))
           (else
            (package--install name url ref #f
@@ -567,7 +570,7 @@
   (let ((dir (package--dir name)))
     (cond ((not (package--git? name))
            (begin (package--fail (string-append "package: " name " isn't a git package"
-                                                (if (package--bundled? name) " (bundled: update beluga)" "")))
+                                                (if (package--bundled? name) " (bundled: update narval)" "")))
                   (k #f)))
           ((package--dirty? dir)
            (begin (package--fail (string-append "package: " name " has local changes, not updating it"))
@@ -647,7 +650,7 @@
                  (lambda (ok)
                    (begin
                      (package--say (string-append "Updated " (package--join (map1 first plans) ", ")
-                                                  (if (package--foreground?) "" ": restart beluga to use the new code")))
+                                                  (if (package--foreground?) "" ": restart narval to use the new code")))
                      (k ok)))))
 
 (define (package-update . args)
@@ -723,7 +726,7 @@
                                  (begin
                                    (package--lock-set! name (list (cons 'commit previous) (cons 'previous current)))
                                    (package--say (string-append "Rolled " name " back to " (package--short previous)
-                                                                ": restart beluga to use it"))
+                                                                ": restart narval to use it"))
                                    (package--list-refresh))
                                  (package--fail (string-append "package: " (package--git-error r)))))
                            "checkout" "--quiet" "--detach" previous)))
@@ -745,7 +748,7 @@
     (cond ((not name) #f)
           ((string=? name "personal-config") (package--fail "package: personal-config is yours, not removing it"))
           ((not (package--exists? (package--dir name))) (package--fail (string-append "package: " name " isn't installed")))
-          ((package--system? name) (package--fail (string-append "package: " name " comes with beluga itself; leave its add-package line out of your config instead")))
+          ((package--system? name) (package--fail (string-append "package: " name " comes with narval itself; leave its add-package line out of your config instead")))
           ((package--confirm? (string-append "Remove " name (if package-remove-deletes " (deleted)" " (moved to packages.bak)") "?"))
            (let ((result (if package-remove-deletes
                              (delete-path (package--dir name))
@@ -761,7 +764,7 @@
                      (package--say (string-append "Removed " name
                                                   (if (package--declaration name)
                                                       ": delete its use-package line too, or the next start reinstalls it"
-                                                      ": restart beluga to unload it")
+                                                      ": restart narval to unload it")
                                                   (if (null? orphans)
                                                       ""
                                                       (string-append ". No longer needed: " (package--join orphans ", ")))))
@@ -888,7 +891,7 @@
   (let* ((kind (package--kind name))
          (manifest (package--manifest name))
          (version (or (package-version name) (package--field-string manifest 'version)
-                      (if (string=? kind "bundled") (beluga-version) #f)))
+                      (if (string=? kind "bundled") (narval-version) #f)))
          (git (string=? kind "git"))
          (commit (if git (package--short (package--head (package--dir name))) ""))
          (locked (package--lock-get name 'commit))

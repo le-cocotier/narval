@@ -14,8 +14,8 @@
  * popupStyleInit() so its colors stay consistent with everything else.
  */
 
-#ifndef BELUGA_POPUP_UI_H
-#define BELUGA_POPUP_UI_H
+#ifndef NARVAL_POPUP_UI_H
+#define NARVAL_POPUP_UI_H
 
 #include "data.h"
 
@@ -84,4 +84,4 @@ void popupRowEnd(struct abuf *ab, const PopupStyle *style);
 void popupDrawShadow(struct abuf *ab, const PopupStyle *style,
                      int origin_x, int origin_y, int box_w, int box_h);
 
-#endif // BELUGA_POPUP_UI_H
+#endif // NARVAL_POPUP_UI_H

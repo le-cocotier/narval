@@ -1,5 +1,5 @@
-#ifndef BELUGA_DAP_H
-#define BELUGA_DAP_H
+#ifndef NARVAL_DAP_H
+#define NARVAL_DAP_H
 
 #include <stddef.h>
 
@@ -13,7 +13,7 @@
 // project's session. Which adapter a file type uses is set from Lisp, like lsp-server:
 //   (dap-adapter "c" "gdb" "-i" "dap")
 // The launch arguments are handed to the adapter as they are (a JSON
-// object), so beluga needs no knowledge of each adapter's own options.
+// object), so narval needs no knowledge of each adapter's own options.
 //
 // Everything here is asynchronous: requests go out, and the answers and
 // events are handled from the run loop (dapPoll()), which updates the
@@ -144,4 +144,4 @@ void dapFree(void);
 // they are handled where the daemon is) and `leave` goes back.
 void dapSetWindowHooks(int (*current)(void), int (*enter)(int id), void (*leave)(void));
 
-#endif // BELUGA_DAP_H
+#endif // NARVAL_DAP_H

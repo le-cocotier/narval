@@ -10,7 +10,7 @@
 ;; with no PHP interpreter installed. It's free for the completion/hover/
 ;; definition/diagnostics features this package uses; some of its other
 ;; features (e.g. full workspace-wide rename) are licensed separately, but
-;; nothing beluga's LSP integration calls into needs a license.
+;; nothing narval's LSP integration calls into needs a license.
 
 (lsp-server "php" "php" "intelephense" "--stdio")
 (lsp-server-install "intelephense" "any" "npm install -g intelephense")

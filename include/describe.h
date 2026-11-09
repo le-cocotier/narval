@@ -1,5 +1,5 @@
-#ifndef BELUGA_DESCRIBE_H
-#define BELUGA_DESCRIBE_H
+#ifndef NARVAL_DESCRIBE_H
+#define NARVAL_DESCRIBE_H
 
 #include "data.h"
 
@@ -17,4 +17,4 @@ Lisp keyBindings(Lisp args, LispError *e, LispContext ctx);
 // lines for a help buffer.
 Lisp describeFunction(Lisp args, LispError *e, LispContext ctx);
 
-#endif // BELUGA_DESCRIBE_H
+#endif // NARVAL_DESCRIBE_H

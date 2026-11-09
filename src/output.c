@@ -1,6 +1,6 @@
 /**
  * @file output.c
- * @brief Screen rendering and output module for the Beluga text editor
+ * @brief Screen rendering and output module for the Narval text editor
  * @details Handles all screen updates, cursor positioning, status bar
  * rendering, and display synchronization using ANSI escape sequences
  */

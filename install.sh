@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Beluga installer. Run with --help for usage.
+# Narval installer. Run with --help for usage.
 #
 # Everything runs from main(), called on the very last line: bash reads a
 # script as it goes, so without that a `git pull` (--update) rewriting this
@@ -32,19 +32,19 @@ UPDATE=0
 UNINSTALL=0
 PURGE=0
 BINDIR="/usr/local/bin"
-BELUGA_HOME="$HOME/.beluga"
+NARVAL_HOME="$HOME/.narval"
 # The arguments to re-run with after --update, minus --update itself.
 RERUN_ARGS=()
 
 usage() {
     cat <<'EOF'
-Beluga installer.
+Narval installer.
 
 Usage: ./install.sh [options]
 
   -y, --yes            Don't prompt for confirmation; assume "yes" (and
                         never overwrite an existing config).
-      --bindir DIR      Where to install the beluga binary (default:
+      --bindir DIR      Where to install the narval binary (default:
                         /usr/local/bin). --prefix DIR is the old name for it.
       --skip-packages   Don't install the bundled packages (packages/ in
                         this checkout).
@@ -57,21 +57,21 @@ Usage: ./install.sh [options]
                         enabled, instead of the default optimized release
                         build. Logs (the editor's own trace calls, plus the
                         language server's own stderr chatter) go to
-                        ~/.beluga/debug.log, not the terminal — `tail -f`
+                        ~/.narval/debug.log, not the terminal — `tail -f`
                         it in another pane while you work.
-      --uninstall       Remove the beluga binary. ~/.beluga (your config and
+      --uninstall       Remove the narval binary. ~/.narval (your config and
                         packages) is kept unless you also pass --purge.
-      --purge           With --uninstall: delete ~/.beluga as well.
+      --purge           With --uninstall: delete ~/.narval as well.
   -h, --help            Show this help and exit.
 
 Safe to re-run: an existing build/ is reconfigured rather than failing,
 and your config is never touched without asking first. Nothing in
-~/.beluga changes until the build has succeeded. Bundled packages are
+~/.narval changes until the build has succeeded. Bundled packages are
 replaced to match this checkout; one with local edits (or an old git
-clone of it) is moved to ~/.beluga/packages.bak/ first, never deleted.
+clone of it) is moved to ~/.narval/packages.bak/ first, never deleted.
 Packages that aren't bundled are never touched.
 
-Your own changes belong in ~/.beluga/packages/personal-config/init.lisp:
+Your own changes belong in ~/.narval/packages/personal-config/init.lisp:
 it's created from a template on the first install and never overwritten
 afterwards (even with --yes or --skip-packages), so it survives updates.
 EOF
@@ -234,7 +234,7 @@ check_deps() {
 # --- update ----------------------------------------------------------------
 
 update_and_rerun() {
-    [ -d .git ] || die "--update needs a git clone of beluga, and $SCRIPT_DIR isn't one."
+    [ -d .git ] || die "--update needs a git clone of narval, and $SCRIPT_DIR isn't one."
     info "Updating $SCRIPT_DIR ..."
     local before
     before="$(git rev-parse HEAD)"
@@ -252,31 +252,31 @@ update_and_rerun() {
 # --- uninstall -------------------------------------------------------------
 
 uninstall() {
-    local bin="$BINDIR/beluga"
+    local bin="$BINDIR/narval"
     if [ ! -e "$bin" ]; then
         # Not where --bindir says: the one on PATH, then.
-        bin="$(command -v beluga 2>/dev/null || true)"
+        bin="$(command -v narval 2>/dev/null || true)"
     fi
 
-    echo "${C_BOLD}--- Beluga uninstaller ---${C_RESET}"
+    echo "${C_BOLD}--- Narval uninstaller ---${C_RESET}"
     if [ -n "$bin" ] && [ -e "$bin" ]; then
         if confirm "Remove $bin?"; then
             if [ -w "$(dirname "$bin")" ]; then rm -f "$bin"; else as_root rm -f "$bin"; fi
             ok "Removed $bin"
         fi
     else
-        warn "No beluga binary found in $BINDIR or on your PATH"
+        warn "No narval binary found in $BINDIR or on your PATH"
     fi
 
-    if [ ! -d "$BELUGA_HOME" ]; then
+    if [ ! -d "$NARVAL_HOME" ]; then
         return 0
     elif [ "$PURGE" -eq 1 ]; then
-        if confirm "Delete $BELUGA_HOME (your config, personal-config and every package) for good?"; then
-            rm -rf "$BELUGA_HOME"
-            ok "Deleted $BELUGA_HOME"
+        if confirm "Delete $NARVAL_HOME (your config, personal-config and every package) for good?"; then
+            rm -rf "$NARVAL_HOME"
+            ok "Deleted $NARVAL_HOME"
         fi
     else
-        echo "Kept $BELUGA_HOME (your config and packages); --uninstall --purge deletes it too."
+        echo "Kept $NARVAL_HOME (your config and packages); --uninstall --purge deletes it too."
     fi
 }
 
@@ -302,17 +302,45 @@ build() {
     else
         meson setup build "${meson_args[@]}" || die "meson setup failed"
     fi
-    meson compile -C build || die "Build failed — nothing was installed, ~/.beluga is untouched."
+    meson compile -C build || die "Build failed — nothing was installed, ~/.narval is untouched."
+}
+
+# --- migrating from beluga ----------------------------------------------------
+
+# The editor was called beluga: carry ~/.beluga over (config, packages,
+# projects) unless ~/.narval already exists. narval itself does the same
+# on its first start; doing it here keeps install_config from setting up a
+# fresh ~/.narval beside the old one.
+migrate_home() {
+    local legacy="$HOME/.beluga"
+    if [ ! -e "$NARVAL_HOME" ] && [ -d "$legacy" ]; then
+        mv "$legacy" "$NARVAL_HOME" || die "Couldn't move $legacy to $NARVAL_HOME"
+        ok "Moved $legacy to $NARVAL_HOME (narval was called beluga)"
+    fi
+    rm -f "$NARVAL_HOME/assets/beluga.txt"
+}
+
+# Removes the beluga binary an earlier install put in BINDIR: narval
+# replaces it.
+remove_old_binary() {
+    local old="$BINDIR/beluga"
+    [ -e "$old" ] || [ -L "$old" ] || return 0
+    if [ -w "$BINDIR" ]; then
+        rm -f "$old"
+    else
+        as_root rm -f "$old"
+    fi
+    ok "Removed the old $old (beluga is now narval)"
 }
 
 # --- config files ----------------------------------------------------------
 
 install_config() {
-    local config="$BELUGA_HOME/config/init.lisp"
+    local config="$NARVAL_HOME/config/init.lisp"
 
-    info "Setting up $BELUGA_HOME ..."
-    mkdir -p "$BELUGA_HOME/assets" "$BELUGA_HOME/packages" "$BELUGA_HOME/config"
-    cp -f ./assets/beluga.txt "$BELUGA_HOME/assets/"
+    info "Setting up $NARVAL_HOME ..."
+    mkdir -p "$NARVAL_HOME/assets" "$NARVAL_HOME/packages" "$NARVAL_HOME/config"
+    cp -f ./assets/narval.txt "$NARVAL_HOME/assets/"
 
     if [ -f "$config" ]; then
         if cmp -s ./config/init.lisp "$config"; then
@@ -337,7 +365,7 @@ install_config() {
     # created once from the template, then never overwritten (not even with
     # --yes or on re-install), so edits there survive every update. Independent
     # of --skip-packages for the same reason.
-    PERSONAL_CONFIG="$BELUGA_HOME/packages/personal-config/init.lisp"
+    PERSONAL_CONFIG="$NARVAL_HOME/packages/personal-config/init.lisp"
     if [ -f "$PERSONAL_CONFIG" ]; then
         echo "  personal-config already exists, leaving it alone"
     else
@@ -368,11 +396,11 @@ install_config() {
 # editing a package there is live in the editor and shows up in this
 # repo's git status right next to the C changes.
 #
-# ~/.beluga/packages/<name> for a bundled package is beluga's to replace on
+# ~/.narval/packages/<name> for a bundled package is narval's to replace on
 # every install — that's what keeps it in step with the binary. Anything
 # that would be lost doing so (a copy with local edits, or an old git
 # clone from before packages were bundled) is moved to
-# ~/.beluga/packages.bak/<name>-<timestamp> first, never deleted. Packages
+# ~/.narval/packages.bak/<name>-<timestamp> first, never deleted. Packages
 # that aren't bundled — personal-config, your own, third-party ones — are
 # never touched.
 
@@ -387,7 +415,7 @@ install_package() {
     # install_package <name> — prints nothing when already up to date
     local name="$1"
     local src="$PACKAGES_SRC/$1"
-    local dest="$BELUGA_HOME/packages/$1"
+    local dest="$NARVAL_HOME/packages/$1"
 
     if [ -L "$dest" ]; then
         if [ "$DEV_MODE" -eq 1 ] && [ "$(readlink "$dest")" = "$src" ]; then
@@ -415,7 +443,7 @@ install_package() {
         echo "  $name -> $src"
     else
         cp -R "$src" "$dest"
-        # Marks it as beluga's own (the *packages* list shows it as
+        # Marks it as narval's own (the *packages* list shows it as
         # "bundled"); a --dev link is recognised as a link instead.
         : > "$dest/.bundled"
         echo "  $name"
@@ -424,7 +452,7 @@ install_package() {
 
 install_packages() {
     PACKAGES_SRC="$SCRIPT_DIR/packages"
-    PACKAGES_BAK="$BELUGA_HOME/packages.bak"
+    PACKAGES_BAK="$NARVAL_HOME/packages.bak"
     STAMP="$(date +%Y%m%d-%H%M%S)"
 
     if [ "$SKIP_PACKAGES" -eq 1 ]; then
@@ -455,27 +483,27 @@ install_binary() {
         mkdir -p "$BINDIR" 2>/dev/null || as_root mkdir -p "$BINDIR"
     fi
     # Copy next to it, then rename over it: writing into the file in place
-    # breaks a beluga that's running from it (macOS kills it outright).
+    # breaks a narval that's running from it (macOS kills it outright).
     if [ -w "$BINDIR" ]; then
-        cp -f ./build/beluga "$BINDIR/.beluga.new"
-        mv -f "$BINDIR/.beluga.new" "$BINDIR/beluga"
+        cp -f ./build/narval "$BINDIR/.narval.new"
+        mv -f "$BINDIR/.narval.new" "$BINDIR/narval"
     else
         warn "$BINDIR isn't writable by you — using sudo"
-        as_root cp -f ./build/beluga "$BINDIR/.beluga.new"
-        as_root mv -f "$BINDIR/.beluga.new" "$BINDIR/beluga"
+        as_root cp -f ./build/narval "$BINDIR/.narval.new"
+        as_root mv -f "$BINDIR/.narval.new" "$BINDIR/narval"
     fi
 
     echo
-    ok "Installed $("$BINDIR/beluga" --version 2>/dev/null || echo beluga) to $BINDIR/beluga"
+    ok "Installed $("$BINDIR/narval" --version 2>/dev/null || echo narval) to $BINDIR/narval"
     local found
-    found="$(command -v beluga 2>/dev/null || true)"
+    found="$(command -v narval 2>/dev/null || true)"
     if [ -z "$found" ]; then
         warn "$BINDIR isn't on your PATH yet — add it, e.g.: export PATH=\"$BINDIR:\$PATH\""
-    elif [ "$found" != "$BINDIR/beluga" ]; then
-        warn "\`beluga\` on your PATH is $found, not the one just installed — remove it or put $BINDIR first in PATH"
+    elif [ "$found" != "$BINDIR/narval" ]; then
+        warn "\`narval\` on your PATH is $found, not the one just installed — remove it or put $BINDIR first in PATH"
     fi
     echo "Put your customizations in $PERSONAL_CONFIG — unlike"
-    echo "$BELUGA_HOME/config/init.lisp, it's never replaced by an update."
+    echo "$NARVAL_HOME/config/init.lisp, it's never replaced by an update."
 }
 
 # --- main ----------------------------------------------------------------
@@ -486,8 +514,8 @@ main() {
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     cd "$SCRIPT_DIR"
 
-    if [ ! -f "./meson.build" ] || [ ! -f "./assets/beluga.txt" ]; then
-        die "This doesn't look like a beluga checkout ($SCRIPT_DIR). Run this script from inside the cloned repo."
+    if [ ! -f "./meson.build" ] || [ ! -f "./assets/narval.txt" ]; then
+        die "This doesn't look like a narval checkout ($SCRIPT_DIR). Run this script from inside the cloned repo."
     fi
 
     if [ "$UNINSTALL" -eq 1 ]; then
@@ -498,16 +526,18 @@ main() {
         update_and_rerun   # doesn't return
     fi
 
-    echo "${C_BOLD}--- Beluga installer ---${C_RESET}"
-    confirm "Install beluga from $SCRIPT_DIR to $BINDIR?" || { echo "Aborted."; exit 1; }
+    echo "${C_BOLD}--- Narval installer ---${C_RESET}"
+    confirm "Install narval from $SCRIPT_DIR to $BINDIR?" || { echo "Aborted."; exit 1; }
 
     check_deps
-    # Build first: if it fails, ~/.beluga stays as it was, rather than
+    # Build first: if it fails, ~/.narval stays as it was, rather than
     # holding new packages the old binary can't run.
     build
+    migrate_home
     install_config
     install_packages
     install_binary
+    remove_old_binary
 }
 
 main "$@"

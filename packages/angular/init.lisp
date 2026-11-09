@@ -27,10 +27,10 @@
 ;; --ngProbeLocations/--tsProbeLocations tell ngserver where to find
 ;; @angular/language-service and typescript in your project's own
 ;; node_modules — VSCode's Angular extension resolves these from the
-;; workspace root, but beluga's (lsp-server ...) argv is fixed at
+;; workspace root, but narval's (lsp-server ...) argv is fixed at
 ;; package-load time with no per-project templating, so this hardcodes
 ;; the relative path "node_modules" instead. That resolves correctly as
-;; long as beluga is started from the project root (the ordinary way to
+;; long as narval is started from the project root (the ordinary way to
 ;; use it — the "Project root:" prompt only sets the LSP rootUri, it
 ;; doesn't chdir the server process; see lspStart() in completion.c). A
 ;; monorepo where the Angular app doesn't sit at the repo's own root

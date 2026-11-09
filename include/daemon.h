@@ -1,8 +1,8 @@
 /**
  * @file daemon.h
- * @brief Daemon mode: one beluga process serving several terminal windows.
- * @details `beluga --daemon` keeps the buffers, the Lisp interpreter, the
- * language servers and the terminal panes; `beluga -c [file]`, run in any
+ * @brief Daemon mode: one narval process serving several terminal windows.
+ * @details `narval --daemon` keeps the buffers, the Lisp interpreter, the
+ * language servers and the terminal panes; `narval -c [file]`, run in any
  * terminal, opens a window on it. Each window has its own layout, popups
  * and status line; the text is shared. See daemon.c.
  */
@@ -33,22 +33,22 @@ void daemonVisitLispRoots(LispRootVisitor visit, LispContext ctx);
 
 /**
  * @brief Starts the daemon called `name` in the background (detached from
- * the terminal, its output in <beluga dir>/daemon-NAME.log) and waits
- * until it takes connections. `beluga --daemon` without --foreground, and
- * `beluga -c` when none is running.
+ * the terminal, its output in <narval dir>/daemon-NAME.log) and waits
+ * until it takes connections. `narval --daemon` without --foreground, and
+ * `narval -c` when none is running.
  * @return 0, or 1 with the reason on stderr.
  */
 int clientStartDaemon(const char *name);
 
 /**
- * @brief Runs a client window (beluga -c) on the daemon called `name`,
+ * @brief Runs a client window (narval -c) on the daemon called `name`,
  * opening `files` (relative to the current directory) in it.
  * @return The process exit code.
  */
 int clientMain(const char *name, char *const *files, int n_files);
 
 /**
- * @brief beluga --kill: stops the daemon called `name`. It refuses while a
+ * @brief narval --kill: stops the daemon called `name`. It refuses while a
  * buffer has unsaved changes, unless `force`.
  * @return The process exit code.
  */

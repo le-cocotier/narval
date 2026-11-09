@@ -1,7 +1,7 @@
 ;; ─── Lisp ───────────────────────────────────────────────────────────────────
 ;; (add-package "lisp") — a CTRL-d comment toggle and syntax highlighting
 ;; for Lisp-family files: .lisp / .cl (Common Lisp), .scm / .ss / .sld
-;; (Scheme), .el (Emacs Lisp). Beluga's own config and package files are
+;; (Scheme), .el (Emacs Lisp). Narval's own config and package files are
 ;; .lisp, so this lights those up too.
 ;;
 ;; Unlike the other language packages, this one registers NO LSP server.

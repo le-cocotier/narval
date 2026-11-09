@@ -39,13 +39,13 @@ static void testRegistry(void) {
 
   // Only commands whose program is missing: none offered, and the first
   // one's program is named.
-  CHECK_INT(eval("(lsp-server-install \"srv\" \"linux\" \"sudo beluga-no-such-tool install srv\""
-                 " \"any\" \"beluga-other-missing-tool srv\")"),
+  CHECK_INT(eval("(lsp-server-install \"srv\" \"linux\" \"sudo narval-no-such-tool install srv\""
+                 " \"any\" \"narval-other-missing-tool srv\")"),
             LISP_ERROR_NONE);
   CHECK(lspInstallCommandFor("srv", "linux", &needs) == NULL);
-  CHECK_STR(needs, "beluga-no-such-tool");
+  CHECK_STR(needs, "narval-no-such-tool");
   CHECK(lspInstallCommandFor("srv", "windows", &needs) == NULL);
-  CHECK_STR(needs, "beluga-other-missing-tool");
+  CHECK_STR(needs, "narval-other-missing-tool");
 
   // One that can run, after the missing ones: it's the one offered.
   snprintf(expr, sizeof(expr),

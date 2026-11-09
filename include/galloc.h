@@ -19,8 +19,8 @@ char * gstrdup_impl(const char * s, const char * file, int line, const char * fu
 /**
  * Writes every block still tracked to `out`, grouped by the line that
  * allocated it (count, bytes, file:line, function), biggest first, then a
- * total. Returns the number of blocks. beluga calls it at exit in APP_DEBUG
- * builds (~/.beluga/memory-at-exit.log); call it anywhere else to see what
+ * total. Returns the number of blocks. narval calls it at exit in APP_DEBUG
+ * builds (~/.narval/memory-at-exit.log); call it anywhere else to see what
  * is allocated at that moment.
  */
 int gReportMemory(FILE * out);

@@ -160,18 +160,18 @@ struct const_t
 };
 
 /**
- * @brief One project beluga knows about, found by its markers or read
- * back from ~/.beluga/projects. See project.h.
+ * @brief One project narval knows about, found by its markers or read
+ * back from ~/.narval/projects. See project.h.
  */
 typedef struct
 {
     char* root;          // absolute, '/' separators, no trailing slash
-    int trusted;         // its .beluga/init.lisp may run (project-trust)
+    int trusted;         // its .narval/init.lisp may run (project-trust)
     int opened;          // made current at least once this session
     int removed;         // forgotten (project-remove): not listed or saved
-    int has_config_env;  // config_env holds its evaluated .beluga/init.lisp
+    int has_config_env;  // config_env holds its evaluated .narval/init.lisp
     Lisp config_env;     // the global env extended with the project's own table
-    long last_used;      // larger is more recent; orders ~/.beluga/projects
+    long last_used;      // larger is more recent; orders ~/.narval/projects
     struct const_t constantes; // the settings while it's the current project
 } Project;
 
@@ -883,7 +883,7 @@ typedef struct editor_config_t
     int exit_requested;
 
     // initialized: init.lisp has finished loading (set by initEditor()).
-    // batch: no screen, messages go to stdout (beluga --sync-packages).
+    // batch: no screen, messages go to stdout (narval --sync-packages).
     int initialized;
     int batch;
     // Screen cell (0-based, row 0 = top line) of the last mouse report,

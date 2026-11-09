@@ -1,12 +1,12 @@
 #!/bin/bash
 #
-# Builds beluga_<version>_amd64.deb and beluga-<version>-1.x86_64.rpm from
+# Builds narval_<version>_amd64.deb and narval-<version>-1.x86_64.rpm from
 # this checkout, into dist/ (or the folder given as the second argument).
 #
 #   packaging/linux/build-packages.sh 3.5 [outdir]
 #
-# Both install /usr/bin/beluga and /usr/share/beluga (default config, the
-# bundled packages, the splash screen); beluga sets up ~/.beluga from those
+# Both install /usr/bin/narval and /usr/share/narval (default config, the
+# bundled packages, the splash screen); narval sets up ~/.narval from those
 # on its first start. Needs meson, ninja, a C compiler, dpkg-deb and
 # rpmbuild (apt-get install meson ninja-build gcc rpm). Run by
 # .gitea/workflows/release-linux.yml on every v* tag.
@@ -23,7 +23,7 @@ trap 'rm -rf "$WORK"' EXIT
 ARCH_DEB="$(dpkg --print-architecture 2>/dev/null || echo amd64)"
 ARCH_RPM="$(uname -m)"
 SUMMARY="Terminal text editor configured in Lisp, with LSP and a debugger"
-HOMEPAGE="https://git.giorgio-nas.fr/arthur/beluga"
+HOMEPAGE="https://git.giorgio-nas.fr/arthur/narval"
 MAINTAINER="Arthur Barraux <arthurbarraux@icloud.com>"
 LICENSE="MIT"
 
@@ -31,10 +31,10 @@ LICENSE="MIT"
 meson setup "$WORK/build" "$ROOT" --prefix=/usr --buildtype=release >/dev/null
 meson compile -C "$WORK/build"
 DESTDIR="$WORK/root" meson install -C "$WORK/build" --no-rebuild >/dev/null
-strip "$WORK/root/usr/bin/beluga"
-mkdir -p "$WORK/root/usr/share/doc/beluga"
-cp "$ROOT/README.md" "$WORK/root/usr/share/doc/beluga/"
-[ -f "$ROOT/LICENSE" ] && cp "$ROOT/LICENSE" "$WORK/root/usr/share/doc/beluga/copyright"
+strip "$WORK/root/usr/bin/narval"
+mkdir -p "$WORK/root/usr/share/doc/narval"
+cp "$ROOT/README.md" "$WORK/root/usr/share/doc/narval/"
+[ -f "$ROOT/LICENSE" ] && cp "$ROOT/LICENSE" "$WORK/root/usr/share/doc/narval/copyright"
 
 # --- .deb ------------------------------------------------------------------
 DEB="$WORK/deb"
@@ -43,41 +43,44 @@ mkdir -p "$DEB/DEBIAN"
 # The C library and libutil are all it links; dpkg-shlibdeps would say the
 # same, but needs a debian/ tree to run.
 cat > "$DEB/DEBIAN/control" <<CONTROL
-Package: beluga
+Package: narval
 Version: $VERSION
 Architecture: $ARCH_DEB
 Maintainer: $MAINTAINER
 Installed-Size: $(du -sk "$WORK/root" | cut -f1)
 Depends: libc6
+Replaces: beluga
+Conflicts: beluga
 Recommends: git
 Suggests: gdb, clangd
 Section: editors
 Priority: optional
 Homepage: $HOMEPAGE
 Description: $SUMMARY
- Beluga is a terminal text editor for Linux, macOS and Windows, written in
+ Narval is a terminal text editor for Linux, macOS and Windows, written in
  C and configured in Lisp. It has language servers (LSP), a debugger (DAP),
  a git client, a package manager, terminal panes and a daemon mode.
 CONTROL
-dpkg-deb --root-owner-group --build "$DEB" "$OUT/beluga_${VERSION}_${ARCH_DEB}.deb"
+dpkg-deb --root-owner-group --build "$DEB" "$OUT/narval_${VERSION}_${ARCH_DEB}.deb"
 
 # --- .rpm ------------------------------------------------------------------
 RPMTOP="$WORK/rpm"
 mkdir -p "$RPMTOP"/{SPECS,BUILD,RPMS,SRPMS,SOURCES}
-cat > "$RPMTOP/SPECS/beluga.spec" <<SPEC
-Name:           beluga
+cat > "$RPMTOP/SPECS/narval.spec" <<SPEC
+Name:           narval
 Version:        $VERSION
 Release:        1
 Summary:        $SUMMARY
 License:        $LICENSE
 URL:            $HOMEPAGE
+Obsoletes:      beluga
 Recommends:     git
 %global debug_package %{nil}
 %global _build_id_links none
 %global __os_install_post %{nil}
 
 %description
-Beluga is a terminal text editor for Linux, macOS and Windows, written in
+Narval is a terminal text editor for Linux, macOS and Windows, written in
 C and configured in Lisp. It has language servers (LSP), a debugger (DAP),
 a git client, a package manager, terminal panes and a daemon mode.
 
@@ -85,11 +88,11 @@ a git client, a package manager, terminal panes and a daemon mode.
 cp -a "$WORK/root/." "%{buildroot}/"
 
 %files
-/usr/bin/beluga
-/usr/share/beluga
-%doc /usr/share/doc/beluga
+/usr/bin/narval
+/usr/share/narval
+%doc /usr/share/doc/narval
 SPEC
-rpmbuild --quiet -bb --define "_topdir $RPMTOP" "$RPMTOP/SPECS/beluga.spec"
-cp "$RPMTOP"/RPMS/*/beluga-*.rpm "$OUT/"
+rpmbuild --quiet -bb --define "_topdir $RPMTOP" "$RPMTOP/SPECS/narval.spec"
+cp "$RPMTOP"/RPMS/*/narval-*.rpm "$OUT/"
 
 ls -l "$OUT"

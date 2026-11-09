@@ -12,7 +12,7 @@
 
 /**
  * @brief Where the editor's screen is. Standalone, that is the terminal
- * beluga runs in. In daemon mode (daemon.c) it is the client window being
+ * narval runs in. In daemon mode (daemon.c) it is the client window being
  * served at the moment: drawing, key reads and the window size all go
  * through these three, never to os_term_*() directly.
  */
@@ -82,10 +82,10 @@ void appDebug(const char *fmt, ...);
 // Path of the debug log appDebug() writes to (opened by this call if not
 // yet), or NULL when built without APP_DEBUG. Lets another subsystem —
 // currently just the spawned language server — send its own stderr there
-// too instead of onto the terminal beluga is drawing on.
+// too instead of onto the terminal narval is drawing on.
 const char *appDebugLogPath(void);
 
-// Closes the debug log at exit (its stdio buffer is the last thing beluga
+// Closes the debug log at exit (its stdio buffer is the last thing narval
 // would otherwise still hold when the memory report is written).
 void appDebugClose(void);
 

@@ -3,9 +3,9 @@
 #
 #
 # Pushing a tag that starts with "v" (git tag v3.3 && git push origin v3.3)
-# cross-compiles beluga.exe on Linux and publishes
-#   beluga-<tag>-windows-x64.zip
-# on the repository's Releases page: beluga.exe, install.ps1, the default
+# cross-compiles narval.exe on Linux and publishes
+#   narval-<tag>-windows-x64.zip
+# on the repository's Releases page: narval.exe, install.ps1, the default
 # config, the bundled packages and a README. Windows users unzip it and run
 # install.ps1 — no compiler, Meson or git needed.
 #
@@ -15,7 +15,7 @@
 # the Actions secret RELEASE_TOKEN (Settings > Actions > Secrets).
 #
 # The same zip also goes to the Generic package registry, at
-#   <server>/api/packages/<owner>/generic/beluga/<version>/beluga-<tag>-windows-x64.zip
+#   <server>/api/packages/<owner>/generic/narval/<version>/narval-<tag>-windows-x64.zip
 # where <version> is the tag without its "v" (v3.4 -> 3.4). If Gitea refuses
 # the automatic token there (HTTP 401/403), create a personal access token
 # with the "write:package" scope and save it as the Actions secret
@@ -47,7 +47,7 @@ jobs:
       - name: Build the zip
         run: |
           packaging/windows/build-zip.sh "${{ github.ref_name }}" dist
-          echo "PKG=beluga-${{ github.ref_name }}-windows-x64" >> "$GITHUB_ENV"
+          echo "PKG=narval-${{ github.ref_name }}-windows-x64" >> "$GITHUB_ENV"
 
       - name: Publish the release
         shell: bash
@@ -66,7 +66,7 @@ jobs:
           if RELEASE=$(api "$API/releases/tags/$TAG" 2>/dev/null); then
             ID=$(jq -er '.id' <<<"$RELEASE")
           else
-            ID=$(jq -n --arg tag "$TAG" '{tag_name: $tag, name: ("Beluga " + $tag),
+            ID=$(jq -n --arg tag "$TAG" '{tag_name: $tag, name: ("Narval " + $tag),
                    body: "Windows: download the zip below, unzip it and run install.ps1 (see README.txt inside)."}' \
                  | api -X POST -H "Content-Type: application/json" --data @- "$API/releases" \
                  | jq -er '.id')
@@ -95,7 +95,7 @@ jobs:
           api() { curl -sS --fail-with-body -H "Authorization: token $TOKEN" "$@"; }
 
           VERSION="${TAG#v}"
-          URL="$SERVER/api/packages/$OWNER/generic/beluga/$VERSION/$PKG.zip"
+          URL="$SERVER/api/packages/$OWNER/generic/narval/$VERSION/$PKG.zip"
 
           # Gitea refuses to overwrite a file (HTTP 409), so a re-run on the
           # same tag deletes the old one first.
@@ -106,19 +106,19 @@ jobs:
           # Show the package on the repository's Packages tab. Already
           # linked (or an older Gitea) is fine.
           curl -sS -o /dev/null -X POST -H "Authorization: token $TOKEN" \
-            "$SERVER/api/v1/packages/$OWNER/generic/beluga/-/link/$REPO" || true
+            "$SERVER/api/v1/packages/$OWNER/generic/narval/-/link/$REPO" || true
 
       - name: Keep the zip as a build artifact too
         uses: actions/upload-artifact@v3
         with:
-          name: beluga-windows-x64
+          name: narval-windows-x64
           path: dist/*.zip
 
   # Linux packages and the source tarball, attached to the same release
   # once the Windows job has created it:
-  #   beluga-<version>.tar.gz          what Homebrew and the AUR build from
-  #   beluga_<version>_amd64.deb       also in Gitea's Debian registry
-  #   beluga-<version>-1.x86_64.rpm    also in Gitea's RPM registry
+  #   narval-<version>.tar.gz          what Homebrew and the AUR build from
+  #   narval_<version>_amd64.deb       also in Gitea's Debian registry
+  #   narval-<version>-1.x86_64.rpm    also in Gitea's RPM registry
   # The registries use the same tokens as above (PACKAGE_TOKEN for the
   # registries, RELEASE_TOKEN for the release, else GITEA_TOKEN). After the
   # release, packaging/render.sh <version> fills in the Homebrew, winget and
@@ -178,16 +178,16 @@ jobs:
           # A re-run on the same tag replaces what the last one uploaded
           # (Gitea refuses a second upload of a version with HTTP 409).
           curl -sS -o /dev/null -X DELETE -H "Authorization: token $TOKEN" \
-            "$SERVER/api/packages/$OWNER/debian/pool/stable/main/beluga/$VERSION/amd64" || true
+            "$SERVER/api/packages/$OWNER/debian/pool/stable/main/narval/$VERSION/amd64" || true
           api --upload-file "$DEB" "$SERVER/api/packages/$OWNER/debian/pool/stable/main/upload"
           echo "Published $DEB to $SERVER/api/packages/$OWNER/debian (stable main)"
 
           curl -sS -o /dev/null -X DELETE -H "Authorization: token $TOKEN" \
-            "$SERVER/api/packages/$OWNER/rpm/package/beluga/$VERSION-1/x86_64" || true
+            "$SERVER/api/packages/$OWNER/rpm/package/narval/$VERSION-1/x86_64" || true
           api --upload-file "$RPM" "$SERVER/api/packages/$OWNER/rpm/upload"
           echo "Published $RPM to $SERVER/api/packages/$OWNER/rpm"
 
           for TYPE in debian rpm; do
             curl -sS -o /dev/null -X POST -H "Authorization: token $TOKEN" \
-              "$SERVER/api/v1/packages/$OWNER/$TYPE/beluga/-/link/$REPO" || true
+              "$SERVER/api/v1/packages/$OWNER/$TYPE/narval/-/link/$REPO" || true
           done

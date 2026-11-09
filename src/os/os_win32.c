@@ -1,6 +1,6 @@
 /**
  * @file os_win32.c
- * @brief libbeluga-os-win32: include/os.h for Windows 10 (1809+) and 11.
+ * @brief libnarval-os-win32: include/os.h for Windows 10 (1809+) and 11.
  * @details How the os.h model maps onto Windows:
  * - Terminal: the console in VT mode. Output escape sequences are
  *   interpreted natively (ENABLE_VIRTUAL_TERMINAL_PROCESSING); keys are
@@ -513,7 +513,7 @@ char *os_find_program(const char *name)
         // Installed since the editor started? Installers change the PATH
         // in the registry, which a running process never sees. The
         // registry's entries go after this process's own, so whatever the
-        // shell beluga started from added (a venv, ...) still comes first.
+        // shell narval started from added (a venv, ...) still comes first.
         memset(&path, 0, sizeof(path));
         if (_wgetenv(L"PATH"))
             wbufAppend(&path, _wgetenv(L"PATH"));
@@ -1763,8 +1763,8 @@ char **os_shell_argv(const char *command)
         "[Console]::OutputEncoding = [Text.Encoding]::UTF8; "
         "$OutputEncoding = [Text.Encoding]::UTF8\n";
     static const char epilogue[] =
-        "\n$__beluga_ok = $?; if ($LASTEXITCODE) { exit $LASTEXITCODE }; "
-        "if (-not $__beluga_ok) { exit 1 }";
+        "\n$__narval_ok = $?; if ($LASTEXITCODE) { exit $LASTEXITCODE }; "
+        "if (-not $__narval_ok) { exit 1 }";
     char **argv = gcalloc(6, sizeof(char *));
     size_t len = sizeof(prologue) + strlen(command) + sizeof(epilogue);
     char *script = galloc(len);
@@ -1844,14 +1844,18 @@ struct OsPty {
 };
 
 /**
- * @brief The shell a terminal pane runs when none is given: $BELUGA_SHELL,
- * then PowerShell 7 (pwsh), then Windows PowerShell, then cmd.exe.
+ * @brief The shell a terminal pane runs when none is given: $NARVAL_SHELL
+ * (or the old $BELUGA_SHELL), then PowerShell 7 (pwsh), then Windows
+ * PowerShell, then cmd.exe.
  */
 static void defaultShellCommand(WBuf *cmd)
 {
     wchar_t path[MAX_PATH * 2];
-    const wchar_t *configured = _wgetenv(L"BELUGA_SHELL");
+    const wchar_t *configured = _wgetenv(L"NARVAL_SHELL");
     int is_batch;
+
+    if (!configured || !*configured)
+        configured = _wgetenv(L"BELUGA_SHELL"); // its name before the rename
 
     if (configured && *configured)
     {
@@ -2118,7 +2122,7 @@ static void ipcError(char *err, const size_t err_size, const char *what)
 }
 
 /**
- * @brief \\.\pipe\beluga-<user>-<name>, galloc'd. The user name keeps two
+ * @brief \\.\pipe\narval-<user>-<name>, galloc'd. The user name keeps two
  * users' daemons on one machine apart.
  */
 static wchar_t *pipeName(const char *name, char *err, const size_t err_size)
@@ -2140,10 +2144,10 @@ static wchar_t *pipeName(const char *name, char *err, const size_t err_size)
     wname = toWide(name);
     if (!wname)
         return NULL;
-    len = wcslen(L"\\\\.\\pipe\\beluga--") + wcslen(user) + wcslen(wname) + 1;
+    len = wcslen(L"\\\\.\\pipe\\narval--") + wcslen(user) + wcslen(wname) + 1;
     full = galloc(len * sizeof(wchar_t));
     if (full)
-        _snwprintf(full, len, L"\\\\.\\pipe\\beluga-%ls-%ls", user, wname);
+        _snwprintf(full, len, L"\\\\.\\pipe\\narval-%ls-%ls", user, wname);
     gfree(wname);
     return full;
 }
@@ -2242,7 +2246,7 @@ OsServer *os_server_listen(const char *name, char *err, const size_t err_size)
         if (h != INVALID_HANDLE_VALUE)
             CloseHandle(h);
         if (err && err_size > 0)
-            snprintf(err, err_size, "a beluga daemon called \"%s\" is already running", name);
+            snprintf(err, err_size, "a narval daemon called \"%s\" is already running", name);
         gfree(s->pipe_name);
         LocalFree(s->sd);
         gfree(s);
@@ -2255,7 +2259,7 @@ OsServer *os_server_listen(const char *name, char *err, const size_t err_size)
         if (GetLastError() == ERROR_ACCESS_DENIED || GetLastError() == ERROR_PIPE_BUSY)
         {
             if (err && err_size > 0)
-                snprintf(err, err_size, "a beluga daemon called \"%s\" is already running", name);
+                snprintf(err, err_size, "a narval daemon called \"%s\" is already running", name);
         }
         else
             ipcError(err, err_size, "can't create the daemon's pipe");
@@ -2329,7 +2333,7 @@ OsConn *os_conn_connect(const char *name, char *err, const size_t err_size)
     if (h == INVALID_HANDLE_VALUE)
     {
         if (err && err_size > 0)
-            snprintf(err, err_size, "no beluga daemon called \"%s\" is running", name);
+            snprintf(err, err_size, "no narval daemon called \"%s\" is running", name);
         return NULL;
     }
     c = gcalloc(1, sizeof(*c));
@@ -2987,7 +2991,7 @@ static HWND clipboardWindow(void)
 {
     static HWND hwnd = NULL;
     if (!hwnd)
-        hwnd = CreateWindowExW(0, L"STATIC", L"beluga-clipboard", 0, 0, 0, 0, 0, HWND_MESSAGE,
+        hwnd = CreateWindowExW(0, L"STATIC", L"narval-clipboard", 0, 0, 0, 0, 0, HWND_MESSAGE,
                                NULL, GetModuleHandleW(NULL), NULL);
     return hwnd;
 }

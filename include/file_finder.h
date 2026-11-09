@@ -1,5 +1,5 @@
-#ifndef BELUGA_FILE_FINDER_H
-#define BELUGA_FILE_FINDER_H
+#ifndef NARVAL_FILE_FINDER_H
+#define NARVAL_FILE_FINDER_H
 
 #include "data.h"
 #include "append_buffer.h"
@@ -26,4 +26,4 @@ int fileFinderHandleKey(const Utf8Char *key);
 // Call from editorRefreshScreen() — appends the popup to `ab` when visible.
 void fileFinderDraw(struct abuf *ab);
 
-#endif // BELUGA_FILE_FINDER_H
+#endif // NARVAL_FILE_FINDER_H

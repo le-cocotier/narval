@@ -3,10 +3,10 @@
 # Pushing a tag that starts with "v" builds the same files as the Gitea
 # release (.gitea/workflows/release-windows.yml), with the same scripts,
 # and attaches them to a GitHub release for that tag:
-#   beluga-<tag>-windows-x64.zip     packaging/windows/build-zip.sh
-#   beluga-<version>.tar.gz          packaging/source-tarball.sh
-#   beluga_<version>_amd64.deb       packaging/linux/build-packages.sh
-#   beluga-<version>-1.x86_64.rpm    packaging/linux/build-packages.sh
+#   narval-<tag>-windows-x64.zip     packaging/windows/build-zip.sh
+#   narval-<version>.tar.gz          packaging/source-tarball.sh
+#   narval_<version>_amd64.deb       packaging/linux/build-packages.sh
+#   narval-<version>-1.x86_64.rpm    packaging/linux/build-packages.sh
 #
 # It only builds and releases: the Gitea workflow is the one that publishes
 # to Gitea's package registries, and the Homebrew, winget and AUR recipes
@@ -57,6 +57,6 @@ jobs:
             gh release upload "$GITHUB_REF_NAME" dist/*.zip dist/*.tar.gz dist/*.deb dist/*.rpm --clobber
           else
             gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.tar.gz dist/*.deb dist/*.rpm \
-              --title "Beluga $GITHUB_REF_NAME" --verify-tag \
-              --notes "Windows: winget install ArthurBarraux.Beluga, or download the zip, unzip it and run install.ps1. Linux: the .deb or .rpm below. macOS: brew (see the README)."
+              --title "Narval $GITHUB_REF_NAME" --verify-tag \
+              --notes "Windows: winget install ArthurBarraux.Narval, or download the zip, unzip it and run install.ps1. Linux: the .deb or .rpm below. macOS: brew (see the README)."
           fi

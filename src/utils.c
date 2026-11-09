@@ -117,7 +117,39 @@ void utilDirname(const char *path, char *out, const size_t out_size)
     snprintf(out, out_size, "%.*s", (int) len, path);
 }
 
-const char *utilBelugaDir(void)
+const char *utilEnv(const char *name, const char *legacy_name)
+{
+    const char *value = getenv(name);
+    if (value && value[0])
+        return value;
+    value = legacy_name ? getenv(legacy_name) : NULL;
+    return (value && value[0]) ? value : NULL;
+}
+
+/**
+ * @brief The editor was called beluga and kept its things in ~/.beluga
+ * (%USERPROFILE%\.beluga on Windows): the first start after the rename
+ * moves that directory to ~/.narval, so config, packages and projects
+ * carry over. Does nothing once ~/.narval exists.
+ */
+static void migrateLegacyDir(const char *home, const char *dir)
+{
+    OsFileInfo info;
+    char legacy[OS_PATH_MAX];
+    char err[256];
+    const char *sources[1];
+
+    if (os_file_info(dir, &info) == 0)
+        return;
+    snprintf(legacy, sizeof(legacy), "%s/.beluga", home);
+    if (os_file_info(legacy, &info) != 0 || !info.is_dir)
+        return;
+    sources[0] = legacy;
+    if (os_move(sources, 1, dir, err, sizeof(err)) != 0)
+        fprintf(stderr, "narval: could not move %s to %s: %s\n", legacy, dir, err);
+}
+
+const char *utilNarvalDir(void)
 {
     static char dir[OS_PATH_MAX];
     const char *env;
@@ -125,15 +157,17 @@ const char *utilBelugaDir(void)
 
     if (dir[0])
         return dir;
-    env = getenv("BELUGA_HOME");
-    if (env && env[0])
+    env = utilEnv("NARVAL_HOME", "BELUGA_HOME");
+    if (env)
         snprintf(dir, sizeof(dir), "%s", env);
     else
     {
         home = os_home_dir();
         if (!home)
             return NULL;
-        snprintf(dir, sizeof(dir), "%s/.beluga", home);
+        os_path_to_slashes(home);
+        snprintf(dir, sizeof(dir), "%s/.narval", home);
+        migrateLegacyDir(home, dir);
         gfree(home);
     }
     os_path_to_slashes(dir);
@@ -163,8 +197,8 @@ const char *utilDataDir(void) {
   if (looked)
     return dir[0] ? dir : NULL;
   looked = 1;
-  env = getenv("BELUGA_DATA_DIR");
-  if (env && env[0]) {
+  env = utilEnv("NARVAL_DATA_DIR", "BELUGA_DATA_DIR");
+  if (env) {
     snprintf(dir, sizeof(dir), "%s", env);
     os_path_to_slashes(dir);
     return dir;
@@ -172,7 +206,7 @@ const char *utilDataDir(void) {
   exe = os_exe_path();
   if (!exe)
     return NULL;
-  // Through any link (Homebrew's bin/beluga, winget's Links\beluga.exe)
+  // Through any link (Homebrew's bin/narval, winget's Links\narval.exe)
   // to the file itself, whose folder the data is installed next to.
   real = os_realpath(exe);
   if (real) {
@@ -183,7 +217,7 @@ const char *utilDataDir(void) {
   utilDirname(exe, bin, sizeof(bin));
   gfree(exe);
 
-  candidate = utilFormat("%s/../share/beluga", bin);
+  candidate = utilFormat("%s/../share/narval", bin);
   if (candidate && hasDefaultConfig(candidate)) {
     real = os_realpath(candidate);
     snprintf(dir, sizeof(dir), "%s", real ? real : candidate);

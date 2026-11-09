@@ -1,5 +1,5 @@
-#ifndef BELUGA_LIST_POPUP_H
-#define BELUGA_LIST_POPUP_H
+#ifndef NARVAL_LIST_POPUP_H
+#define NARVAL_LIST_POPUP_H
 
 #include "data.h"
 #include "append_buffer.h"
@@ -25,4 +25,4 @@ int listPopupHandleKey(const Utf8Char *key);
 // Call from editorRefreshScreen() — appends the popup to abuf when visible.
 void listPopupDraw(struct abuf *ab);
 
-#endif //BELUGA_LIST_POPUP_H
+#endif //NARVAL_LIST_POPUP_H

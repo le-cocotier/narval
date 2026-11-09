@@ -1,6 +1,6 @@
 /**
  * @file daemon.c
- * @brief The beluga daemon: one editor, several client windows.
+ * @brief The narval daemon: one editor, several client windows.
  * @details
  * Shared by every window: the buffers (text, cursor, undo, mark), the Lisp
  * interpreter and everything init.lisp set up, the language servers, the
@@ -136,7 +136,7 @@ static DaemonClient *s_current = NULL; // whose view is in E (NULL: s_idle's)
 static DaemonClient *s_focused = NULL; // the window that last sent keys
 static ClientView s_idle;              // E's view while no window is current
 static int s_running = 0;
-static int s_stop = 0; // beluga --kill was accepted
+static int s_stop = 0; // narval --kill was accepted
 static int s_next_id = 1;
 // The windows whose key is being handled, outermost first: more than one
 // when a window's prompt serves the others (serveOtherWindows()).
@@ -274,7 +274,7 @@ static void clientSwitchTo(DaemonClient *c) {
   viewLoad(c ? &c->view : &s_idle);
   s_current = c;
   // Relative paths, the open-file prompt, new terminals: from where this
-  // window's `beluga -c` ran.
+  // window's `narval -c` ran.
   E.cwd = c ? c->cwd : NULL;
   if (!c)
     return;
@@ -372,7 +372,7 @@ static int handleHello(DaemonClient *c, const unsigned char *payload, const size
 }
 
 /**
- * @brief beluga --kill: the daemon stops after this tick, unless a file
+ * @brief narval --kill: the daemon stops after this tick, unless a file
  * buffer has unsaved changes and the kill isn't forced.
  */
 // How many file buffers have unsaved changes.
@@ -392,7 +392,7 @@ static void handleKill(DaemonClient *c, const int force) {
 
   if (unsaved > 0 && !force) {
     snprintf(message, sizeof(message),
-             "beluga: %d buffer%s unsaved changes; save them, or use beluga --kill --force",
+             "narval: %d buffer%s unsaved changes; save them, or use narval --kill --force",
              unsaved, unsaved == 1 ? " has" : "s have");
     frameSend(c->conn, FRAME_EXIT, message, strlen(message));
   } else {
@@ -421,8 +421,8 @@ static void clientPump(DaemonClient *c, const int timeout_ms) {
   while ((r = frameNext(&c->reader, &type, &payload, &len)) == 1) {
     if (type == FRAME_HELLO && !c->greeted && !c->hello_pending) {
       if (handleHello(c, payload, len) == -1) {
-        frameSend(c->conn, FRAME_EXIT, "beluga: this daemon speaks another protocol version",
-                  strlen("beluga: this daemon speaks another protocol version"));
+        frameSend(c->conn, FRAME_EXIT, "narval: this daemon speaks another protocol version",
+                  strlen("narval: this daemon speaks another protocol version"));
         c->gone = 1;
       }
     } else if (type == FRAME_INPUT && (c->greeted || c->hello_pending)) {
@@ -477,7 +477,7 @@ static void clientOpen(DaemonClient *c) {
   }
   if (first >= 0)
     bufferSwitch(first);
-  editorSetStatusMessage("beluga daemon: CTRL-x CTRL-c closes this window, the buffers stay open");
+  editorSetStatusMessage("narval daemon: CTRL-x CTRL-c closes this window, the buffers stay open");
 }
 
 static void clientFree(DaemonClient *c) {
@@ -525,8 +525,8 @@ static void acceptClients(void) {
     count++;
   while ((conn = os_server_accept(s_server)) != NULL) {
     if (count >= DAEMON_MAX_CLIENTS) {
-      frameSend(conn, FRAME_EXIT, "beluga: the daemon has too many windows open",
-                strlen("beluga: the daemon has too many windows open"));
+      frameSend(conn, FRAME_EXIT, "narval: the daemon has too many windows open",
+                strlen("narval: the daemon has too many windows open"));
       os_conn_close(conn);
       continue;
     }
@@ -733,7 +733,7 @@ static void handleStopSignal(void) {
       (s_interrupted_at < 0 || now - s_interrupted_at > DAEMON_INTERRUPT_AGAIN_MS)) {
     s_interrupted_at = now;
     fprintf(stderr,
-            "\nbeluga: %d buffer%s unsaved changes. Save them, or press Ctrl-C again to "
+            "\nnarval: %d buffer%s unsaved changes. Save them, or press Ctrl-C again to "
             "stop anyway (autosave keeps a copy).\n",
             unsaved, unsaved == 1 ? " has" : "s have");
     return;
@@ -743,7 +743,7 @@ static void handleStopSignal(void) {
     if (b->type == FILE_BUFF && b->dirty)
       autosaveWrite(b);
   if (unsaved > 0)
-    fprintf(stderr, "beluga: stopped; the unsaved changes of %d buffer%s are in ~/.beluga/autosave\n",
+    fprintf(stderr, "narval: stopped; the unsaved changes of %d buffer%s are in ~/.narval/autosave\n",
             unsaved, unsaved == 1 ? "" : "s");
   s_stop = 1;
 }
@@ -810,7 +810,7 @@ static void daemonRunLoop(void) {
   }
 
   while (s_clients)
-    clientClose(s_clients, "beluga: the daemon was stopped");
+    clientClose(s_clients, "narval: the daemon was stopped");
   editorCloseTerminals();
   os_server_close(s_server);
   s_server = NULL;
@@ -858,7 +858,7 @@ int daemonMain(const char *name) {
 
   s_server = os_server_listen(name, err, sizeof(err));
   if (!s_server) {
-    fprintf(stderr, "beluga: %s\n", err);
+    fprintf(stderr, "narval: %s\n", err);
     return 1;
   }
   // Ctrl-C, a closed terminal, SIGTERM: stop the way --kill does, rather
@@ -871,7 +871,7 @@ int daemonMain(const char *name) {
   initEditor();
 
   splash_screen = gcalloc(PATH_MAX, sizeof(Utf8Char));
-  utf8Printf(splash_screen, PATH_MAX, "%s/assets/beluga.txt", utilBelugaDir());
+  utf8Printf(splash_screen, PATH_MAX, "%s/assets/narval.txt", utilNarvalDir());
   active = splitScreenGetActivePane();
   active->buffer_id = bufferCreate(splash_screen, READ_ONLY, FILE_BUFF);
   gfree(splash_screen);
@@ -880,13 +880,13 @@ int daemonMain(const char *name) {
   settingsReportProblems();
   configShowErrors();
   if (configErrorCount() > 0)
-    fprintf(stderr, "beluga: %d error(s) in the config, listed in *config-errors*\n",
+    fprintf(stderr, "narval: %d error(s) in the config, listed in *config-errors*\n",
             configErrorCount());
 
   if (strcmp(name, DAEMON_DEFAULT_NAME) == 0)
-    printf("beluga daemon running. Open a window with: beluga -c [file]\n");
+    printf("narval daemon running. Open a window with: narval -c [file]\n");
   else
-    printf("beluga daemon \"%s\" running. Open a window with: beluga -c --name=%s [file]\n",
+    printf("narval daemon \"%s\" running. Open a window with: narval -c --name=%s [file]\n",
            name, name);
   fflush(stdout);
 

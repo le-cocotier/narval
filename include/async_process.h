@@ -1,5 +1,5 @@
-#ifndef BELUGA_ASYNC_PROCESS_H
-#define BELUGA_ASYNC_PROCESS_H
+#ifndef NARVAL_ASYNC_PROCESS_H
+#define NARVAL_ASYNC_PROCESS_H
 
 #include "lisp.h"
 #include "os.h"
@@ -30,4 +30,4 @@ void asyncProcessPoll(void);
 // The callbacks of the running processes, for the collector (lisp_gc.c).
 void asyncProcessVisitLispRoots(LispRootVisitor visit, LispContext ctx);
 
-#endif // BELUGA_ASYNC_PROCESS_H
+#endif // NARVAL_ASYNC_PROCESS_H

@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <!--
-  Embedded into beluga.exe (see meson.build). activeCodePage UTF-8 makes the
+  Embedded into narval.exe (see meson.build). activeCodePage UTF-8 makes the
   C runtime's narrow file functions (fopen, opendir, stat, ...) take UTF-8
   paths, exactly as on Linux and macOS, instead of the legacy ANSI code page:
   without it, any file or folder name outside that code page couldn't be
   opened. Honoured from Windows 10 version 1903 on.
 -->
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-  <assemblyIdentity type="win32" name="Beluga.Editor" version="1.0.0.0"/>
+  <assemblyIdentity type="win32" name="Narval.Editor" version="1.0.0.0"/>
   <application xmlns="urn:schemas-microsoft-com:asm.v3">
     <windowsSettings>
       <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>

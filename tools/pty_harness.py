@@ -1,7 +1,7 @@
-"""Runs beluga in a pseudo-terminal for the headless tests (POSIX only).
+"""Runs narval in a pseudo-terminal for the headless tests (POSIX only).
 
-    from pty_harness import Beluga
-    with Beluga(binary, repo) as ed:
+    from pty_harness import Narval
+    with Narval(binary, repo) as ed:
         ed.keys('hi', '\\x18', '\\x13')       # type, then CTRL-x CTRL-s
         ed.wait_for('File saved')
         print(ed.text())                     # the screen, as pyte sees it
@@ -36,7 +36,7 @@ except ImportError:
 # this. A passing test never waits for a deadline, so a generous one only
 # costs time when something is already wrong; a sanitizer build on a slow
 # CI machine runs several times slower than a laptop.
-TIME_SCALE = float(os.environ.get('BELUGA_TEST_TIME_SCALE', '3'))
+TIME_SCALE = float(os.environ.get('NARVAL_TEST_TIME_SCALE', '3'))
 
 
 class Timeout(Exception):
@@ -53,22 +53,22 @@ def _on_alarm(signum, frame):
 
 def install_config(repo, home):
     """The repo's init.lisp, packages, personal config and assets, as
-    install.sh puts them in ~/.beluga."""
-    beluga = os.path.join(home, '.beluga')
-    os.makedirs(os.path.join(beluga, 'config'))
+    install.sh puts them in ~/.narval."""
+    narval = os.path.join(home, '.narval')
+    os.makedirs(os.path.join(narval, 'config'))
     shutil.copy(os.path.join(repo, 'config', 'init.lisp'),
-                os.path.join(beluga, 'config'))
+                os.path.join(narval, 'config'))
     shutil.copytree(os.path.join(repo, 'packages'),
-                    os.path.join(beluga, 'packages'))
-    personal = os.path.join(beluga, 'packages', 'personal-config')
+                    os.path.join(narval, 'packages'))
+    personal = os.path.join(narval, 'packages', 'personal-config')
     os.makedirs(personal, exist_ok=True)
     shutil.copy(os.path.join(repo, 'config', 'personal-config.lisp'),
                 os.path.join(personal, 'init.lisp'))
     shutil.copytree(os.path.join(repo, 'assets'),
-                    os.path.join(beluga, 'assets'))
+                    os.path.join(narval, 'assets'))
 
 
-class Beluga:
+class Narval:
     def __init__(self, binary, repo, args=(), rows=30, cols=100,
                  timeout=60, env=None, home=None):
         self.binary = os.path.abspath(binary)
@@ -77,7 +77,7 @@ class Beluga:
         self.rows, self.cols = rows, cols
         self.timeout = timeout
         self.extra_env = env or {}
-        # Another Beluga's HOME, to run a second program next to it (a
+        # Another Narval's HOME, to run a second program next to it (a
         # daemon window); it is left for that one to remove.
         self.shared_home = home
         self.home = None
@@ -105,7 +105,7 @@ class Beluga:
         return self
 
     def start(self, *args, cwd=None):
-        """Starts beluga with `args` (paths relative to HOME, or to `cwd`,
+        """Starts narval with `args` (paths relative to HOME, or to `cwd`,
         a directory under HOME, when given)."""
         master, slave = pty.openpty()
         # Sized before the editor exists: it reads the size once at startup.
@@ -154,7 +154,7 @@ class Beluga:
         return os.path.join(self.home, name)
 
     def run(self, *args):
-        """Runs beluga with `args` to the end, outside the pty, with this
+        """Runs narval with `args` to the end, outside the pty, with this
         HOME; (exit code, stdout + stderr)."""
         # The environment start() gives, which a daemon started here
         # passes on to its terminal panes.
@@ -246,7 +246,7 @@ class Beluga:
                 break
         status = self.status if self.status is not None else self.wait_exit(10)
         assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0, \
-            'beluga exited abnormally (status %d)' % status
+            'narval exited abnormally (status %d)' % status
 
     def wait_exit(self, seconds=20):
         """Waits for the editor to exit; its wait status."""
@@ -257,7 +257,7 @@ class Beluga:
                 self.status = status
                 return status
             self.pump(0.1)
-        raise AssertionError('beluga did not exit')
+        raise AssertionError('narval did not exit')
 
 
 class Skip(Exception):

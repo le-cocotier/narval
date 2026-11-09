@@ -12,7 +12,7 @@ incomplete · **[feature]** new capability.
 
 ## Daemon mode
 
-`beluga --daemon` / `beluga -c` (src/daemon.c, src/daemon_client.c). What's
+`narval --daemon` / `narval -c` (src/daemon.c, src/daemon_client.c). What's
 left after the first step:
 
 - [ ] **[debt]** Prompts still nest on one stack: the other windows are

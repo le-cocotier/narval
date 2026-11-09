@@ -128,7 +128,7 @@
 
 #define ABUF_INIT {NULL, 0, 0}
 
-#define BELUGA_VERSION "3.4"
+#define NARVAL_VERSION "3.4"
 
 
 

@@ -296,7 +296,7 @@ static int loadPackage(const char *name, const char *dir_arg, LispContext ctx);
 /**
  * @brief Loads what the manifest requires, in order.
  * @return 0 when the package must not load: a dependency is missing or
- * failed, or it needs a newer beluga. A dependency older than required,
+ * failed, or it needs a newer narval. A dependency older than required,
  * or a cycle, is only reported.
  */
 static int loadRequires(const char *name, Lisp requires, LispContext ctx) {
@@ -314,11 +314,12 @@ static int loadRequires(const char *name, Lisp requires, LispContext ctx) {
               ? lisp_string(lisp_car(lisp_cdr(req)))
               : NULL;
 
-    if (strcmp(dep, "beluga") == 0) {
-      if (min && packageVersionCompare(BELUGA_VERSION, min) < 0) {
-        editorSetStatusMessage("add-package: \"%s\" needs beluga %s or later (this is %s)", name,
-                               min, BELUGA_VERSION);
-        appDebug("[PACKAGE] %s: needs beluga %s\n", name, min);
+    // "beluga" is the editor's name before the rename, in older manifests.
+    if (strcmp(dep, "narval") == 0 || strcmp(dep, "beluga") == 0) {
+      if (min && packageVersionCompare(NARVAL_VERSION, min) < 0) {
+        editorSetStatusMessage("add-package: \"%s\" needs narval %s or later (this is %s)", name,
+                               min, NARVAL_VERSION);
+        appDebug("[PACKAGE] %s: needs narval %s\n", name, min);
         return 0;
       }
       continue;
@@ -348,13 +349,13 @@ static int loadRequires(const char *name, Lisp requires, LispContext ctx) {
 
 /**
  * @brief Where add-package looks for a package named without a folder:
- * <beluga dir>/packages/<name> when it has an init.lisp, else the copy
- * bundled with an installed beluga (utilDataDir()/packages/<name>), else
+ * <narval dir>/packages/<name> when it has an init.lisp, else the copy
+ * bundled with an installed narval (utilDataDir()/packages/<name>), else
  * the first one (for the "isn't installed" message).
  * @param from_install set to 1 when the bundled copy was picked
  */
 static char *defaultPackageDir(const char *name, int *from_install) {
-  char *dir = utilFormat("%s/packages/%s", utilBelugaDir(), name);
+  char *dir = utilFormat("%s/packages/%s", utilNarvalDir(), name);
   const char *data_dir = utilDataDir();
   char *bundled;
   OsFileInfo info;
@@ -375,7 +376,7 @@ static char *defaultPackageDir(const char *name, int *from_install) {
 /**
  * @brief Loads one package, once: its requires first, then its init.lisp.
  * @param dir_arg the package's directory, or NULL for
- * <beluga dir>/packages/<name>
+ * <narval dir>/packages/<name>
  * @return 1 when it is loaded (now or before), 0 otherwise
  */
 static int loadPackage(const char *name, const char *dir_arg, LispContext ctx) {
@@ -433,7 +434,7 @@ static int loadPackage(const char *name, const char *dir_arg, LispContext ctx) {
   // A bundled package without a version of its own is as new as the
   // editor it was installed with.
   if (!version && (from_install || fileExists(dir, ".bundled")))
-    version = BELUGA_VERSION;
+    version = NARVAL_VERSION;
   setString(&entry->version, version);
 
   if (loadRequires(name, manifestField(manifest, "requires"), ctx)) {
@@ -474,11 +475,11 @@ static const char *stringArg(Lisp args, int index) {
 /**
  * @brief Lisp function: (add-package "name" ["dir"]) — load a package once
  * @details Evaluates dir/init.lisp, dir being by default
- * <beluga dir>/packages/name (~/.beluga/packages/name unless BELUGA_HOME
+ * <narval dir>/packages/name (~/.narval/packages/name unless NARVAL_HOME
  * says otherwise). Naming a package that's already loaded again does
  * nothing, like Emacs' require. When dir has a package.lisp manifest, what
  * its (requires ...) names is loaded first, and a package needing a newer
- * beluga, or a missing dependency, isn't loaded at all. A missing package
+ * narval, or a missing dependency, isn't loaded at all. A missing package
  * and a Lisp error inside one are reported in the status bar.
  * @return #t when the package is loaded, #f when it isn't installed,
  * failed, or couldn't be loaded
@@ -524,7 +525,7 @@ Lisp l_packageState(const Lisp args, LispError *e, LispContext ctx) {
 
 /**
  * @brief Lisp function: (package-version "name") — the version a loaded
- * package's manifest gave (beluga's own for a bundled package without
+ * package's manifest gave (narval's own for a bundled package without
  * one), or #f.
  */
 Lisp l_packageVersion(const Lisp args, LispError *e, LispContext ctx) {
@@ -537,12 +538,12 @@ Lisp l_packageVersion(const Lisp args, LispError *e, LispContext ctx) {
 }
 
 /**
- * @brief Lisp function: (beluga-version) — "3.4", the running editor's.
+ * @brief Lisp function: (narval-version) — "3.4", the running editor's.
  */
-Lisp l_belugaVersion(const Lisp args, LispError *e, LispContext ctx) {
+Lisp l_narvalVersion(const Lisp args, LispError *e, LispContext ctx) {
   (void)args;
   (void)e;
-  return lisp_make_string2(BELUGA_VERSION, ctx);
+  return lisp_make_string2(NARVAL_VERSION, ctx);
 }
 
 /**
@@ -564,13 +565,13 @@ Lisp l_versionCompare(const Lisp args, LispError *e, LispContext ctx) {
 }
 
 /**
- * @brief Lisp function: (beluga-directory) — where beluga keeps its config
- * and packages: $BELUGA_HOME, or ~/.beluga.
+ * @brief Lisp function: (narval-directory) — where narval keeps its config
+ * and packages: $NARVAL_HOME, or ~/.narval.
  */
-Lisp l_belugaDirectory(const Lisp args, LispError *e, LispContext ctx) {
+Lisp l_narvalDirectory(const Lisp args, LispError *e, LispContext ctx) {
   (void)args;
   (void)e;
-  return lisp_make_string2(utilBelugaDir(), ctx);
+  return lisp_make_string2(utilNarvalDir(), ctx);
 }
 
 /**
@@ -582,8 +583,8 @@ Lisp l_packageDirectory(const Lisp args, LispError *e, LispContext ctx) {
   char *path;
   Lisp result;
   (void)e;
-  path = name ? utilFormat("%s/packages/%s", utilBelugaDir(), name)
-              : utilFormat("%s/packages", utilBelugaDir());
+  path = name ? utilFormat("%s/packages/%s", utilNarvalDir(), name)
+              : utilFormat("%s/packages", utilNarvalDir());
   if (!path)
     return lisp_make_bool(0);
   result = lisp_make_string2(path, ctx);
@@ -593,8 +594,8 @@ Lisp l_packageDirectory(const Lisp args, LispError *e, LispContext ctx) {
 
 /**
  * @brief Lisp function: (bundled-package-directory ["name"]) — the
- * packages that came with an installed beluga (Homebrew, winget, a .deb,
- * ...), or that package's folder in it; #f for a beluga that has none
+ * packages that came with an installed narval (Homebrew, winget, a .deb,
+ * ...), or that package's folder in it; #f for a narval that has none
  * (built from source, set up by install.sh). Read-only: add-package falls
  * back to it for a package missing from (package-directory).
  */

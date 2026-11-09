@@ -293,13 +293,13 @@
     (if (string=? root "") (editor-pwd) root)))
 
 ;; The current file's directory — except for buffers with no file, and the
-;; splash screen (whose "file" lives in ~/.beluga/assets), where the project
+;; splash screen (whose "file" lives in ~/.narval/assets), where the project
 ;; root (or the working directory) is what you'd want, as with Emacs' *scratch*.
 (define (dired--default-dir)
   (let* ((file (buffer-filename))
          (dir (if (string=? file "") "" (dired--dirname file))))
     (if (or (string=? dir "")
-            (string=? dir (expand-path "~/.beluga/assets"))
+            (string=? dir (expand-path "~/.narval/assets"))
             (not (dired--directory? dir)))
         (dired--project-dir)
         dir)))

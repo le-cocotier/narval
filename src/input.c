@@ -49,7 +49,7 @@ static int starPrefixId(void) {
 
 /**
  * @file input.c
- * @brief Input handling module for the Beluga text editor
+ * @brief Input handling module for the Narval text editor
  * @details Manages user input processing, key bindings, cursor movement, and
  * file path completion
  */

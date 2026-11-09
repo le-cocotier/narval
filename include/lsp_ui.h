@@ -2,8 +2,8 @@
 // Created by Giorgio on 27/05/2026.
 //
 
-#ifndef BELUGA_LSP_UI_H
-#define BELUGA_LSP_UI_H
+#ifndef NARVAL_LSP_UI_H
+#define NARVAL_LSP_UI_H
 
 
 #include "data.h"

@@ -50,7 +50,7 @@
 ;; Keys > Left/Right Option key: "Esc+". Then Option+key is ALT-key.
 ;;
 ;; Ctrl+1, Ctrl+., Ctrl+Shift+a, Ctrl+Enter only exist where the terminal
-;; can report them: beluga asks for xterm's modifyOtherKeys (xterm,
+;; can report them: narval asks for xterm's modifyOtherKeys (xterm,
 ;; WezTerm, foot, Ghostty; iTerm2's "Report keys using CSI u" works too)
 ;; and reads them from the Windows console's key events. Terminal.app and
 ;; the Linux console can't: there Ctrl+1 is just "1". (define EXTENDED-KEYS
@@ -58,7 +58,7 @@
 (define EXTENDED-KEYS #t)
 
 ;; Every AUTOSAVE-INTERVAL seconds, files with unsaved changes are copied to
-;; ~/.beluga/autosave/. Saving (or killing the buffer) removes the copy; after
+;; ~/.narval/autosave/. Saving (or killing the buffer) removes the copy; after
 ;; a crash or a closed terminal, opening the file again offers to recover it.
 ;; 0 turns autosave off. Omitting this means 15.
 (define AUTOSAVE-INTERVAL 15)
@@ -95,16 +95,16 @@
 
 ;; PACKAGES
 ;;
-;; Bundled packages come with beluga (packages/ in its repo) and install.sh
-;; puts them in ~/.beluga/packages/ — all of the ones named in this file.
+;; Bundled packages come with narval (packages/ in its repo) and install.sh
+;; puts them in ~/.narval/packages/ — all of the ones named in this file.
 ;; (add-package "name") loads one, once; a package that isn't installed is
 ;; reported in the status bar.
 ;;
 ;; "package" is the package manager and loads first: it defines
-;; use-package, for packages that don't ship with beluga. Declare yours in
+;; use-package, for packages that don't ship with narval. Declare yours in
 ;; personal-config, e.g.
 ;;   (use-package "rainbow" "https://example.org/rainbow.git" "v1.2.0")
-;; A declared package that's missing is cloned while beluga starts, and the
+;; A declared package that's missing is cloned while narval starts, and the
 ;; exact commit is recorded in personal-config/packages.lock. CTRL-x c l
 ;; lists every package, with install, update, roll back and remove keys;
 ;; see packages/package/init.lisp for the rest.
@@ -129,7 +129,7 @@
 ;; personal-config). Calling (lsp-server ...) directly here also works fine
 ;; for a language with no package of its own yet.
 ;;
-;; When a file's server isn't on PATH, beluga offers to install it, if the
+;; When a file's server isn't on PATH, narval offers to install it, if the
 ;; package says how with
 ;; (lsp-server-install "command" "os" "shell command" ["os" "shell command"]...)
 ;; where os is "linux", "darwin", "windows", "unix" (all but Windows) or
@@ -511,7 +511,7 @@
 (map-key "c" editor-open-config "config")
 (map-key "p" '(dired-open (package-directory)) "config")
 (map-key "m" '(editor-open-file-path (string-append (package-directory "personal-config") "/init.lisp")) "config")
-(map-key "s" list-settings "config")(map-key "m" '(editor-open-file-path "~/.beluga/packages/personal-config/init.lisp") "config")
+(map-key "s" list-settings "config")(map-key "m" '(editor-open-file-path "~/.narval/packages/personal-config/init.lisp") "config")
 ;; Who calls the function at the cursor, as a tree: its callers indented
 ;; under it, theirs under them. Type to filter, ENTER jumps to the call.
 (define (lsp-call-hierarchy)
@@ -540,7 +540,7 @@
 (map-key "r" lsp-rename "project")
 (map-key "z" lsp-format-buffer "project")
 ;; The project itself: switch to a remembered one (opens find-file in
-;; it), trust it so its .beluga/init.lisp loads, or open that file (a new
+;; it), trust it so its .narval/init.lisp loads, or open that file (a new
 ;; one starts with every setting as a commented-out placeholder).
 ;; n remembers any directory as a project, x forgets one (its files are
 ;; left alone), X forgets those whose directory is gone, u undoes t.
@@ -580,7 +580,7 @@
     (map-key "CTRL-x" '(editor-set-prefix "user") "memory")))
 
 ;; Your own modifications, kept out of this file so an update can replace it
-;; without erasing them: ~/.beluga/packages/personal-config/init.lisp,
+;; without erasing them: ~/.narval/packages/personal-config/init.lisp,
 ;; created once by install.sh and never overwritten. Loaded last, so its
 ;; settings, colors and key bindings win over everything above, and every
 ;; function defined in this file is there to bind.

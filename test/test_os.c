@@ -210,7 +210,7 @@ static void testMissingProgram(void) {
   OsSpawn spawn;
   OsProc *proc;
   int exit_code;
-  argv[0] = "beluga-no-such-program";
+  argv[0] = "narval-no-such-program";
   argv[1] = NULL;
   memset(&spawn, 0, sizeof(spawn));
   spawn.argv = argv;
@@ -228,13 +228,13 @@ static void testFindProgram(const char *self) {
   CHECK(found != NULL);
   CHECK(found && os_path_is_absolute(found));
   gfree(found);
-  CHECK(os_find_program("beluga-no-such-program") == NULL);
+  CHECK(os_find_program("narval-no-such-program") == NULL);
   CHECK(os_find_program("") == NULL);
   // A path is checked as given: this test program is there, nothing else.
   found = os_find_program(self);
   CHECK(found != NULL);
   gfree(found);
-  CHECK(os_find_program("./beluga-no-such-program") == NULL);
+  CHECK(os_find_program("./narval-no-such-program") == NULL);
 }
 
 int main(int argc, char **argv) {

@@ -1,8 +1,8 @@
 # A template for packaging/render.sh. One of the three files of the winget
 # manifest; all three go to microsoft/winget-pkgs under
-# manifests/a/ArthurBarraux/Beluga/@VERSION@/.
+# manifests/a/ArthurBarraux/Narval/@VERSION@/.
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.9.0.schema.json
-PackageIdentifier: ArthurBarraux.Beluga
+PackageIdentifier: ArthurBarraux.Narval
 PackageVersion: "@VERSION@"
 DefaultLocale: en-US
 ManifestType: version

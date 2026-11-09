@@ -15,7 +15,7 @@ int projectIsGitRepo(const char *root);
 typedef int (*ProjectFileVisitor)(const char *rel_path, const char *full_path, void *ctx);
 
 // Visits every regular file under `root`, skipping the directories nobody
-// wants in a project listing (.git, node_modules, build, dist, .beluga).
+// wants in a project listing (.git, node_modules, build, dist, .narval).
 // Returns what the visitor stopped with, or 0.
 int projectWalkFiles(const char *root, ProjectFileVisitor visit, void *ctx);
 

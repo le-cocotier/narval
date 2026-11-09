@@ -2,8 +2,8 @@
 // which-key style discoverability help.
 //
 
-#ifndef BELUGA_WHICH_KEY_H
-#define BELUGA_WHICH_KEY_H
+#ifndef NARVAL_WHICH_KEY_H
+#define NARVAL_WHICH_KEY_H
 
 #include "data.h"
 
@@ -30,4 +30,4 @@ void whichKeyInvalidate(void);
 // cache the panel uses. NULL for an index out of range.
 const char *whichKeyBindingName(int index);
 
-#endif // BELUGA_WHICH_KEY_H
+#endif // NARVAL_WHICH_KEY_H

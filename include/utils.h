@@ -26,12 +26,19 @@ char *utilFormat(const char *fmt, ...);
 // ("a/b/c.txt" -> "a/b", "c.txt" -> ".", "/c.txt" -> "/", "C:/x" -> "C:/").
 void utilDirname(const char *path, char *out, size_t out_size);
 
-// Where beluga keeps its config, packages and logs: $BELUGA_HOME when set
-// (tests, a portable install), else ~/.beluga. Never NULL once HOME is.
-const char *utilBelugaDir(void);
+// getenv(name), else getenv(legacy_name) (the NARVAL_* variables were
+// BELUGA_* before the rename; old setups keep working). NULL when neither
+// is set or both are empty. legacy_name may be NULL.
+const char *utilEnv(const char *name, const char *legacy_name);
 
-// Where an installed beluga's own files are (config/, packages/, assets/
-// as shipped): $BELUGA_DATA_DIR when set, else <prefix>/share/beluga next
+// Where narval keeps its config, packages and logs: $NARVAL_HOME (or the
+// old $BELUGA_HOME) when set (tests, a portable install), else ~/.narval,
+// which the first call moves ~/.beluga to if only that one exists. Never
+// NULL once HOME is.
+const char *utilNarvalDir(void);
+
+// Where an installed narval's own files are (config/, packages/, assets/
+// as shipped): $NARVAL_DATA_DIR when set, else <prefix>/share/narval next
 // to the real executable's bin/ (Homebrew, .deb, .rpm, AUR), else the
 // executable's own folder (the Windows zip, winget). NULL when none of
 // them holds a config/init.lisp, as in a build directory.

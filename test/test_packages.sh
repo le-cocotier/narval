@@ -1,14 +1,14 @@
 #!/bin/sh
-# The package manager, end to end: beluga --sync-packages against a
-# throwaway BELUGA_HOME and package repositories made on the spot (file://
+# The package manager, end to end: narval --sync-packages against a
+# throwaway NARVAL_HOME and package repositories made on the spot (file://
 # URLs, so no network). Checks installing, dependencies, refs, the
 # lockfile, the index, update/rollback/remove and add-package's refusals.
 #
-# Usage: test/test_packages.sh <beluga binary> <source root>
+# Usage: test/test_packages.sh <narval binary> <source root>
 
-beluga="$1"
+narval="$1"
 root="$2"
-[ -x "$beluga" ] && [ -d "$root/packages/package" ] || { echo "usage: $0 <beluga> <source root>" >&2; exit 2; }
+[ -x "$narval" ] && [ -d "$root/packages/package" ] || { echo "usage: $0 <narval> <source root>" >&2; exit 2; }
 command -v git >/dev/null || { echo "git not found: skipping"; exit 77; }
 
 tmp=$(mktemp -d) || exit 2
@@ -60,7 +60,7 @@ make_repo beta
 cat > "$tmp/work/beta/package.lisp" <<EOF
 (define-package "beta"
   (version "0.1")
-  (requires ("beluga" "1.0") ("alpha" "1.0"))
+  (requires ("narval" "1.0") ("alpha" "1.0"))
   (sources ("alpha" "$(url alpha)")))
 EOF
 echo '(define beta-saw alpha-value)' > "$tmp/work/beta/init.lisp"
@@ -81,7 +81,7 @@ EOF
 }
 personal() { cat > "$home/packages/personal-config/init.lisp"; }
 run() {
-    BELUGA_HOME="$home" "$beluga" --sync-packages </dev/null >"$tmp/out" 2>&1
+    NARVAL_HOME="$home" "$narval" --sync-packages </dev/null >"$tmp/out" 2>&1
     echo $? >"$tmp/status"
     cat "$tmp/out" >>"$tmp/all"
 }
@@ -228,10 +228,10 @@ else
     fail "remove"; cat "$tmp/out"
 fi
 
-# 9. add-package's refusals: too old a beluga, a missing dependency, a cycle.
+# 9. add-package's refusals: too old a narval, a missing dependency, a cycle.
 reset_home
 for p in future needy ying yang; do mkdir -p "$home/packages/$p"; done
-echo '(define-package "future" (requires ("beluga" "999")))' > "$home/packages/future/package.lisp"
+echo '(define-package "future" (requires ("narval" "999")))' > "$home/packages/future/package.lisp"
 echo '(define future-loaded #t)' > "$home/packages/future/init.lisp"
 echo '(define-package "needy" (requires ("nowhere" "1.0")))' > "$home/packages/needy/package.lisp"
 echo '(define needy-loaded #t)' > "$home/packages/needy/init.lisp"
@@ -246,7 +246,7 @@ personal <<'EOF'
 (editor-message (string-append "yang " (package-state "yang")))
 EOF
 run
-if out_has "needs beluga 999" && out_has "future refused" && out_has "needy refused" &&
+if out_has "needs narval 999" && out_has "future refused" && out_has "needy refused" &&
    out_has "require each other" && out_has "ying loaded" && out_has "yang loaded"; then
     pass "add-package refusals"
 else

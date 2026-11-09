@@ -82,8 +82,11 @@ void initBuiltins(void) {
   registerBuiltin("package-version", l_packageVersion);
   registerBuiltin("package-directory", l_packageDirectory);
   registerBuiltin("bundled-package-directory", l_bundledPackageDirectory);
-  registerBuiltin("beluga-directory", l_belugaDirectory);
-  registerBuiltin("beluga-version", l_belugaVersion);
+  registerBuiltin("narval-directory", l_narvalDirectory);
+  registerBuiltin("narval-version", l_narvalVersion);
+  // The names before the rename from beluga, so older configs still load.
+  registerBuiltin("beluga-directory", l_narvalDirectory);
+  registerBuiltin("beluga-version", l_narvalVersion);
   registerBuiltin("version-compare", l_versionCompare);
   registerBuiltin("read-data-file", l_readDataFile);
   registerBuiltin("write-data-file", l_writeDataFile);
@@ -251,7 +254,7 @@ void initBuiltins(void) {
 }
 
 /**
- * @brief The bindings needed to fix a broken config from inside beluga:
+ * @brief The bindings needed to fix a broken config from inside narval:
  * move around, type, save, open a file and quit.
  * @details Applied only after init.lisp reported an error, and only for
  * keys the config didn't bind itself, so a config that half-loaded keeps
@@ -332,12 +335,12 @@ static void initConfig(void) {
   char *home;
 
   E.ctx = lisp_init();
-  // In ~/.beluga, not the directory beluga was started from (where it
+  // In ~/.narval, not the directory narval was started from (where it
   // used to leave a lisp_log.err behind in every project). w+:
   // config_load.c reads back what the interpreter wrote here to put the
   // reason for a failing form in its error message.
   home = os_home_dir();
-  lisp_log_path = home ? utilFormat("%s/.beluga/lisp_log.err", home) : NULL;
+  lisp_log_path = home ? utilFormat("%s/.narval/lisp_log.err", home) : NULL;
   gfree(home);
   E.ctx.p->err_port = lisp_log_path ? fopen(lisp_log_path, "w+") : NULL;
   gfree(lisp_log_path);
@@ -411,12 +414,12 @@ static char *themeColor(const char *ansi) {
  *   - E.panes.layout (via SplitScreenInit)
  */
 /**
- * @brief Breakpoints outlive the editor: ~/.beluga/breakpoints holds every
+ * @brief Breakpoints outlive the editor: ~/.narval/breakpoints holds every
  * project's, and each debug session gets those of its own project.
  */
 static void initBreakpointStore(void) {
   char path[OS_PATH_MAX];
-  const char *dir = utilBelugaDir();
+  const char *dir = utilNarvalDir();
   if (!dir)
     return;
   snprintf(path, sizeof(path), "%s/breakpoints", dir);
@@ -424,7 +427,7 @@ static void initBreakpointStore(void) {
 }
 
 /**
- * @brief Copies one file of an installed beluga's data into ~/.beluga,
+ * @brief Copies one file of an installed narval's data into ~/.narval,
  * unless it's there already: never overwrites what the user has.
  */
 static void seedFile(const char *data_dir, const char *from, const char *to) {
@@ -432,7 +435,7 @@ static void seedFile(const char *data_dir, const char *from, const char *to) {
   char err[256];
   char parent[OS_PATH_MAX];
   char *src = utilFormat("%s/%s", data_dir, from);
-  char *dest = utilFormat("%s/%s", utilBelugaDir(), to);
+  char *dest = utilFormat("%s/%s", utilNarvalDir(), to);
   const char *sources[1];
 
   if (src && dest && os_file_info(dest, &info) != 0 && os_file_info(src, &info) == 0) {
@@ -447,21 +450,21 @@ static void seedFile(const char *data_dir, const char *from, const char *to) {
 }
 
 /**
- * @brief A beluga installed by a package manager (Homebrew, winget, a
- * .deb, ...) gets no install.sh to set up ~/.beluga, so its first start
+ * @brief A narval installed by a package manager (Homebrew, winget, a
+ * .deb, ...) gets no install.sh to set up ~/.narval, so its first start
  * does it: the default config/init.lisp, a personal-config to edit and the
  * splash screen, each only when missing. The bundled packages are not
  * copied: add-package finds them in the install itself (utilDataDir()), so
  * they stay in step with the editor through upgrades, and a copy in
- * ~/.beluga/packages still wins.
+ * ~/.narval/packages still wins.
  */
 static void seedUserDir(void) {
   const char *data_dir = utilDataDir();
-  if (!data_dir || !utilBelugaDir())
+  if (!data_dir || !utilNarvalDir())
     return;
   seedFile(data_dir, "config/init.lisp", "config/init.lisp");
   seedFile(data_dir, "config/personal-config.lisp", "packages/personal-config/init.lisp");
-  seedFile(data_dir, "assets/beluga.txt", "assets/beluga.txt");
+  seedFile(data_dir, "assets/narval.txt", "assets/narval.txt");
 }
 
 void initEditor() {
@@ -500,7 +503,7 @@ void initEditor() {
   gfree(home);
 
   seedUserDir();
-  E.init_file_path = utilFormat("%s/config/init.lisp", utilBelugaDir());
+  E.init_file_path = utilFormat("%s/config/init.lisp", utilNarvalDir());
   if (!E.init_file_path) {
     die("out of memory");
   }
@@ -639,7 +642,7 @@ void deInitEditor() {
   breakpointsFree();
   debugUiFree();
 
-  // write back ~/.beluga/projects, then free the list
+  // write back ~/.narval/projects, then free the list
   projectFree();
 
   // free the fuzzy file finder's path snapshot

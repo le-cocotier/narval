@@ -1,4 +1,4 @@
-project('beluga', 'c',
+project('narval', 'c',
   version : '3.5',
   default_options : [
     'c_std=c99'
@@ -23,10 +23,10 @@ if get_option('fuzzers')
 endif
 
 # ─── The OS layer ─────────────────────────────────────────────────────────────
-# Everything beluga needs from the operating system is declared in
+# Everything narval needs from the operating system is declared in
 # include/os.h and implemented by exactly one of two libraries:
-#   libbeluga-os-posix  src/os/os_posix.c  Linux, macOS, BSD
-#   libbeluga-os-win32  src/os/os_win32.c  Windows 10 1809+ / 11
+#   libnarval-os-posix  src/os/os_posix.c  Linux, macOS, BSD
+#   libnarval-os-win32  src/os/os_win32.c  Windows 10 1809+ / 11
 # They're the only code allowed OS headers or POSIX/Win32 calls
 # (tools/check_os_boundary.sh checks it).
 if is_windows
@@ -34,7 +34,7 @@ if is_windows
   if cc.get_argument_syntax() == 'msvc'
     error('Windows builds need MinGW-w64 gcc or clang (MSYS2 UCRT64/CLANG64, WinLibs, llvm-mingw, or a cross-compiler); MSVC is not supported.')
   endif
-  os_lib = static_library('beluga-os-win32',
+  os_lib = static_library('narval-os-win32',
     'src/os/os_win32.c',
     c_args : ['-D_WIN32_WINNT=0x0A00'],
     dependencies : [cc.find_library('user32'),    # clipboard
@@ -42,7 +42,7 @@ if is_windows
                     cc.find_library('advapi32'),  # the daemon pipe's permissions
                     cc.find_library('ws2_32')])   # debug adapters over TCP
 else
-  os_lib = static_library('beluga-os-posix',
+  os_lib = static_library('narval-os-posix',
     'src/os/os_posix.c',
     # forkpty, realpath, ...: this library is the POSIX one.
     c_args : ['-D_GNU_SOURCE'],
@@ -68,10 +68,10 @@ if is_windows
   # C99 printf (%zu, %lld, ...) instead of msvcrt.dll's, which lacks them.
   core_args += ['-D__USE_MINGW_ANSI_STDIO=1']
   # The manifest sets the process code page to UTF-8, so the C runtime's
-  # fopen() takes UTF-8 paths, as on Unix (see windows/beluga.manifest).
-  extra_sources += import('windows').compile_resources('windows/beluga.rc',
-    depend_files : files('windows/beluga.manifest'))
-  # One self-contained beluga.exe: no libgcc DLLs to ship next to it.
+  # fopen() takes UTF-8 paths, as on Unix (see windows/narval.manifest).
+  extra_sources += import('windows').compile_resources('windows/narval.rc',
+    depend_files : files('windows/narval.manifest'))
+  # One self-contained narval.exe: no libgcc DLLs to ship next to it.
   # Not for a sanitizer build (clang's AddressSanitizer on Windows only
   # comes as a DLL, libclang_rt.asan_dynamic-x86_64.dll).
   if get_option('b_sanitize') == 'none'
@@ -133,14 +133,14 @@ src_files = files(
 )
 
 # Everything but main(), so the unit tests link the same code.
-core_lib = static_library('beluga-core',
+core_lib = static_library('narval-core',
   src_files,
   c_args : core_args,
   link_with : os_lib,
   dependencies : [m]
 )
 
-beluga_exe = executable('beluga',
+narval_exe = executable('narval',
   files('main.c') + extra_sources,
   c_args : core_args,
   link_with : [core_lib, os_lib],
@@ -150,17 +150,17 @@ beluga_exe = executable('beluga',
 )
 
 # `meson install` (what Homebrew, the .deb/.rpm and the AUR package run):
-# bin/beluga, plus the default config, the bundled packages and the splash
-# screen in share/beluga. beluga finds them from its own path at start
-# (utilDataDir()), sets up ~/.beluga from them the first time, and loads
+# bin/narval, plus the default config, the bundled packages and the splash
+# screen in share/narval. narval finds them from its own path at start
+# (utilDataDir()), sets up ~/.narval from them the first time, and loads
 # bundled packages from there, so they upgrade with the editor.
-# install.sh and install.ps1 don't use this: they copy into ~/.beluga.
+# install.sh and install.ps1 don't use this: they copy into ~/.narval.
 if not is_windows
-  beluga_data = get_option('datadir') / 'beluga'
-  install_subdir('config', install_dir : beluga_data)
-  install_subdir('packages', install_dir : beluga_data,
+  narval_data = get_option('datadir') / 'narval'
+  install_subdir('config', install_dir : narval_data)
+  install_subdir('packages', install_dir : narval_data,
     exclude_files : ['lisp_log.err'])
-  install_subdir('assets', install_dir : beluga_data)
+  install_subdir('assets', install_dir : narval_data)
 endif
 
 # The OS boundary, checked: no file outside src/os/ includes an OS header.
@@ -173,7 +173,7 @@ test('galloc', find_program('tools/check_galloc.sh'),
 
 # Unit tests (test/): each is a small program linked against the editor's
 # code; test/test.c stands in for main.c's globals. On Windows they get
-# beluga.exe's manifest too, so file names are UTF-8 for them as well.
+# narval.exe's manifest too, so file names are UTF-8 for them as well.
 foreach t : ['utf8', 'keys', 'buffer', 'ansi_parser', 'os', 'completion', 'packages', 'highlight', 'lsp_symbols', 'breakpoints', 'lisp_lib',
            'utils', 'jsonrpc_stream', 'daemon_frame', 'macro', 'settings', 'lsp_install', 'lsp_completion', 'lsp_start']
   test(t, executable('test_' + t,
@@ -184,13 +184,13 @@ foreach t : ['utf8', 'keys', 'buffer', 'ansi_parser', 'os', 'completion', 'packa
     link_args : link_args))
 endforeach
 
-# Headless tests (POSIX), beluga in a pseudo-terminal. The smoke test opens
+# Headless tests (POSIX), narval in a pseudo-terminal. The smoke test opens
 # a file, types, saves and quits; under a sanitizer build it fails on any
 # report, leaks included.
 python3 = find_program('python3', required : false)
 if python3.found() and not is_windows
   test('smoke', python3,
-    args : [files('tools/smoke_test.py'), beluga_exe, meson.current_source_dir()],
+    args : [files('tools/smoke_test.py'), narval_exe, meson.current_source_dir()],
     timeout : 60)
   # What's on screen, through pyte (tools/pty_harness.py): TAB completion,
   # full-screen programs (less, vim) in a terminal pane, the debugger, the
@@ -201,7 +201,7 @@ if python3.found() and not is_windows
     check : true).stdout().split()
   foreach t : pty_tests
     test('pty-' + t, python3,
-      args : [files('tools/pty_tests.py'), beluga_exe, meson.current_source_dir(), t],
+      args : [files('tools/pty_tests.py'), narval_exe, meson.current_source_dir(), t],
       suite : 'pty',
       timeout : 240)
   endforeach
@@ -229,17 +229,17 @@ foreach f : ['ansi_parser', 'lsp']
   endif
 endforeach
 
-# The package manager end to end (test/test_packages.sh): beluga
+# The package manager end to end (test/test_packages.sh): narval
 # --sync-packages against throwaway package repositories. A shell script
 # with file:// git remotes, so not on Windows.
 if not is_windows
   test('package-manager', find_program('test/test_packages.sh'),
-    args : [beluga_exe.full_path(), meson.current_source_dir()],
-    depends : beluga_exe,
+    args : [narval_exe.full_path(), meson.current_source_dir()],
+    depends : narval_exe,
     timeout : 300)
-  # An installed beluga sets up ~/.beluga and loads the bundled packages
+  # An installed narval sets up ~/.narval and loads the bundled packages
   # from its install (test/test_installed.sh).
   test('installed', find_program('test/test_installed.sh'),
-    args : [beluga_exe.full_path(), meson.current_source_dir()],
-    depends : beluga_exe)
+    args : [narval_exe.full_path(), meson.current_source_dir()],
+    depends : narval_exe)
 endif

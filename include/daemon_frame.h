@@ -1,10 +1,10 @@
 /**
  * @file daemon_frame.h
- * @brief The messages between the beluga daemon and its clients.
+ * @brief The messages between the narval daemon and its clients.
  * @details Each frame is one type byte, the payload length as 4 bytes
  * (big-endian), then the payload:
  *
- *   'H' hello   client -> daemon  "beluga-daemon 1\n<rows> <cols>\n<cwd>\n"
+ *   'H' hello   client -> daemon  "narval-daemon 1\n<rows> <cols>\n<cwd>\n"
  *                                 then one line per file to open
  *   'I' input   client -> daemon  key bytes, as the terminal sent them
  *   'R' resize  client -> daemon  "<rows> <cols>"
@@ -29,7 +29,7 @@
 #define FRAME_KILL 'K'
 #define FRAME_EXIT 'X'
 
-#define DAEMON_PROTOCOL "beluga-daemon 1"
+#define DAEMON_PROTOCOL "narval-daemon 1"
 
 // A frame larger than this is a broken peer, not a big screen.
 #define FRAME_MAX_PAYLOAD (16 * 1024 * 1024)

@@ -1,11 +1,11 @@
 # Smart delimiters
 
-Smart delimiters is a package for beluga editor. The aim of it is to add closure delimiter when opening it.
+Smart delimiters is a package for narval editor. The aim of it is to add closure delimiter when opening it.
 
 ## Install
-Clone this repo in the packages folder of beluga (`~/.beluga/packages`).
+Clone this repo in the packages folder of narval (`~/.narval/packages`).
 ``` bash
-git clone https://homelinuxserver.ddns.net/git/arthur/smart_delimiters.git ~/.beluga/packages/smart_delimiters
+git clone https://homelinuxserver.ddns.net/git/arthur/smart_delimiters.git ~/.narval/packages/smart_delimiters
 ```
 Then add the following line to your init file.
 

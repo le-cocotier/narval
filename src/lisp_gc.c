@@ -57,7 +57,7 @@ void lispGcMaybeCollect(void) {
   size_t live;
   if (!E.ctx.p)
     return;
-#ifndef BELUGA_LISP_GC_STRESS // collect every time, to test the roots
+#ifndef NARVAL_LISP_GC_STRESS // collect every time, to test the roots
   if (lisp_heap_size(E.ctx) < s_collect_at)
     return;
 #endif

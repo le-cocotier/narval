@@ -119,7 +119,7 @@ void lisp_shutdown(LispContext ctx);
 Lisp lisp_collect(Lisp root_to_save, LispContext ctx);
 void lisp_print_collect_stats(LispContext ctx);
 
-// beluga: values the embedding program keeps outside the Lisp heap (a key
+// narval: values the embedding program keeps outside the Lisp heap (a key
 // binding's command, a hook's callback, ...). lisp_collect() moves every
 // object it keeps, so it calls `roots` to have each such value updated:
 // `roots` calls `visit` on the address of every one of them. The program
@@ -127,7 +127,7 @@ void lisp_print_collect_stats(LispContext ctx);
 typedef void (*LispRootVisitor)(Lisp *root, LispContext ctx);
 void lisp_set_roots(void (*roots)(LispRootVisitor visit, LispContext ctx),
                     LispContext ctx);
-// beluga: bytes allocated on the Lisp heap, live or not, since the last
+// narval: bytes allocated on the Lisp heap, live or not, since the last
 // collection (or startup).
 size_t lisp_heap_size(LispContext ctx);
 const char *lisp_error_string(LispError error);
@@ -362,7 +362,7 @@ void lisp_promise_store(Lisp p, Lisp x);
 #include <memory.h>
 #include <stdlib.h>
 
-// beluga: the interpreter allocates through galloc (gutils.c), so its pages,
+// narval: the interpreter allocates through galloc (gutils.c), so its pages,
 // stack and read buffers show up in the memory inspector and the exit report.
 #include "galloc.h"
 
@@ -837,7 +837,7 @@ Lisp lisp_make_vector(int n, LispContext ctx) {
   size_t size = sizeof(Vector) + sizeof(LispVal) * n + sizeof(char) * n;
   Vector *vector = gc_alloc(size, LISP_VECTOR, ctx);
   vector->block.d.vector.length = n;
-  // beluga: the collector walks every entry of a vector, so none may be
+  // narval: the collector walks every entry of a vector, so none may be
   // left uninitialized ((make-vector n) without a fill, vector-grow's new
   // tail, a hash table's unused value slots).
   memset(vector->entries, 0, sizeof(LispVal) * n);
@@ -969,7 +969,7 @@ Lisp lisp_make_table(LispContext ctx) {
 
 static void table_grow_(Lisp t, size_t new_capacity, LispContext ctx) {
   Table *table = table_get_(t);
-  // beluga: was 16. Every lambda call gets a table for its frame, and most
+  // narval: was 16. Every lambda call gets a table for its frame, and most
   // frames hold one to three names: apply() sizes them with
   // frame_capacity_() instead of paying for 16 slots each.
   if (new_capacity < 4)
@@ -999,7 +999,7 @@ static void table_grow_(Lisp t, size_t new_capacity, LispContext ctx) {
   assert(n == table->size);
 }
 
-// beluga: the smallest capacity that holds n names (and one internal define)
+// narval: the smallest capacity that holds n names (and one internal define)
 // without lisp_table_set() growing the table.
 static int frame_capacity_(int n) {
   int capacity = 4;
@@ -1258,7 +1258,7 @@ static Lisp symbol_intern_(Lisp table, const char *string, size_t length,
 
 Lisp lisp_make_symbol(const char *string, LispContext ctx) {
   assert(string);
-  // strnlen() isn't standard C (beluga's core is plain C99).
+  // strnlen() isn't standard C (narval's core is plain C99).
   int length = 0;
   while (length < LISP_IDENTIFIER_MAX && string[length])
     ++length;
@@ -2287,7 +2287,7 @@ static int apply(Lisp operator, Lisp args, Lisp *out_result, Lisp *out_env,
     // make a new environment
     Lisp new_table = lisp_make_table(ctx);
 
-    // beluga: sized for the parameters up front. A frame with none stays
+    // narval: sized for the parameters up front. A frame with none stays
     // empty (capacity 0) until something is defined in it.
     int slot_count = 0;
     Lisp it = slot_names;
@@ -2630,7 +2630,7 @@ Lisp lisp_macroexpand(Lisp lisp, LispError *out_error, LispContext ctx) {
   }
 }
 
-// beluga: lisp_eval2() without the macroexpansion pass, for code that was
+// narval: lisp_eval2() without the macroexpansion pass, for code that was
 // already expanded, like the body of a lambda (see apply_expanded_()).
 static Lisp eval_expanded_(Lisp expanded, Lisp env, LispError *out_error,
                            LispContext ctx) {
@@ -2693,7 +2693,7 @@ Lisp lisp_apply(Lisp operator, Lisp args, LispError *out_error,
   return needs_to_eval ? lisp_eval2(x, env, out_error, ctx) : x;
 }
 
-// beluga: lisp_apply() for the library's own calls (apply, map, filter,
+// narval: lisp_apply() for the library's own calls (apply, map, filter,
 // sort, ...). A lambda's body was expanded along with the form that made
 // it, and eval_r() runs it as is; walking it through the expander again on
 // every call only cost time.

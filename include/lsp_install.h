@@ -1,12 +1,12 @@
-#ifndef BELUGA_LSP_INSTALL_H
-#define BELUGA_LSP_INSTALL_H
+#ifndef NARVAL_LSP_INSTALL_H
+#define NARVAL_LSP_INSTALL_H
 
 #include "data.h"
 #include "lisp.h"
 
 // ─── Installing a missing language server ───────────────────────────────────
 // (lsp-server-install "command" "os" "shell command" ["os" "shell command"]...)
-// tells beluga how to install a language server on each platform. When a
+// tells narval how to install a language server on each platform. When a
 // file whose server isn't on PATH is opened, the user is asked whether to
 // run that command; it runs in a terminal pane, *lsp-install*, so its
 // progress shows and a sudo password or a licence question can be answered.
@@ -43,4 +43,4 @@ void lspInstallFree(void);
  */
 const char *lspInstallCommandFor(const char *command, const char *os, const char **needs);
 
-#endif // BELUGA_LSP_INSTALL_H
+#endif // NARVAL_LSP_INSTALL_H

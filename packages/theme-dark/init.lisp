@@ -1,5 +1,5 @@
 ;; ─── Theme: dark ────────────────────────────────────────────────────────────
-;; (add-package "theme-dark") — beluga's original default palette, now
+;; (add-package "theme-dark") — narval's original default palette, now
 ;; just an ordinary package instead of a hardcoded C if/else. Fork this
 ;; file (or write your own from scratch) to build a custom theme: eight
 ;; (editor-set-theme-color role r g b) calls is the whole interface.

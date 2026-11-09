@@ -36,7 +36,7 @@ static int autosaveApplies(const struct buffer_t *buf) {
 }
 
 /**
- * @brief ~/.beluga/autosave/<fullname with / \ : replaced by !>.
+ * @brief ~/.narval/autosave/<fullname with / \ : replaced by !>.
  * @return galloc'd path, or NULL.
  */
 static char *autosavePath(const struct buffer_t *buf) {
@@ -58,7 +58,7 @@ static char *autosavePath(const struct buffer_t *buf) {
   for (p = full; *p; p++)
     if (*p == '/' || *p == '\\' || *p == ':')
       *p = '!';
-  path = utilFormat("%s/.beluga/autosave/%s", home, full);
+  path = utilFormat("%s/.narval/autosave/%s", home, full);
   gfree(full);
   gfree(home);
   return path;
@@ -81,7 +81,7 @@ void autosaveWrite(struct buffer_t *buf) {
   if (!home)
     return;
 
-  dir = utilFormat("%s/.beluga/autosave", home);
+  dir = utilFormat("%s/.narval/autosave", home);
   gfree(home);
   if (dir) {
     os_mkdirs(dir, err, sizeof(err));

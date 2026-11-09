@@ -8,10 +8,10 @@
 # hashes them, and writes ready-to-commit copies of every recipe to
 # dist/packaging/<version>/, laid out like the repositories they go to:
 #
-#   homebrew-beluga/Formula/beluga.rb       -> git.giorgio-nas.fr/arthur/homebrew-beluga
-#   winget-pkgs/manifests/a/ArthurBarraux/Beluga/<version>/*.yaml
+#   homebrew-narval/Formula/narval.rb       -> git.giorgio-nas.fr/arthur/homebrew-narval
+#   winget-pkgs/manifests/a/ArthurBarraux/Narval/<version>/*.yaml
 #                                           -> a PR to github.com/microsoft/winget-pkgs
-#   aur/beluga-editor/PKGBUILD (+.SRCINFO)  -> ssh://aur@aur.archlinux.org/beluga-editor.git
+#   aur/narval-editor/PKGBUILD (+.SRCINFO)  -> ssh://aur@aur.archlinux.org/narval-editor.git
 #
 # The templates next to this script keep their @VERSION@ placeholders.
 
@@ -21,7 +21,7 @@ VERSION="${1:?usage: $0 VERSION}"
 VERSION="${VERSION#v}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OUT="$HERE/../dist/packaging/$VERSION"
-BASE="${BELUGA_RELEASE_URL:-https://git.giorgio-nas.fr/arthur/beluga/releases/download}/v$VERSION"
+BASE="${NARVAL_RELEASE_URL:-https://git.giorgio-nas.fr/arthur/narval/releases/download}/v$VERSION"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -31,8 +31,8 @@ sha() {  # sha256 of a downloaded release file
     else shasum -a 256 "$TMP/$1" | cut -d' ' -f1; fi
 }
 
-SHA_SOURCE="$(sha "beluga-$VERSION.tar.gz")"
-SHA_WINDOWS="$(sha "beluga-v$VERSION-windows-x64.zip")"
+SHA_SOURCE="$(sha "narval-$VERSION.tar.gz")"
+SHA_WINDOWS="$(sha "narval-v$VERSION-windows-x64.zip")"
 DATE="$(date +%Y-%m-%d)"
 
 render() {  # template -> destination
@@ -42,16 +42,16 @@ render() {  # template -> destination
 }
 
 rm -rf "$OUT"
-render "$HERE/homebrew/beluga.rb" "$OUT/homebrew-beluga/Formula/beluga.rb"
-WINGET="$OUT/winget-pkgs/manifests/a/ArthurBarraux/Beluga/$VERSION"
+render "$HERE/homebrew/narval.rb" "$OUT/homebrew-narval/Formula/narval.rb"
+WINGET="$OUT/winget-pkgs/manifests/a/ArthurBarraux/Narval/$VERSION"
 for f in "$HERE"/winget/*.yaml; do
     render "$f" "$WINGET/$(basename "$f")"
 done
-render "$HERE/arch/PKGBUILD" "$OUT/aur/beluga-editor/PKGBUILD"
+render "$HERE/arch/PKGBUILD" "$OUT/aur/narval-editor/PKGBUILD"
 if command -v makepkg >/dev/null; then
-    (cd "$OUT/aur/beluga-editor" && makepkg --printsrcinfo > .SRCINFO)
+    (cd "$OUT/aur/narval-editor" && makepkg --printsrcinfo > .SRCINFO)
 else
-    echo "makepkg isn't installed: generate aur/beluga-editor/.SRCINFO on Arch (makepkg --printsrcinfo > .SRCINFO)"
+    echo "makepkg isn't installed: generate aur/narval-editor/.SRCINFO on Arch (makepkg --printsrcinfo > .SRCINFO)"
 fi
 
 echo "source  $SHA_SOURCE"

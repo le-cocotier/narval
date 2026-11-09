@@ -8,7 +8,7 @@
 ;; It gives you completion and validation against whatever schema applies —
 ;; GitHub Actions workflows, docker-compose, Kubernetes manifests and so on
 ;; are matched from the SchemaStore catalog by filename, with no extra
-;; configuration. Beluga sends no per-language settings, so anything that
+;; configuration. Narval sends no per-language settings, so anything that
 ;; needs an explicit schema mapping won't get one; the catalog covers the
 ;; common cases on its own.
 

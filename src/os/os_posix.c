@@ -542,9 +542,15 @@ OsStream *os_term_input(void) { return &s_term_input; }
 struct OsProc {
   pid_t pid;
   OsStream out;
-  int in_fd; // -1 without OsSpawn.stdin_pipe
+  int in_fd; // -1 without OsSpawn.stdin_pipe; non-blocking
   int exited;
   int exit_code;
+  // What os_proc_write() couldn't hand to the pipe yet: the program isn't
+  // reading its stdin. Sent by os_proc_flush(), in order, before anything
+  // written later.
+  char *queued;
+  size_t queued_len;
+  size_t queued_cap;
 };
 
 static void setCloexec(const int fd) {
@@ -633,8 +639,11 @@ OsProc *os_proc_spawn(const OsSpawn *o) {
   // Our ends must not leak into programs started later: an inherited
   // copy of a pipe's write end keeps it from ever reaching EOF.
   setCloexec(out[0]);
-  if (in[1] >= 0)
+  if (in[1] >= 0) {
     setCloexec(in[1]);
+    // Never block on a program that stops reading: see os_proc_write().
+    fcntl(in[1], F_SETFL, fcntl(in[1], F_GETFL, 0) | O_NONBLOCK);
+  }
 
   p->pid = pid;
   streamInit(&p->out, out[0], 0);
@@ -645,21 +654,82 @@ OsProc *os_proc_spawn(const OsSpawn *o) {
 
 OsStream *os_proc_output(OsProc *p) { return p ? &p->out : NULL; }
 
-long os_proc_write(OsProc *p, const void *buf, const size_t n) {
-  const char *c = buf;
-  size_t left = n;
+/**
+ * @brief Writes what the pipe takes now, without waiting.
+ * @return bytes written (possibly 0), or -1 if the pipe is broken.
+ */
+static long writeSome(const int fd, const char *buf, const size_t n) {
+  size_t done = 0;
   ssize_t w;
-  if (!p || p->in_fd < 0)
-    return -1;
-  while (left > 0) {
-    w = write(p->in_fd, c, left);
+  while (done < n) {
+    w = write(fd, buf + done, n - done);
+    if (w > 0) {
+      done += (size_t)w;
+      continue;
+    }
     if (w < 0 && errno == EINTR)
       continue;
-    if (w <= 0)
-      return -1;
-    c += w;
-    left -= (size_t)w;
+    if (w < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+      break;
+    return -1;
   }
+  return (long)done;
+}
+
+long os_proc_flush(OsProc *p) {
+  long w;
+  if (!p || p->in_fd < 0)
+    return -1;
+  if (p->queued_len == 0)
+    return 0;
+  w = writeSome(p->in_fd, p->queued, p->queued_len);
+  if (w < 0)
+    return -1;
+  if (w > 0) {
+    memmove(p->queued, p->queued + w, p->queued_len - (size_t)w);
+    p->queued_len -= (size_t)w;
+  }
+  return (long)p->queued_len;
+}
+
+size_t os_proc_queued(const OsProc *p) { return p ? p->queued_len : 0; }
+
+long os_proc_write(OsProc *p, const void *buf, const size_t n) {
+  long w = 0;
+  size_t left;
+  size_t cap;
+  char *grown;
+  if (!p || p->in_fd < 0)
+    return -1;
+  // The stdin pipe is non-blocking. A blocking write() here froze the
+  // whole editor for good as soon as a language server stopped reading
+  // (stuck, stopped, or itself blocked writing a reply the editor wasn't
+  // reading, since the editor was in this write): once the pipe's 16-64KB
+  // filled up, write() never returned, and no key was read again. What
+  // doesn't fit now is queued and sent by os_proc_flush() from the run
+  // loop, which keeps reading the program's output meanwhile.
+  if (os_proc_flush(p) < 0)
+    return -1;
+  if (p->queued_len == 0) {
+    w = writeSome(p->in_fd, buf, n);
+    if (w < 0)
+      return -1;
+  }
+  left = n - (size_t)w;
+  if (left == 0)
+    return (long)n;
+  if (p->queued_len + left > p->queued_cap) {
+    cap = p->queued_cap ? p->queued_cap : 4096;
+    while (cap < p->queued_len + left)
+      cap *= 2;
+    grown = grealloc(p->queued, cap);
+    if (!grown)
+      return -1;
+    p->queued = grown;
+    p->queued_cap = cap;
+  }
+  memcpy(p->queued + p->queued_len, (const char *)buf + w, left);
+  p->queued_len += left;
   return (long)n;
 }
 
@@ -716,6 +786,7 @@ void os_proc_free(OsProc *p) {
     os_proc_kill(p);
     reap(p, 0);
   }
+  gfree(p->queued);
   gfree(p);
 }
 

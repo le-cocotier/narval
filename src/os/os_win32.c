@@ -1680,6 +1680,19 @@ long os_proc_write(OsProc *p, const void *buf, const size_t n)
     return (long) n;
 }
 
+// Writes on Windows still wait for the program (WriteFile on an anonymous
+// pipe has no non-blocking mode): nothing is ever queued.
+long os_proc_flush(OsProc *p)
+{
+    return p && p->in_write ? 0 : -1;
+}
+
+size_t os_proc_queued(const OsProc *p)
+{
+    (void) p;
+    return 0;
+}
+
 void os_proc_kill(OsProc *p)
 {
     if (!p || !p->process || p->exited)

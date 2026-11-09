@@ -1741,6 +1741,10 @@ int lspStart(LspClient *lsp, const char *project_root, char *const server_argv[]
     memset(&spawn, 0, sizeof(spawn));
     spawn.argv = (const char *const *) server_argv;
     spawn.stdin_pipe = 1;
+    // No controlling terminal: a server (or a compiler, git, ssh it runs)
+    // that touched /dev/tty from its background process group was stopped
+    // by SIGTTIN/SIGTTOU, and a stopped server never reads its stdin again.
+    spawn.no_prompt = 1;
     debug_log = appDebugLogPath();
     spawn.stderr_mode = debug_log ? OS_STDERR_FILE : OS_STDERR_DISCARD;
     spawn.stderr_file = debug_log;
@@ -1748,6 +1752,7 @@ int lspStart(LspClient *lsp, const char *project_root, char *const server_argv[]
     if (lsp->proc)
     {
         lsp->next_id = 1;
+        lsp->write_stall_ms = 0;
         lsp->state = LSP_INITIALIZING;
         lsp->pending_count = 0;
         // A restart (after a failed initialize, or an install) can find
@@ -3004,6 +3009,8 @@ int lspAwaitResponse(LspClient *lsp, const int request_id, const int timeout_ms)
     deadline = monotonic_ms() + timeout_ms;
     while (monotonic_ms() < deadline && lsp->proc)
     {
+        // The request itself may still be queued (os_proc_write()).
+        os_proc_flush(lsp->proc);
         still_pending = 0;
         for (i = 0; i < lsp->pending_count; i++)
         {
@@ -3644,6 +3651,55 @@ void lspSyncDebounceTick(void)
  * drains whatever's available, without waiting, into the incremental
  * parser.
  */
+/**
+ * @brief Sends what's queued for each language server's stdin, and stops a
+ * server that hasn't taken any of it for LSP_WRITE_STALL_MS.
+ * @details Writes to a server never wait (os_proc_write()): one that stops
+ * reading used to freeze the editor inside write() for good. Called every
+ * tick. Only time the editor spends running counts towards the limit, so
+ * a Mac waking up from sleep doesn't find every queue "stuck" for hours.
+ */
+void lspFlushWrites(void)
+{
+    static long long last_ms = 0;
+    const long long now = os_monotonic_ms();
+    const long long gap = last_ms ? now - last_ms : 0;
+    LspClient *lsp;
+    size_t before;
+    long after;
+    int i;
+    last_ms = now;
+
+    for (i = 0; i < E.number_of_lsp_clients; i++)
+    {
+        lsp = E.lsp_clients[i];
+        if (!lsp || !lsp->proc)
+            continue;
+        before = os_proc_queued(lsp->proc);
+        after = before ? os_proc_flush(lsp->proc) : 0;
+        if (after <= 0 || (size_t) after < before)
+        {
+            // Sent (or the pipe is broken, which lspPoll() sees as the
+            // server's end), or at least it's reading.
+            lsp->write_stall_ms = 0;
+            continue;
+        }
+        if (gap > 1000)
+            continue; // the editor itself wasn't running (sleep, a long command)
+        lsp->write_stall_ms += gap;
+        if (lsp->write_stall_ms < LSP_WRITE_STALL_MS)
+            continue;
+
+        appDebug("[LSP] %s stopped reading its input: stopping it\n", lsp->command);
+        editorSetStatusMessage("%s stopped responding and was stopped", lsp->command);
+        lsp->write_stall_ms = 0;
+        lsp->pending_count = 0;
+        // Its output ends with it: lspPoll() then releases it, as after a
+        // crash.
+        os_proc_kill(lsp->proc);
+    }
+}
+
 void lspPoll(LspClient *lsp)
 {
     char chunk[4096];
@@ -3713,8 +3769,9 @@ void lspShutdown(LspClient *lsp)
         lsp->state = LSP_SHUTTING_DOWN;
 
         timeout = 1000;
-        while (lsp->state == LSP_SHUTTING_DOWN && timeout > 0)
+        while (lsp->state == LSP_SHUTTING_DOWN && timeout > 0 && lsp->proc)
         {
+            os_proc_flush(lsp->proc);
             os_sleep_ms(10);
             timeout -= 10;
             lspPoll(lsp);

@@ -198,6 +198,9 @@ void editorTick(void) {
   // Runs every ~50ms tick regardless of what woke the wait up, so a
   // scheduled completion request fires shortly after its debounce
   // deadline passes even if the user has stopped typing entirely.
+  // Whatever a language server couldn't take yet (os_proc_write()), even
+  // with LSP since turned off: a server still running gets it.
+  lspFlushWrites();
   if (E.constantes.LSP) {
     lspCompletionDebounceTick();
     lspSyncDebounceTick();

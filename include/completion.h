@@ -12,6 +12,8 @@ void lspCleanup(LspClient* lsp);
 // ── Non-blocking I/O — call from editorRunLoop() when the server's output
 // stream is ready ───────────────────────────────────────────────────────────
 void lspPoll(LspClient* lsp);
+// Sends what's queued for the servers' stdin; stops a server that's hung.
+void lspFlushWrites(void);
 
 // ── Message dispatch (internal to completion.c's lspPoll, but exposed
 // in case lsp_ui.c or tests need to feed a message directly) ────────────────

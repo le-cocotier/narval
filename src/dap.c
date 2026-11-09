@@ -1236,6 +1236,9 @@ void dapTick(void) {
     if (s_sessions[i].state == DAP_OFF)
       continue;
     entered = enter(&s_sessions[i]);
+    // What the adapter's stdin couldn't take yet (os_proc_write()).
+    if (s->proc && !s->conn)
+      os_proc_flush(s->proc);
     tickSession();
     leave(entered);
   }

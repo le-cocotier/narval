@@ -18,6 +18,9 @@
 #endif
 
 #define LSP_MAX_PENDING 64
+// A language server that takes none of what's written to it for this long
+// (editor running time) is taken for hung and stopped: lspFlushWrites().
+#define LSP_WRITE_STALL_MS 10000
 // Language servers running at once (one per server command).
 #define LSP_MAX_CLIENTS 8
 

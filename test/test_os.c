@@ -125,6 +125,86 @@ static void testProcess(const char *self) {
   os_proc_free(proc);
 }
 
+#define NO_READ_BYTES (1024L * 1024L)
+
+/**
+ * @brief A program that stops reading its stdin (a hung language server)
+ * must not block os_proc_write(): what the pipe can't take is queued, then
+ * delivered whole and in order by os_proc_flush() once it reads again.
+ */
+static void testWriteDoesNotBlock(const char *self) {
+  const char *argv[3];
+  OsSpawn spawn;
+  OsProc *proc;
+  char *data;
+  char out[64];
+  long n;
+  long total;
+  long long start;
+  long i;
+
+  argv[0] = self;
+  argv[1] = "--no-read";
+  argv[2] = NULL;
+  memset(&spawn, 0, sizeof(spawn));
+  spawn.argv = argv;
+  spawn.stdin_pipe = 1;
+  proc = os_proc_spawn(&spawn);
+  CHECK(proc != NULL);
+  if (!proc)
+    return;
+  data = galloc((size_t)NO_READ_BYTES);
+  for (i = 0; i < NO_READ_BYTES; i++)
+    data[i] = (char)('a' + i % 26);
+
+  start = os_monotonic_ms();
+  CHECK_INT(os_proc_write(proc, data, (size_t)NO_READ_BYTES), NO_READ_BYTES);
+  if (!isWindows()) {
+    // Windows' pipes still block: nothing is ever queued there.
+    CHECK(os_monotonic_ms() - start < 1000);
+    CHECK(os_proc_queued(proc) > 0);
+  }
+
+  total = 0;
+  start = os_monotonic_ms();
+  while (os_monotonic_ms() - start < 20000) {
+    if (os_proc_flush(proc) < 0)
+      break;
+    n = os_stream_read(os_proc_output(proc), out + total,
+                       sizeof(out) - 1 - (size_t)total, 50);
+    if (n < 0)
+      break;
+    total += n;
+  }
+  out[total] = '\0';
+  CHECK_INT((long)os_proc_queued(proc), 0);
+  CHECK(strstr(out, "ok 1048576") != NULL);
+  gfree(data);
+  os_proc_free(proc);
+}
+
+/**
+ * @brief The --no-read child: doesn't read for a while, then checks it got
+ * NO_READ_BYTES of the a-z pattern, in order.
+ */
+static int noReadChild(void) {
+  char buf[4096];
+  long got = 0;
+  long bad = 0;
+  long i;
+  size_t n;
+  os_sleep_ms(1500);
+  while (got < NO_READ_BYTES && (n = fread(buf, 1, sizeof(buf), stdin)) > 0) {
+    for (i = 0; i < (long)n; i++)
+      if (buf[i] != (char)('a' + (got + i) % 26))
+        bad++;
+    got += (long)n;
+  }
+  printf(bad ? "bad %ld\n" : "ok %ld\n", bad ? bad : got);
+  fflush(stdout);
+  return 0;
+}
+
 static void testMissingProgram(void) {
   const char *argv[2];
   OsSpawn spawn;
@@ -163,11 +243,14 @@ int main(int argc, char **argv) {
     fflush(stdout);
     return 3;
   }
+  if (argc > 1 && strcmp(argv[1], "--no-read") == 0)
+    return noReadChild();
   os_init();
   testInit();
   testFiles();
   testPaths();
   testProcess(argv[0]);
+  testWriteDoesNotBlock(argv[0]);
   testMissingProgram();
   testFindProgram(argv[0]);
   return testDone();

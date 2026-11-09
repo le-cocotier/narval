@@ -323,6 +323,10 @@ struct lsp_client_t
     // "" otherwise. Reported again, and the server retried, at the next
     // file of its language (bufferMaybeStartLsp()).
     char start_error[256];
+    // How long what's queued for its stdin has sat there without the
+    // server taking any of it (lspFlushWrites()), in ms of the editor
+    // running: time asleep doesn't count.
+    long long write_stall_ms;
 
     // ── Pending requests ──────────────────────────────────────────────────────
     LspPending pending[LSP_MAX_PENDING];

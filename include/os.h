@@ -201,8 +201,18 @@ OsProc *os_proc_spawn(const OsSpawn *spawn);
 // The program's stdout (and stderr with OS_STDERR_MERGE).
 OsStream *os_proc_output(OsProc *p);
 
-// Writes to its stdin (OsSpawn.stdin_pipe). All of `buf`, or -1.
+// Writes to its stdin (OsSpawn.stdin_pipe). Never waits for the program
+// to read: on Unix, what the pipe can't take now is queued, in order, and
+// sent by os_proc_flush(). Returns n (written or queued), or -1 if the
+// pipe is broken.
 long os_proc_write(OsProc *p, const void *buf, size_t n);
+
+// Sends what os_proc_write() queued, as far as the pipe takes it without
+// waiting. Returns the bytes still queued, or -1 if the pipe is broken.
+long os_proc_flush(OsProc *p);
+
+// Bytes os_proc_write() has queued and not sent yet.
+size_t os_proc_queued(const OsProc *p);
 
 // Ends the program and everything it started (a process group on Unix, a
 // Job object on Windows).

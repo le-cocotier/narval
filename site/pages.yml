@@ -1,0 +1,58 @@
+# Project website, on the GitHub mirror's GitHub Pages.
+#
+# site/ holds the page with __SITE_URL__, __GITHUB_URL__ and __LASTMOD__
+# placeholders; this fills them in and deploys the result. The site lives at
+# https://<owner>.github.io/<repo> unless the repository variable SITE_URL
+# names another address (a custom domain, without a trailing slash).
+#
+# One-time setup on GitHub: Settings > Pages > Source: "GitHub Actions".
+# Gitea never runs this file: it uses .gitea/workflows when that folder exists.
+
+name: Website
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["site/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fill in the site's address
+        env:
+          SITE_URL: ${{ vars.SITE_URL || format('https://{0}.github.io/{1}', github.repository_owner, github.event.repository.name) }}
+          GITHUB_URL: https://github.com/${{ github.repository }}
+        run: |
+          mkdir -p _site
+          cp -R site/. _site/
+          lastmod=$(git log -1 --format=%cs)
+          find _site -type f \( -name '*.html' -o -name '*.xml' -o -name '*.txt' \) -exec \
+            sed -i -e "s|__SITE_URL__|${SITE_URL}|g" -e "s|__GITHUB_URL__|${GITHUB_URL}|g" \
+                   -e "s|__LASTMOD__|${lastmod}|g" {} +
+          if [ -n "${{ vars.SITE_URL }}" ]; then
+            echo "${SITE_URL#https://}" > _site/CNAME
+          fi
+          if grep -rl '__[A-Z_]*__' _site; then echo "unfilled placeholder" >&2; exit 1; fi
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

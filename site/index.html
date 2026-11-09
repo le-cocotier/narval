@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Narval: a terminal text editor in C, configured in Lisp</title>
+<meta name="description" content="Narval is a free, open-source terminal text editor written in C and configured in Lisp, with LSP, a DAP debugger, git and a package manager. Linux, macOS, Windows.">
+<meta name="keywords" content="narval, narval editor, terminal text editor, console editor, cli editor, lisp configured editor, emacs alternative, C text editor, LSP, debugger, cross-platform">
+<meta name="author" content="Arthur Barraux">
+<link rel="canonical" href="__SITE_URL__/">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0e1a24">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Narval">
+<meta property="og:title" content="Narval: a terminal text editor in C, configured in Lisp">
+<meta property="og:description" content="LSP, a debugger, git, a package manager and terminal panes in one small C binary. Configure everything in Lisp. Linux, macOS and Windows.">
+<meta property="og:url" content="__SITE_URL__/">
+<meta property="og:image" content="__SITE_URL__/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Narval: a terminal text editor in C, configured in Lisp">
+<meta name="twitter:description" content="LSP, a debugger, git, a package manager and terminal panes in one small C binary, configured in Lisp.">
+<meta name="twitter:image" content="__SITE_URL__/og-image.png">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Narval",
+  "alternateName": ["narval editor", "Beluga editor"],
+  "description": "A terminal text editor written in C and configured in Lisp, with language servers (LSP), a Debug Adapter Protocol debugger, git integration, a package manager, terminal panes and a daemon mode.",
+  "applicationCategory": "DeveloperApplication",
+  "applicationSubCategory": "Text editor",
+  "operatingSystem": "Linux, macOS, Windows",
+  "softwareVersion": "4.0.0",
+  "license": "https://opensource.org/licenses/MIT",
+  "url": "__SITE_URL__/",
+  "downloadUrl": "https://git.giorgio-nas.fr/arthur/narval/releases",
+  "codeRepository": "https://git.giorgio-nas.fr/arthur/narval",
+  "programmingLanguage": ["C", "Lisp"],
+  "author": { "@type": "Person", "name": "Arthur Barraux" },
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "sameAs": ["https://git.giorgio-nas.fr/arthur/narval", "__GITHUB_URL__"]
+}
+</script>
+
+<style>
+:root {
+  --bg: #f6f8fa; --surface: #ffffff; --text: #17212b; --muted: #55636f;
+  --accent: #0b7285; --accent-2: #1c7ed6; --border: #dde3e8;
+  --code-bg: #0e1a24; --code-text: #d8e4ee; --code-muted: #7d93a6; --code-key: #66d9e8; --code-str: #a9e34b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b141c; --surface: #111e29; --text: #e3ebf2; --muted: #95a6b5;
+    --accent: #66d9e8; --accent-2: #74c0fc; --border: #22323f;
+    --code-bg: #070d13;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+a { color: var(--accent-2); }
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+header.top { display: flex; justify-content: space-between; align-items: center; padding: 18px 0; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 20px; color: var(--text); text-decoration: none; }
+.brand img { width: 30px; height: 30px; }
+nav a { margin-left: 18px; color: var(--muted); text-decoration: none; font-size: 15px; }
+nav a:hover { color: var(--text); }
+.hero { padding: 48px 0 28px; }
+.hero h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.15; margin: 0 0 16px; letter-spacing: -0.02em; }
+.hero h1 span { color: var(--accent); }
+.hero p.lead { font-size: 19px; color: var(--muted); max-width: 680px; margin: 0 0 26px; }
+.cta { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn { display: inline-block; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px; }
+.btn.primary { background: var(--accent); color: #fff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primary { color: #06222a; } }
+.btn.ghost { border: 1px solid var(--border); color: var(--text); background: var(--surface); }
+pre, code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+pre {
+  background: var(--code-bg); color: var(--code-text); border-radius: 10px;
+  padding: 16px 18px; overflow-x: auto; font-size: 14px; line-height: 1.55; margin: 0;
+}
+pre .c { color: var(--code-muted); }
+pre .k { color: var(--code-key); }
+pre .s { color: var(--code-str); }
+p code, li code, td code { background: var(--surface); border: 1px solid var(--border); padding: 1px 5px; border-radius: 4px; font-size: 0.88em; }
+section { padding: 36px 0; border-top: 1px solid var(--border); }
+section h2 { font-size: 26px; margin: 0 0 18px; letter-spacing: -0.01em; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+.card h3 { margin: 0 0 6px; font-size: 17px; }
+.card p { margin: 0; color: var(--muted); font-size: 15px; }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.two > * { min-width: 0; }
+@media (max-width: 760px) { .two { grid-template-columns: 1fr; } nav a { margin: 0 14px 0 0; } }
+.install h3 { font-size: 16px; margin: 18px 0 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; }
+td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+td:first-child { white-space: nowrap; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 14px; }
+details { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin-bottom: 10px; }
+summary { cursor: pointer; font-weight: 600; }
+details p { color: var(--muted); margin: 10px 0 0; }
+footer { padding: 30px 0 50px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--border); }
+footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="./"><img src="favicon.svg" alt="" width="30" height="30">Narval</a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#install">Install</a>
+      <a href="https://git.giorgio-nas.fr/arthur/narval/wiki">Docs</a>
+      <a href="https://git.giorgio-nas.fr/arthur/narval">Source</a>
+    </nav>
+  </header>
+
+  <main>
+  <div class="hero">
+    <h1>Narval, a terminal text editor<br>written in C, <span>configured in Lisp</span></h1>
+    <p class="lead">Language servers, a debugger, git, a package manager and terminal panes, in one
+      small binary with no dependencies. It runs the same on Linux, macOS and Windows, and every
+      setting, key binding and hook is a line of Lisp.</p>
+    <div class="cta">
+      <a class="btn primary" href="#install">Install Narval 4.0</a>
+      <a class="btn ghost" href="https://git.giorgio-nas.fr/arthur/narval">Source code</a>
+      <a class="btn ghost" href="__GITHUB_URL__">GitHub mirror</a>
+    </div>
+  </div>
+
+  <section id="features">
+    <h2>Features</h2>
+    <div class="grid">
+      <div class="card"><h3>Configured in Lisp</h3><p><code>init.lisp</code> is a program: settings, key bindings, hooks and whole packages. Errors are reported with file and line, and the rest still loads.</p></div>
+      <div class="card"><h3>Language servers (LSP)</h3><p>Completion, signature help, go to definition, references, diagnostics, outline, workspace symbols, inlay hints, sticky scroll. Offers to install a missing server.</p></div>
+      <div class="card"><h3>Debugger (DAP)</h3><p>gdb, lldb-dap, debugpy or any Debug Adapter Protocol server. Breakpoints that follow your edits, conditions, logpoints, watches, inline values.</p></div>
+      <div class="card"><h3>git built in</h3><p>Status, hunk staging, commits, push and pull, log and branches, colored diffs, branch and diff markers in the gutter.</p></div>
+      <div class="card"><h3>Package manager</h3><p><code>use-package</code> with versions, dependencies and a lockfile, so the same setup installs on every machine.</p></div>
+      <div class="card"><h3>Daemon mode</h3><p>Several terminal windows on one editor: shared buffers and language servers, a project per window.</p></div>
+      <div class="card"><h3>Terminal panes</h3><p>Run full-screen programs inside the editor. Plus keyboard macros, mouse support, autosave and crash recovery.</p></div>
+      <div class="card"><h3>Native everywhere</h3><p>Plain C99, no dependencies beyond the C library. Windows 10 and 11 run it in Windows Terminal, no WSL needed.</p></div>
+    </div>
+  </section>
+
+  <section id="config">
+    <div class="two">
+      <div>
+        <h2>Your editor is a Lisp program</h2>
+        <p>Narval reads <code>~/.narval/packages/personal-config/init.lisp</code> at start. Define
+          commands, bind keys, react to hooks, declare packages from any git repository. Updates
+          never touch it.</p>
+        <p>Everything beyond the core is a package written the same way: the C mode, the git UI,
+          the debugger panel. Read them, copy them, change them.</p>
+      </div>
+<pre><span class="c">; ~/.narval/packages/personal-config/init.lisp</span>
+(<span class="k">define</span> DEBUG-INLINE-VALUES #t)
+
+(<span class="k">map-key</span> <span class="s">"F5"</span> debug-continue <span class="s">"no-prefix"</span>)
+
+(<span class="k">lsp-server-install</span> <span class="s">"pyright-langserver"</span> <span class="s">"any"</span>
+                    <span class="s">"pipx install pyright"</span>)
+
+(<span class="k">use-package</span> <span class="s">"rainbow"</span>
+             <span class="s">"https://example.org/rainbow.git"</span> <span class="s">"latest"</span>)
+
+(<span class="k">dap-adapter</span> <span class="s">"go"</span> <span class="s">"dlv"</span> <span class="s">"dap"</span>
+             <span class="s">"--listen=127.0.0.1:{port}"</span>)</pre>
+    </div>
+  </section>
+
+  <section id="install" class="install">
+    <h2>Install</h2>
+    <div class="two">
+      <div>
+        <h3>macOS and Linux (Homebrew)</h3>
+<pre>brew tap arthur/narval https://git.giorgio-nas.fr/arthur/homebrew-narval.git
+brew install narval</pre>
+        <h3>Windows (winget)</h3>
+<pre>winget install ArthurBarraux.Narval</pre>
+        <h3>Arch Linux (AUR)</h3>
+<pre>yay -S narval-editor</pre>
+      </div>
+      <div>
+        <h3>Debian and Ubuntu</h3>
+<pre>sudo curl -fsSL https://git.giorgio-nas.fr/api/packages/arthur/debian/repository.key \
+     -o /etc/apt/keyrings/narval.asc
+echo "deb [signed-by=/etc/apt/keyrings/narval.asc] https://git.giorgio-nas.fr/api/packages/arthur/debian stable main" \
+  | sudo tee /etc/apt/sources.list.d/narval.list
+sudo apt update &amp;&amp; sudo apt install narval</pre>
+        <h3>Fedora, RHEL, openSUSE</h3>
+<pre>sudo curl -fsSL https://git.giorgio-nas.fr/api/packages/arthur/rpm.repo \
+     -o /etc/yum.repos.d/narval.repo
+sudo dnf install narval</pre>
+        <h3>From source</h3>
+<pre>git clone https://git.giorgio-nas.fr/arthur/narval.git
+cd narval &amp;&amp; ./install.sh</pre>
+      </div>
+    </div>
+    <p>Prebuilt <code>.deb</code>, <code>.rpm</code> and Windows zip files are on the
+      <a href="https://git.giorgio-nas.fr/arthur/narval/releases">releases page</a>.</p>
+  </section>
+
+  <section id="keys">
+    <h2>First steps</h2>
+    <p>Run <code>narval path/to/file</code>. After a prefix such as Ctrl-x, pause and the keys
+      available under it appear at the bottom of the screen.</p>
+    <table>
+      <tr><td>Ctrl-x Ctrl-s</td><td>save</td></tr>
+      <tr><td>Ctrl-x Ctrl-c</td><td>quit</td></tr>
+      <tr><td>Ctrl-x f</td><td>open a file</td></tr>
+      <tr><td>Ctrl-x h k</td><td>what does this key do?</td></tr>
+      <tr><td>Ctrl-x c s</td><td>every setting, with its default</td></tr>
+      <tr><td>Ctrl-x B c</td><td>start the debugger, or continue</td></tr>
+    </table>
+  </section>
+
+  <section id="faq">
+    <h2>Questions</h2>
+    <details><summary>Is Narval the same editor as Beluga?</summary>
+      <p>Yes. Narval was called Beluga up to version 3.5 and was renamed in 4.0. On its first
+        start narval moves <code>~/.beluga</code> to <code>~/.narval</code>, and the old
+        <code>BELUGA_*</code> variables and <code>beluga-*</code> Lisp functions keep working.</p></details>
+    <details><summary>How does it compare to Emacs, Vim or Neovim?</summary>
+      <p>Like Emacs it is configured in Lisp and uses Ctrl-x style key bindings; like Neovim it
+        speaks LSP and DAP out of the box. Unlike both it is a single small C binary with no
+        runtime to install, and it runs natively on Windows.</p></details>
+    <details><summary>Which languages does it support?</summary>
+      <p>Bundled packages cover C and C++ (clangd), Python, Rust, TypeScript and Node.js,
+        Angular, PHP, LaTeX, Markdown, YAML and Lisp. Any other language with a language server
+        is one <code>lsp-server</code> line away, and narval offers to install a missing server.</p></details>
+    <details><summary>Is it free?</summary>
+      <p>Yes, Narval is open source under the MIT license.</p></details>
+  </section>
+  </main>
+
+  <footer>
+    Narval 4.0.0 · MIT license · by Arthur Barraux ·
+    <a href="https://git.giorgio-nas.fr/arthur/narval">Source</a> ·
+    <a href="__GITHUB_URL__">GitHub</a> ·
+    <a href="https://git.giorgio-nas.fr/arthur/narval/wiki">Wiki</a> ·
+    <a href="https://git.giorgio-nas.fr/arthur/narval/releases">Releases</a>
+  </footer>
+</div>
+</body>
+</html>

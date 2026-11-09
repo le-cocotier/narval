@@ -4,6 +4,11 @@
 debugger, git, a package manager and terminal panes, in one small binary that runs the same
 on Linux, macOS and Windows.
 
+[Website](https://le-cocotier.github.io/narval/) ·
+[Wiki](https://git.giorgio-nas.fr/arthur/narval/wiki) ·
+[Releases](https://git.giorgio-nas.fr/arthur/narval/releases) ·
+[GitHub mirror](https://github.com/le-cocotier/narval)
+
 > **Narval was called Beluga** (up to v3.5). Nothing to do by hand: on its first start
 > narval moves `~/.beluga` to `~/.narval`, the old `BELUGA_*` environment variables
 > and the `beluga-version` / `beluga-directory` Lisp functions still work, and a

@@ -181,32 +181,24 @@ footer a { color: var(--muted); }
     <h2>Install</h2>
     <div class="two">
       <div>
-        <h3>macOS and Linux (Homebrew)</h3>
-<pre>brew tap arthur/narval https://git.giorgio-nas.fr/arthur/homebrew-narval.git
-brew install narval</pre>
-        <h3>Windows (winget)</h3>
-<pre>winget install ArthurBarraux.Narval</pre>
-        <h3>Arch Linux (AUR)</h3>
-<pre>yay -S narval-editor</pre>
+        <h3>Windows</h3>
+        <p>Download <code>narval-&lt;version&gt;-windows-x64.zip</code> from the
+          <a href="https://git.giorgio-nas.fr/arthur/narval/releases">releases page</a>,
+          unzip it and run <code>install.ps1</code> (right-click, <em>Run with PowerShell</em>).</p>
+        <h3>Debian, Ubuntu, Fedora, openSUSE</h3>
+        <p>Download the <code>.deb</code> or <code>.rpm</code> for your machine (x86_64 or ARM) from the
+          <a href="https://git.giorgio-nas.fr/arthur/narval/releases">releases page</a>, then:</p>
+<pre>sudo apt install ./narval_&lt;version&gt;_amd64.deb
+sudo dnf install ./narval-&lt;version&gt;-1.x86_64.rpm</pre>
       </div>
       <div>
-        <h3>Debian and Ubuntu</h3>
-<pre>sudo curl -fsSL https://git.giorgio-nas.fr/api/packages/arthur/debian/repository.key \
-     -o /etc/apt/keyrings/narval.asc
-echo "deb [signed-by=/etc/apt/keyrings/narval.asc] https://git.giorgio-nas.fr/api/packages/arthur/debian stable main" \
-  | sudo tee /etc/apt/sources.list.d/narval.list
-sudo apt update &amp;&amp; sudo apt install narval</pre>
-        <h3>Fedora, RHEL, openSUSE</h3>
-<pre>sudo curl -fsSL https://git.giorgio-nas.fr/api/packages/arthur/rpm.repo \
-     -o /etc/yum.repos.d/narval.repo
-sudo dnf install narval</pre>
-        <h3>From source</h3>
+        <h3>macOS, and any other system</h3>
 <pre>git clone https://git.giorgio-nas.fr/arthur/narval.git
 cd narval &amp;&amp; ./install.sh</pre>
+        <p><code>install.sh</code> builds narval and offers to install meson, ninja and a C
+          compiler if they are missing.</p>
       </div>
     </div>
-    <p>Prebuilt <code>.deb</code>, <code>.rpm</code> and Windows zip files are on the
-      <a href="https://git.giorgio-nas.fr/arthur/narval/releases">releases page</a>.</p>
   </section>
 
   <section id="keys">

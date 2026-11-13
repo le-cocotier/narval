@@ -511,7 +511,7 @@
 (map-key "c" editor-open-config "config")
 (map-key "p" '(dired-open (package-directory)) "config")
 (map-key "m" '(editor-open-file-path (string-append (package-directory "personal-config") "/init.lisp")) "config")
-(map-key "s" list-settings "config")(map-key "m" '(editor-open-file-path "~/.narval/packages/personal-config/init.lisp") "config")
+(map-key "s" list-settings "config")
 ;; Who calls the function at the cursor, as a tree: its callers indented
 ;; under it, theirs under them. Type to filter, ENTER jumps to the call.
 (define (lsp-call-hierarchy)

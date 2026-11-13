@@ -57,6 +57,11 @@ extern EditorConfig E;
 #define DAP_MAX_PENDING 64
 #define DAP_STACK_LEVELS 64
 #define DAP_OUTPUT_LINES 2000
+
+// The streams an adapter's output arrives on, each with its own unfinished
+// line: the program's stdout and stderr, and the rest (the adapter's and
+// narval's own messages, "console", "important"...).
+typedef enum { OUT_STDOUT, OUT_STDERR, OUT_CONSOLE, OUT_STREAMS } OutStream;
 #define DAP_MAX_SESSIONS 8
 
 typedef void (*DapHandler)(cJSON *response, void *ctx);
@@ -138,11 +143,12 @@ typedef struct
     int scope_count;
     char stop_reason[64];
     int exit_code;
-    // Output, oldest line first; a line still being written waits in
-    // partial. Kept after the session ends, until the next one starts.
+    // Output, oldest line first; a line still being written waits in its
+    // stream's partial. Kept after the session ends, until the next one
+    // starts.
     char *output[DAP_OUTPUT_LINES];
     int output_count;
-    char *partial;
+    char *partial[OUT_STREAMS];
     // The project it was last started for: its output and exit code stay
     // that project's after the session ends.
     char last_root[OS_PATH_MAX];
@@ -254,25 +260,33 @@ static void outputPushLine(const char *text, const size_t len) {
   s->output[s->output_count++] = line;
 }
 
+static void outputFlushStream(const OutStream stream) {
+  if (s->partial[stream] && *s->partial[stream])
+    outputPushLine(s->partial[stream], strlen(s->partial[stream]));
+  gfree(s->partial[stream]);
+  s->partial[stream] = NULL;
+}
+
 static void outputFlushPartial(void) {
-  if (s->partial && *s->partial)
-    outputPushLine(s->partial, strlen(s->partial));
-  gfree(s->partial);
-  s->partial = NULL;
+  int i;
+  for (i = 0; i < OUT_STREAMS; i++)
+    outputFlushStream((OutStream)i);
 }
 
 /**
- * @brief Appends `text` to the output: whole lines go in, the rest waits
- * for the line's end. Carriage returns are dropped.
+ * @brief Appends `text` to `stream`'s output: whole lines go in, the rest
+ * waits for the line's end, on that stream only, so what another stream
+ * sends meanwhile never lands in the middle of the line. Carriage returns
+ * are dropped.
  */
-static void outputAppend(const char *text) {
+static void outputAppendTo(const OutStream stream, const char *text) {
   char *joined;
   char *p;
   char *start;
   char *nl;
-  joined = utilFormat("%s%s", s->partial ? s->partial : "", text);
-  gfree(s->partial);
-  s->partial = NULL;
+  joined = utilFormat("%s%s", s->partial[stream] ? s->partial[stream] : "", text);
+  gfree(s->partial[stream]);
+  s->partial[stream] = NULL;
   if (!joined)
     return;
   for (p = start = joined; *p; p++)
@@ -285,8 +299,39 @@ static void outputAppend(const char *text) {
     start = nl + 1;
   }
   if (*start)
-    s->partial = utilStrdup(start);
+    s->partial[stream] = utilStrdup(start);
   gfree(joined);
+}
+
+// narval's own messages and the adapter process's output.
+static void outputAppend(const char *text) {
+  outputAppendTo(OUT_CONSOLE, text);
+}
+
+/**
+ * @brief An output event's text, on its category's stream. One that names
+ * where in the source it comes from (a logpoint) is a message of its own,
+ * written out whole: debugpy sends logpoints on "stdout" too, from another
+ * process than the program's own writes, so one can arrive between the
+ * "total" and " 10" of a print().
+ */
+static void outputEvent(const char *category, const int has_source, const char *text) {
+  OutStream stream = OUT_CONSOLE;
+  char *line;
+  if (category && !strcmp(category, "stdout"))
+    stream = OUT_STDOUT;
+  else if (category && !strcmp(category, "stderr"))
+    stream = OUT_STDERR;
+  if (!has_source) {
+    outputAppendTo(stream, text);
+    return;
+  }
+  // Its own line, through an empty partial, then back to what was there.
+  line = s->partial[stream];
+  s->partial[stream] = NULL;
+  outputAppendTo(stream, text);
+  outputFlushStream(stream);
+  s->partial[stream] = line;
 }
 
 static void outputClear(void) {
@@ -294,8 +339,10 @@ static void outputClear(void) {
   for (i = 0; i < s->output_count; i++)
     gfree(s->output[i]);
   s->output_count = 0;
-  gfree(s->partial);
-  s->partial = NULL;
+  for (i = 0; i < OUT_STREAMS; i++) {
+    gfree(s->partial[i]);
+    s->partial[i] = NULL;
+  }
 }
 
 const char *const *dapOutputTail(int *count) {
@@ -1469,6 +1516,7 @@ static void onStopped(cJSON *body) {
 
 static void onEvent(const char *event, cJSON *body) {
   cJSON *item;
+  const char *category;
   if (!strcmp(event, "initialized")) {
     // The adapter is ready for the breakpoints; configurationDone, once
     // they're all answered, lets the program run. (gdb answers it with an
@@ -1483,12 +1531,12 @@ static void onEvent(const char *event, cJSON *body) {
     s->state = DAP_RUNNING;
     forgetStoppedState();
   } else if (!strcmp(event, "output")) {
-    item = cJSON_GetObjectItemCaseSensitive(body, "category");
-    if (cJSON_GetStringValue(item) && !strcmp(cJSON_GetStringValue(item), "telemetry"))
+    category = cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(body, "category"));
+    if (category && !strcmp(category, "telemetry"))
       return;
     item = cJSON_GetObjectItemCaseSensitive(body, "output");
     if (cJSON_GetStringValue(item))
-      outputAppend(cJSON_GetStringValue(item));
+      outputEvent(category, cJSON_HasObjectItem(body, "source"), cJSON_GetStringValue(item));
   } else if (!strcmp(event, "thread")) {
     item = cJSON_GetObjectItemCaseSensitive(body, "threadId");
     if (s->thread_id == 0 && cJSON_IsNumber(item))

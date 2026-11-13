@@ -12,10 +12,18 @@
  * the file is named in error messages (e.g. "init.lisp",
  * "packages/git/init.lisp"). A file that can't be opened counts as one
  * error. Returns the number of errors this call recorded.
+ * `read_to_end` (may be NULL) is set to 1 when every form of the file was
+ * at least tried, 0 when loading stopped early: the file couldn't be
+ * opened, or a ( or " was never closed and the rest of it was skipped.
  */
-int configLoadFile(const char *path, const char *label);
+int configLoadFile(const char *path, const char *label, int *read_to_end);
 
-/** Records one error message (printf-style), shown by configShowErrors(). */
+/**
+ * Records one error message (printf-style), shown by configShowErrors(),
+ * and writes it to the debug log. Once the editor is up (an add-package
+ * run from M-x or a project's config, say) it goes to the status bar
+ * right away too.
+ */
 void configReportError(const char *fmt, ...);
 
 /** Number of errors recorded since startup. */

@@ -6,6 +6,7 @@
  */
 
 #include "../include/packages.h"
+#include "../include/config_load.h"
 #include "../include/data.h"
 #include "../include/define.h"
 #include "../include/editor_op.h"
@@ -317,9 +318,8 @@ static int loadRequires(const char *name, Lisp requires, LispContext ctx) {
     // "beluga" is the editor's name before the rename, in older manifests.
     if (strcmp(dep, "narval") == 0 || strcmp(dep, "beluga") == 0) {
       if (min && packageVersionCompare(NARVAL_VERSION, min) < 0) {
-        editorSetStatusMessage("add-package: \"%s\" needs narval %s or later (this is %s)", name,
-                               min, NARVAL_VERSION);
-        appDebug("[PACKAGE] %s: needs narval %s\n", name, min);
+        configReportError("add-package \"%s\": needs narval %s or later (this is %s)", name,
+                          min, NARVAL_VERSION);
         return 0;
       }
       continue;
@@ -327,21 +327,18 @@ static int loadRequires(const char *name, Lisp requires, LispContext ctx) {
 
     entry = findPackage(dep);
     if (entry && entry->state == PACKAGE_LOADING) {
-      editorSetStatusMessage("add-package: \"%s\" and \"%s\" require each other", name, dep);
-      appDebug("[PACKAGE] cycle: %s -> %s\n", name, dep);
+      configReportError("add-package \"%s\": it and \"%s\" require each other", name, dep);
       continue;
     }
     if (!loadPackage(dep, NULL, ctx)) {
-      editorSetStatusMessage("add-package: \"%s\" needs \"%s\", which %s", name, dep,
-                             findPackage(dep) ? "failed to load" : "isn't installed");
-      appDebug("[PACKAGE] %s: dependency %s missing or failed\n", name, dep);
+      configReportError("add-package \"%s\": needs \"%s\", which %s", name, dep,
+                        findPackage(dep) ? "failed to load" : "isn't installed");
       return 0;
     }
     entry = findPackage(dep);
     if (min && entry && entry->version && packageVersionCompare(entry->version, min) < 0) {
-      editorSetStatusMessage("add-package: \"%s\" wants \"%s\" %s or later (installed: %s)", name,
-                             dep, min, entry->version);
-      appDebug("[PACKAGE] %s: %s is %s, wants %s\n", name, dep, entry->version, min);
+      configReportError("add-package \"%s\": wants \"%s\" %s or later (installed: %s)", name,
+                        dep, min, entry->version);
     }
   }
   return 1;
@@ -385,9 +382,8 @@ static int loadPackage(const char *name, const char *dir_arg, LispContext ctx) {
   char *init_path;
   FILE *fd_package;
   Lisp manifest;
-  Lisp code;
   const char *version;
-  LispError package_error = LISP_ERROR_NONE;
+  char *label;
   int ok = 0;
   int from_install = 0;
 
@@ -411,8 +407,9 @@ static int loadPackage(const char *name, const char *dir_arg, LispContext ctx) {
   if (!fd_package) {
     // personal-config is optional: having none isn't worth a message.
     if (strcmp(name, "personal-config") != 0)
-      editorSetStatusMessage("add-package: \"%s\" isn't installed (no %s)", name, init_path);
-    appDebug("[PACKAGE] %s: can't open %s\n", name, init_path);
+      configReportError("add-package \"%s\": not installed (no %s)", name, init_path);
+    else
+      appDebug("[PACKAGE] %s: can't open %s\n", name, init_path);
     gfree(init_path);
     gfree(dir);
     return 0;
@@ -437,21 +434,16 @@ static int loadPackage(const char *name, const char *dir_arg, LispContext ctx) {
     version = NARVAL_VERSION;
   setString(&entry->version, version);
 
-  if (loadRequires(name, manifestField(manifest, "requires"), ctx)) {
-    // A local error, so a broken package is reported and init.lisp carries
-    // on with the next form.
-    code = lisp_read_file(fd_package, &package_error, ctx);
-    if (package_error == LISP_ERROR_NONE)
-      lisp_eval(code, &package_error, ctx);
-    if (package_error != LISP_ERROR_NONE) {
-      editorSetStatusMessage("add-package: error in \"%s\": %s", name,
-                             lisp_error_string(package_error));
-      appDebug("[PACKAGE] %s: %s\n", name, lisp_error_string(package_error));
-    } else {
-      ok = 1;
-    }
-  }
   fclose(fd_package);
+  if (loadRequires(name, manifestField(manifest, "requires"), ctx)) {
+    // Form by form, like init.lisp: each bad form is reported as
+    // add-package "name": init.lisp:LINE: reason, the rest of the package
+    // still loads, and the add-package form calling it carries on. A
+    // package with any error counts as failed (add-package returns #f).
+    label = utilFormat("add-package \"%s\": init.lisp", name);
+    ok = configLoadFile(init_path, label ? label : init_path, NULL) == 0;
+    gfree(label);
+  }
   gfree(init_path);
   gfree(dir);
 

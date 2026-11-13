@@ -48,7 +48,12 @@ void configReportError(const char *fmt, ...) {
   s_errors[s_error_count] = utilStrdup(line);
   if (s_errors[s_error_count])
     s_error_count++;
-  appDebug("config: %s\n", line);
+  appDebug("[CONFIG] %s\n", line);
+  // During startup configShowErrors() shows them, once the first buffer
+  // is up; after that nothing else would. In batch mode (--sync-packages)
+  // status messages are printed, so each one is printed as it happens.
+  if (E.initialized || E.batch)
+    editorSetStatusMessage("Config error: %s", line);
 }
 
 int configErrorCount(void) { return s_error_count; }
@@ -221,7 +226,7 @@ static void reportFormError(const char *label, int line, LispError err,
     configReportError("%s:%d: %s", label, line, lisp_error_string(err));
 }
 
-int configLoadFile(const char *path, const char *label) {
+int configLoadFile(const char *path, const char *label, int *read_to_end) {
   FILE *f;
   char *text;
   long size;
@@ -236,6 +241,8 @@ int configLoadFile(const char *path, const char *label) {
   LispError err;
   Lisp form;
 
+  if (read_to_end)
+    *read_to_end = 0;
   f = fopen(path, "rb");
   if (!f) {
     configReportError("%s: can't open %s", label, path);
@@ -259,6 +266,8 @@ int configLoadFile(const char *path, const char *label) {
 
   p = text;
   end = text + got;
+  if (read_to_end)
+    *read_to_end = 1;
   while ((p = skipBlank(p, end)) < end) {
     line = lineOf(text, p);
     form_end = datumEnd(p, end, &status);
@@ -266,6 +275,8 @@ int configLoadFile(const char *path, const char *label) {
       configReportError("%s:%d: unclosed ( or \" - the rest of the file was "
                         "skipped",
                         label, line);
+      if (read_to_end)
+        *read_to_end = 0;
       break;
     }
     if (status == 2) {

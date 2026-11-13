@@ -253,6 +253,26 @@ else
     fail "add-package refusals"; cat "$tmp/out"
 fi
 
+# 9b. A missing package, and a Lisp error inside one, are reported with the
+# package's name (and the file's line); the rest of the package still loads.
+reset_home
+mkdir -p "$home/packages/broken"
+printf '(define broken-before #t)\n(no-such-function 1)\n(define broken-after #t)\n' \
+    > "$home/packages/broken/init.lisp"
+personal <<'EOF'
+(editor-message (if (add-package "ghost") "ghost loaded" "ghost refused"))
+(editor-message (if (add-package "broken") "broken loaded" "broken refused"))
+(editor-message (if broken-after "rest of broken loaded" "rest of broken skipped"))
+EOF
+run
+if out_has 'add-package "ghost": not installed' && out_has "ghost refused" &&
+   out_has 'add-package "broken": init.lisp:2: no-such-function is not defined' &&
+   out_has "broken refused" && out_has "rest of broken loaded"; then
+    pass "add-package errors name the package"
+else
+    fail "add-package errors name the package"; cat "$tmp/out"
+fi
+
 # 10. A local folder, loaded in place; a missing package with no URL.
 reset_home
 mkdir -p "$tmp/mine"

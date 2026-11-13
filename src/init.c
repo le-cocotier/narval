@@ -318,6 +318,61 @@ static void ensureEmergencyBindings(void) {
 }
 
 /**
+ * @brief 1 when both paths name the same file (through links, ., ..).
+ */
+static int samePath(const char *a, const char *b) {
+  char *ra;
+  char *rb;
+  int same;
+  if (!a || !b)
+    return 0;
+  ra = os_realpath(a);
+  rb = os_realpath(b);
+  if (ra)
+    os_path_to_slashes(ra);
+  if (rb)
+    os_path_to_slashes(rb);
+  same = strcmp(ra ? ra : a, rb ? rb : b) == 0;
+  gfree(ra);
+  gfree(rb);
+  return same;
+}
+
+/**
+ * @brief Loads the default config installed with narval
+ * (utilDataDir()/config/init.lisp), for when the user's init.lisp stopped
+ * loading early: it couldn't be opened, or an unclosed ( or " swallowed
+ * the rest of it.
+ * @details Whatever the user's file did set up before it stopped stays:
+ * add-package of a package it already loaded does nothing, and its
+ * settings are only replaced where the default sets them too. A config
+ * with a bad form here and there still loads everything else, so it gets
+ * no fallback, just the errors (and the emergency bindings). Nothing
+ * happens when the user's file *is* the default (no installed copy, or
+ * NARVAL_HOME pointing at the source tree).
+ */
+static void loadDefaultConfig(void) {
+  const char *data_dir = utilDataDir();
+  char *path;
+  OsFileInfo info;
+  int read_to_end;
+
+  if (!data_dir)
+    return;
+  path = utilFormat("%s/config/init.lisp", data_dir);
+  if (!path)
+    return;
+  os_path_to_slashes(path);
+  if (os_file_info(path, &info) == 0 && !samePath(path, E.init_file_path)) {
+    configReportError("init.lisp didn't load completely: the default config "
+                      "(%s) was loaded as well",
+                      path);
+    configLoadFile(path, "default config/init.lisp", &read_to_end);
+  }
+  gfree(path);
+}
+
+/**
  * @brief Sets up the Lisp interpreter, registers all builtins, then reads
  * and evaluates config/init.lisp.
  * @details This is the one call that actually loads the user's config:
@@ -333,6 +388,7 @@ static void ensureEmergencyBindings(void) {
 static void initConfig(void) {
   char *lisp_log_path;
   char *home;
+  int read_to_end;
 
   E.ctx = lisp_init();
   // In ~/.narval, not the directory narval was started from (where it
@@ -354,7 +410,9 @@ static void initConfig(void) {
   // Form by form: a mistake is reported (see configShowErrors(), called
   // once the first buffer is up) instead of stopping the editor, and the
   // rest of the file still loads.
-  configLoadFile(E.init_file_path, "init.lisp");
+  configLoadFile(E.init_file_path, "init.lisp", &read_to_end);
+  if (!read_to_end)
+    loadDefaultConfig();
   if (configErrorCount() > 0)
     ensureEmergencyBindings();
 }

@@ -5,7 +5,10 @@
 
 #include "test.h"
 #include "../include/define.h"
+#include "../include/builtins.h"
 #include "../include/galloc.h"
+#include "../include/lisp.h"
+#include "../include/lisp_lib.h"
 #include "../include/terminal.h"
 #include "../include/utf8.h"
 
@@ -240,6 +243,55 @@ static void testEscapeSequences(void) {
   CHECK_SEQ(KEY_MOD_CTRL, '1', "\x1b[27;5;49~");
 }
 
+static void addPrefix(const char *code) {
+  LispError error = LISP_ERROR_NONE;
+  lisp_eval(lisp_read(code, &error, E.ctx), &error, E.ctx);
+  CHECK_INT(error, LISP_ERROR_NONE);
+}
+
+// (add-prefix ...) and (map-key ...) as init.lisp and the packages call them.
+static void testPrefixes(void) {
+  char long_name[200];
+  int user_id;
+
+  E.ctx = lisp_init();
+  lisp_set_stderr(tmpfile(), E.ctx);
+  lisp_lib_load(E.ctx);
+  E.prefix = gcalloc(1, sizeof(struct prefix_t));
+  strcpy(E.prefix[0].prefix_name, "no-prefix");
+  E.number_of_prefix = 0;
+  lisp_env_define(lisp_env(E.ctx), lisp_make_symbol("add-prefix", E.ctx),
+                  lisp_make_func(editorPrefix), E.ctx);
+  lisp_env_define(lisp_env(E.ctx), lisp_make_symbol("map-key", E.ctx),
+                  lisp_make_func(mapKey), E.ctx);
+
+  addPrefix("(add-prefix \"user\")");
+  user_id = find_prefix("user").prefix_id;
+  CHECK_INT(user_id, 1);
+  addPrefix("(map-key \"a\" '(f) \"user\")");
+  // Declared again (by a package, the personal config): the same prefix,
+  // so the key bound above still belongs to the prefix "user" finds.
+  addPrefix("(add-prefix \"user\")");
+  CHECK_INT(E.number_of_prefix, 1);
+  CHECK_INT(find_prefix("user").prefix_id, E.key_binds[0].prefix_id);
+  // Its sticky flag only changes when the call gives one.
+  addPrefix("(add-prefix \"user\" #t)");
+  CHECK_INT(E.prefix[user_id].sticky, 1);
+  addPrefix("(add-prefix \"user\")");
+  CHECK_INT(E.prefix[user_id].sticky, 1);
+
+  // A name longer than the field is cut and still terminated.
+  memset(long_name, 'x', sizeof(long_name));
+  memcpy(long_name, "(add-prefix \"", 13);
+  long_name[sizeof(long_name) - 3] = '"';
+  long_name[sizeof(long_name) - 2] = ')';
+  long_name[sizeof(long_name) - 1] = '\0';
+  addPrefix(long_name);
+  CHECK_INT(E.number_of_prefix, 2);
+  CHECK_INT(strlen(E.prefix[2].prefix_name), sizeof(E.prefix[2].prefix_name) - 1);
+  lisp_shutdown(E.ctx);
+}
+
 int main(void) {
   testInit();
   screenSetDriver(&s_fake);
@@ -250,5 +302,6 @@ int main(void) {
   testCanonicalNames();
   testFallback();
   testEscapeSequences();
+  testPrefixes();
   return testDone();
 }

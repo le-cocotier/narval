@@ -27,7 +27,7 @@ Lisp lambda_args_(Lisp l);
 #define DESCRIBE_MAX_KEYS 8
 
 static const char *prefixName(const int prefix_id) {
-  if (prefix_id < 0 || prefix_id >= E.number_of_prefix)
+  if (prefix_id < 0 || prefix_id > E.number_of_prefix) // the last index, not a count
     return "?";
   return E.prefix[prefix_id].prefix_name;
 }

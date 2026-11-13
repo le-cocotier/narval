@@ -1304,14 +1304,40 @@ Lisp editorSetPrefix(const Lisp args, LispError *e, LispContext ctx) {
  * @note Updates global editor state E (prefix array)
  */
 Lisp editorPrefix(Lisp args, LispError *e, LispContext ctx) {
-  E.prefix = (struct prefix_t *)grealloc(
-      E.prefix, (++(E.number_of_prefix) + 1) * sizeof(struct prefix_t));
-  E.prefix[E.number_of_prefix].prefix_id = E.number_of_prefix;
-  strncpy(E.prefix[E.number_of_prefix].prefix_name, lisp_string(lisp_car(args)),
-          64);
+  const char *name = lisp_string(lisp_car(args));
+  struct prefix_t *grown;
+  struct prefix_t *p;
+  int i;
+  int has_sticky;
+  int sticky;
+
   args = lisp_cdr(args);
-  E.prefix[E.number_of_prefix].sticky =
-      lisp_is_pair(args) && lisp_bool(lisp_car(args));
+  has_sticky = lisp_is_pair(args);
+  sticky = has_sticky && lisp_bool(lisp_car(args));
+
+  // Declaring a prefix again (a package and the personal config both
+  // calling (add-prefix "user")) keeps the one already there: a second
+  // entry with a new id would win find_prefix(), and every key bound under
+  // the first one would stop working.
+  for (i = 0; i <= E.number_of_prefix; ++i) {
+    if (strcmp(E.prefix[i].prefix_name, name) == 0) {
+      if (has_sticky)
+        E.prefix[i].sticky = sticky;
+      return lisp_null();
+    }
+  }
+
+  grown = (struct prefix_t *)grealloc(
+      E.prefix, (E.number_of_prefix + 2) * sizeof(struct prefix_t));
+  if (!grown)
+    return lisp_null();
+  E.prefix = grown;
+  p = &E.prefix[++E.number_of_prefix];
+  memset(p, 0, sizeof(*p));
+  p->prefix_id = E.number_of_prefix;
+  // strncpy() doesn't terminate a name of 64 bytes or more.
+  strncpy(p->prefix_name, name, sizeof(p->prefix_name) - 1);
+  p->sticky = sticky;
   return lisp_null();
 }
 

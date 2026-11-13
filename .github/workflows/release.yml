@@ -58,5 +58,5 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.tar.gz dist/*.deb dist/*.rpm \
               --title "Narval $GITHUB_REF_NAME" --verify-tag \
-              --notes "Windows: winget install ArthurBarraux.Narval, or download the zip, unzip it and run install.ps1. Linux: the .deb or .rpm below. macOS: brew (see the README)."
+              --notes "Windows: download the zip, unzip it and run install.ps1. Linux: the .deb or .rpm below. macOS: build from source (see the README)."
           fi

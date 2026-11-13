@@ -1,5 +1,5 @@
 #!/bin/sh
-# An installed narval (Homebrew, a .deb, winget's zip): its first start
+# An installed narval (a .deb, an .rpm, the Windows zip): its first start
 # sets up ~/.narval from the install's data directory, never overwriting,
 # and loads the bundled packages from the install rather than copying them.
 # NARVAL_DATA_DIR stands in for <prefix>/share/narval: the source tree has

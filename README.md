@@ -19,13 +19,6 @@ on Linux, macOS and Windows.
 ![Narval editing C, with LSP completion and the debugger panel](docs/screenshot.png)
 -->
 
-```sh
-winget install ArthurBarraux.Narval                    # Windows
-brew install narval                                    # macOS, Linux (after the tap below)
-sudo apt install narval / sudo dnf install narval      # Debian, Ubuntu / Fedora (after adding the repository below)
-yay -S narval-editor                                   # Arch Linux (AUR)
-```
-
 ## Features
 
 - **Configured in Lisp.** `~/.narval/config/init.lisp` is a program: settings, key bindings,
@@ -49,51 +42,22 @@ yay -S narval-editor                                   # Arch Linux (AUR)
 
 ## Install
 
-### macOS and Linux: Homebrew
+### Windows
 
-```sh
-brew tap arthur/narval https://git.giorgio-nas.fr/arthur/homebrew-narval.git
-brew install narval
-```
-
-### Windows: winget
-
-```powershell
-winget install ArthurBarraux.Narval
-```
-
-Or download `narval-<version>-windows-x64.zip` from the
+Download `narval-<version>-windows-x64.zip` from the
 [Releases](https://git.giorgio-nas.fr/arthur/narval/releases) page, unzip it and run
 `install.ps1` in it (right-click → *Run with PowerShell*). `README.txt` in the zip has the
 details.
 
-### Debian and Ubuntu
+### Debian, Ubuntu, Fedora and openSUSE
+
+Every [release](https://git.giorgio-nas.fr/arthur/narval/releases) has a `.deb` and an `.rpm`
+for x86_64 (`amd64`) and ARM (`arm64`/`aarch64`). Download the one for your system, then:
 
 ```sh
-sudo curl -fsSL https://git.giorgio-nas.fr/api/packages/arthur/debian/repository.key \
-     -o /etc/apt/keyrings/narval.asc
-echo "deb [signed-by=/etc/apt/keyrings/narval.asc] https://git.giorgio-nas.fr/api/packages/arthur/debian stable main" \
-  | sudo tee /etc/apt/sources.list.d/narval.list
-sudo apt update && sudo apt install narval
-```
-
-### Fedora, RHEL and openSUSE
-
-```sh
-sudo curl -fsSL https://git.giorgio-nas.fr/api/packages/arthur/rpm.repo -o /etc/yum.repos.d/narval.repo
-sudo dnf install narval
-# openSUSE: sudo zypper addrepo https://git.giorgio-nas.fr/api/packages/arthur/rpm.repo && sudo zypper install narval
-```
-
-The `.deb` and `.rpm` files are also attached to every
-[release](https://git.giorgio-nas.fr/arthur/narval/releases), for x86_64.
-
-### Arch Linux
-
-From the AUR, as `narval-editor`:
-
-```sh
-yay -S narval-editor     # or paru, or git clone https://aur.archlinux.org/narval-editor.git && makepkg -si
+sudo apt install ./narval_<version>_amd64.deb          # Debian, Ubuntu
+sudo dnf install ./narval-<version>-1.x86_64.rpm       # Fedora, RHEL
+sudo zypper install ./narval-<version>-1.x86_64.rpm    # openSUSE
 ```
 
 ### From source
@@ -355,12 +319,10 @@ Porting narval to another system means writing one more `os_*.c` against `os.h` 
 ## Development
 
 **Publishing a release** (maintainers): push a tag starting with `v`
-(`git tag v3.5 && git push origin v3.5`). CI attaches the Windows zip, a source tarball, a
-`.deb` and an `.rpm` to the release and publishes the Linux packages to Gitea's Debian and RPM
-registries (`.gitea/workflows/release-windows.yml`). A GitHub mirror builds the same files with the same
-scripts and attaches them to a GitHub release (`.github/workflows/release.yml`). Then `packaging/render.sh 3.5` fills in the
-Homebrew formula, the winget manifest and the AUR PKGBUILD; [packaging/README.md](packaging/README.md)
-says where each goes.
+(`git tag v4.1.0 && git push origin v4.1.0`). CI attaches the Windows zip, a source tarball and
+the `.deb` and `.rpm` packages to the release (`.gitea/workflows/release-windows.yml`; the scripts
+are in [packaging/](packaging/README.md)). A GitHub mirror builds the same files with the same
+scripts and attaches them to a GitHub release (`.github/workflows/release.yml`).
 
 To cross-compile `narval.exe` from Linux: `meson setup --cross-file cross/mingw-w64.ini build-windows && meson compile -C build-windows`
 (needs the `mingw-w64` package).

@@ -116,13 +116,12 @@ jobs:
 
   # Linux packages and the source tarball, attached to the same release
   # once the Windows job has created it:
-  #   narval-<version>.tar.gz          what Homebrew and the AUR build from
-  #   narval_<version>_amd64.deb       also in Gitea's Debian registry
-  #   narval-<version>-1.x86_64.rpm    also in Gitea's RPM registry
-  # The registries use the same tokens as above (PACKAGE_TOKEN for the
-  # registries, RELEASE_TOKEN for the release, else GITEA_TOKEN). After the
-  # release, packaging/render.sh <version> fills in the Homebrew, winget and
-  # AUR recipes (see packaging/README.md).
+  #   narval-<version>.tar.gz          the source tarball
+  #   narval_<version>_{amd64,arm64}.deb
+  #   narval-<version>-1.{x86_64,aarch64}.rpm
+  # Both architectures, whatever the runner is: the other one is
+  # cross-compiled.
+  # Attaching uses the same token as above (RELEASE_TOKEN, else GITEA_TOKEN).
   linux-packages:
     runs-on: giorgio-runner
     needs: windows-package
@@ -135,13 +134,19 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y meson ninja-build gcc rpm curl jq
+          # The cross-compiler for the architecture the runner isn't.
+          case "$(dpkg --print-architecture)" in
+            arm64) sudo apt-get install -y gcc-x86-64-linux-gnu ;;
+            *)     sudo apt-get install -y gcc-aarch64-linux-gnu ;;
+          esac
 
       - name: Build the source tarball, .deb and .rpm
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p dist
           packaging/source-tarball.sh "$VERSION" dist
-          packaging/linux/build-packages.sh "$VERSION" dist
+          packaging/linux/build-packages.sh "$VERSION" dist amd64
+          packaging/linux/build-packages.sh "$VERSION" dist arm64
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Attach them to the release
@@ -161,33 +166,4 @@ jobs:
             done
             api -X POST -F "attachment=@$FILE" "$API/releases/$ID/assets?name=$NAME" \
               | jq -er '"Published: " + .browser_download_url'
-          done
-
-      - name: Publish to Gitea's Debian and RPM registries
-        shell: bash
-        env:
-          TOKEN: ${{ secrets.PACKAGE_TOKEN || secrets.GITEA_TOKEN }}
-          SERVER: ${{ github.server_url }}
-          OWNER: ${{ github.repository_owner }}
-          REPO: ${{ github.event.repository.name }}
-        run: |
-          set -euo pipefail
-          api() { curl -sS --fail-with-body -H "Authorization: token $TOKEN" "$@"; }
-          DEB=$(ls dist/*.deb); RPM=$(ls dist/*.rpm)
-
-          # A re-run on the same tag replaces what the last one uploaded
-          # (Gitea refuses a second upload of a version with HTTP 409).
-          curl -sS -o /dev/null -X DELETE -H "Authorization: token $TOKEN" \
-            "$SERVER/api/packages/$OWNER/debian/pool/stable/main/narval/$VERSION/amd64" || true
-          api --upload-file "$DEB" "$SERVER/api/packages/$OWNER/debian/pool/stable/main/upload"
-          echo "Published $DEB to $SERVER/api/packages/$OWNER/debian (stable main)"
-
-          curl -sS -o /dev/null -X DELETE -H "Authorization: token $TOKEN" \
-            "$SERVER/api/packages/$OWNER/rpm/package/narval/$VERSION-1/x86_64" || true
-          api --upload-file "$RPM" "$SERVER/api/packages/$OWNER/rpm/upload"
-          echo "Published $RPM to $SERVER/api/packages/$OWNER/rpm"
-
-          for TYPE in debian rpm; do
-            curl -sS -o /dev/null -X POST -H "Authorization: token $TOKEN" \
-              "$SERVER/api/v1/packages/$OWNER/$TYPE/narval/-/link/$REPO" || true
           done

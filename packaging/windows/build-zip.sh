@@ -4,7 +4,7 @@
 #   <outdir>/narval-<tag>-windows-x64.zip
 # with narval.exe, install.ps1, LICENSE, README.txt, the default config,
 # the bundled packages and the splash screen. Windows users unzip it and
-# run install.ps1; winget installs it as a portable app.
+# run install.ps1.
 #
 #   packaging/windows/build-zip.sh v3.5 [outdir]
 #

@@ -1108,7 +1108,7 @@ void editorRefreshScreen() {
         single_line[i++] = '.';
       }
       single_line[i] = '\0';
-      editorSetStatusMessage("● %s", single_line);
+      editorShowStatus("● %s", single_line);
     }
   }
   editorDrawStatusBar(&ab);

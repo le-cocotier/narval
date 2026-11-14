@@ -92,6 +92,7 @@
 (add-prefix "debug-view" #t) ; keys inside the *debug* panel
 (add-prefix "help-view" #t) ; keys inside *help* and *bindings*
 (add-prefix "settings-view" #t) ; keys inside *settings*
+(add-prefix "debug-log" #t) ; keys inside *debug-log*
 
 ;; PACKAGES
 ;;
@@ -493,6 +494,21 @@
 (map-key "k" describe-key "help")
 (map-key "b" describe-bindings "help")
 (map-key "f" describe-function-prompt "help")
+(map-key "l" debug-log "help")                ; everything narval logged since it started
+
+;; debug-log (inside *debug-log*: follows new lines while the cursor is on
+;; the last one; l shows less detail, debug -> info -> warn -> error)
+(map-key "ARROW-UP" '(move-cursor "up") "debug-log")
+(map-key "ARROW-DOWN" '(move-cursor "down") "debug-log")
+(map-key "PAGE-UP" move-cursor-page-up "debug-log")
+(map-key "PAGE-DOWN" move-cursor-page-down "debug-log")
+(map-key "a" editor-move-cursor-beg-buffer "debug-log")
+(map-key "z" editor-move-cursor-end-buffer "debug-log")  ; and follow again
+(map-key "l" debug-log-level "debug-log")
+(map-key "c" debug-log-clear "debug-log")
+(map-key "q" editor-kill-buffer "debug-log")
+(map-key "CTRL-x" '(editor-set-prefix "user") "debug-log")
+(map-key "ALT-x" execute-command "debug-log")
 
 ;; help-view (inside *help* and *bindings*; q closes)
 (map-key "ARROW-UP" '(move-cursor "up") "help-view")

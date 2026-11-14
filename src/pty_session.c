@@ -36,7 +36,7 @@ int ptySessionSpawn(struct buffer_t* buf, const char* shell_path, const int rows
     gfree(cwd);
     if (!buf->pty)
     {
-        appDebug("couldn't start a shell for the terminal buffer");
+        logError("[terminal] couldn't start a shell for the terminal buffer");
         return -1;
     }
 

@@ -123,7 +123,7 @@ static void finish(AsyncProcess *p) {
 
   lisp_apply(callback, lisp_cons(result, lisp_null(), E.ctx), &error, E.ctx);
   if (error != LISP_ERROR_NONE)
-    appDebug("[ASYNC] process callback raised an error\n");
+    logError("[async] a process callback raised an error");
 }
 
 void asyncProcessVisitLispRoots(LispRootVisitor visit, LispContext ctx) {

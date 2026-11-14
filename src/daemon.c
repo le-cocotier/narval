@@ -511,6 +511,8 @@ static void clientFree(DaemonClient *c) {
 
 // Ends a window: tells the client (if it can still hear) and forgets it.
 static void clientClose(DaemonClient *c, const char *message) {
+  logInfo("[daemon] window %d closed%s%s", c->id, message && *message ? ": " : "",
+          message ? message : "");
   if (!c->gone)
     frameSend(c->conn, FRAME_EXIT, message, strlen(message));
   clientFree(c);
@@ -541,6 +543,7 @@ static void acceptClients(void) {
     c->next = s_clients;
     s_clients = c;
     count++;
+    logInfo("[daemon] window %d connected", c->id);
   }
 }
 

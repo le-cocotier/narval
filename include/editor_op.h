@@ -5,7 +5,12 @@
 #include "define.h"
 #include "os.h"
 
+// Sets the status bar message, and logs it to *debug-log* ("[status] ...",
+// info) unless it's the same as the last one logged.
 void editorSetStatusMessage(const char *fmt, ...);
+// The same, not logged: for what's redrawn as you type (a prompt and its
+// input) or as the cursor moves (the diagnostic under it).
+void editorShowStatus(const char *fmt, ...);
 // The working directory (E.cwd, else the process's), galloc'd; NULL only
 // when it can't be told.
 char *editorGetCwd(void);

@@ -10,6 +10,7 @@
  */
 
 #include "../include/settings.h"
+#include "../include/debug_log.h"
 #include "../include/editor_op.h"
 
 #include <stdio.h>
@@ -119,6 +120,8 @@ void settingsWriteTemplate(FILE *f) {
 }
 
 void settingsReportProblems(void) {
+  if (s_invalid[0])
+    logWarn("[config] invalid %s, using the default", s_invalid);
   if (s_invalid[0])
     editorSetStatusMessage("init.lisp: invalid %s, using the default (CTRL-x c s)", s_invalid);
 }

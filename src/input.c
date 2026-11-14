@@ -236,7 +236,7 @@ Utf8Char *editorPromptEx(const char *prompt, Utf8Char *placeHolder,
   // below, before `buf` is returned to the caller or freed.
   E.prompt_input = buf;
   while (1) {
-    editorSetStatusMessage(prompt, buf);
+    editorShowStatus(prompt, buf);
     editorRefreshScreen();
     c = editorReadKey();
     // Alt+a types "a" here too, Shift+Tab completes like TAB.

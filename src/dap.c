@@ -479,7 +479,7 @@ static void dapWrite(const char *json) {
   snprintf(header, sizeof(header), "Content-Length: %u\r\n\r\n", (unsigned)len);
   appDebug("[DAP →] %s\n", json);
   if (os_conn_write(s->conn, header, strlen(header)) == -1 || os_conn_write(s->conn, json, len) == -1)
-    appDebug("[DAP] the connection to the adapter is gone\n");
+    logWarn("[dap] the connection to the adapter is gone");
 }
 
 static int sendRequest(const char *command, cJSON *arguments, const DapHandler handler,
@@ -1935,9 +1935,11 @@ static int startSession(const char *ext, const char *launch_json, const int atta
       s->tcp_port = 0;
       gfree(root);
       cJSON_Delete(launch);
+      logError("[dap] couldn't start %s", adapter->argv[0]);
       editorSetStatusMessage("Couldn't start %s", adapter->argv[0]);
       return -1;
     }
+    logInfo("[dap] started %s in %s", adapter->argv[0], root ? root : ".");
   }
 
   jsonRpcStreamFree(&s->recv);

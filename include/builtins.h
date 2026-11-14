@@ -214,6 +214,16 @@ Lisp editorListPopup(Lisp args, LispError *e, LispContext ctx);
 // referencing a builtin that might not exist in this build.
 Lisp l_appDebugP(Lisp args, LispError *e, LispContext ctx);
 
+// (debug-log ["level"]) — opens *debug-log*: everything logged since
+// narval started, at "level" ("error", "warn", "info", "debug") and above.
+Lisp l_debugLog(Lisp args, LispError *e, LispContext ctx);
+// (debug-log-level) — in *debug-log*, one level less detail (wraps around).
+Lisp l_debugLogLevel(Lisp args, LispError *e, LispContext ctx);
+// (debug-log-clear) — forgets what was logged so far.
+Lisp l_debugLogClear(Lisp args, LispError *e, LispContext ctx);
+// (log-message "text" ["level"]) — a line in *debug-log*, "info" by default.
+Lisp l_logMessage(Lisp args, LispError *e, LispContext ctx);
+
 // (editor-recenter [row]) — scroll the active pane so the cursor's line is
 // in the middle (or at `row`; negative counts from the bottom).
 Lisp l_editorRecenter(Lisp args, LispError *e, LispContext ctx);

@@ -48,7 +48,7 @@ void configReportError(const char *fmt, ...) {
   s_errors[s_error_count] = utilStrdup(line);
   if (s_errors[s_error_count])
     s_error_count++;
-  appDebug("[CONFIG] %s\n", line);
+  logError("[config] %s", line);
   // During startup configShowErrors() shows them, once the first buffer
   // is up; after that nothing else would. In batch mode (--sync-packages)
   // status messages are printed, so each one is printed as it happens.

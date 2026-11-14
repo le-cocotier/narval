@@ -196,6 +196,10 @@ void initBuiltins(void) {
   registerBuiltin("buffer-set-syntax", l_bufferSetSyntax);
   registerBuiltin("write-file", l_writeFile);
   registerBuiltin("app-debug?", l_appDebugP);
+  registerBuiltin("debug-log", l_debugLog);
+  registerBuiltin("debug-log-level", l_debugLogLevel);
+  registerBuiltin("debug-log-clear", l_debugLogClear);
+  registerBuiltin("log-message", l_logMessage);
   registerBuiltin("editor-recenter", l_editorRecenter);
   registerBuiltin("pane-height", l_paneHeight);
   registerBuiltin("pane-width", l_paneWidth);
@@ -392,6 +396,7 @@ static void initConfig(void) {
   char *lisp_log_path;
   char *home;
   int read_to_end;
+  long long started;
 
   E.ctx = lisp_init();
   // In ~/.narval, not the directory narval was started from (where it
@@ -415,11 +420,20 @@ static void initConfig(void) {
   // Form by form: a mistake is reported (see configShowErrors(), called
   // once the first buffer is up) instead of stopping the editor, and the
   // rest of the file still loads.
+  started = os_monotonic_ms();
+  logInfo("loading %s", E.init_file_path);
   configLoadFile(E.init_file_path, "init.lisp", &read_to_end);
-  if (!read_to_end)
+  if (!read_to_end) {
+    logWarn("init.lisp didn't load to the end: loading the default config too");
     loadDefaultConfig();
+  }
   if (configErrorCount() > 0)
     ensureEmergencyBindings();
+  if (configErrorCount() > 0)
+    logWarn("config loaded in %lld ms with %d error(s)", os_monotonic_ms() - started,
+            configErrorCount());
+  else
+    logInfo("config loaded in %lld ms", os_monotonic_ms() - started);
 }
 
 /**
@@ -438,7 +452,7 @@ static void initConfig(void) {
  */
 static void initStartupConstants(void) {
   settingsLoad();
-  appDebug("LSP ON : %d", E.constantes.LSP);
+  logInfo("language servers %s", E.constantes.LSP ? "on" : "off (LSP is #f)");
   E.global_constantes = E.constantes;
 }
 
@@ -506,7 +520,7 @@ static void seedFile(const char *data_dir, const char *from, const char *to) {
     sources[0] = src;
     if (os_mkdirs(parent, err, sizeof(err)) != 0 ||
         os_copy_tree(sources, 1, dest, err, sizeof(err)) != 0)
-      appDebug("[INIT] couldn't create %s from %s: %s\n", dest, src, err);
+      logWarn("couldn't create %s from %s: %s", dest, src, err);
   }
   gfree(src);
   gfree(dest);
@@ -544,7 +558,7 @@ void initEditor() {
     E.screenrows = 24;
     //    die("getWindowSize");
   }
-  appDebug("%d %d", E.screenrows, E.screencols);
+  appDebug("screen %d rows x %d columns", E.screenrows, E.screencols);
   E.screenrows -= 2;
 
   // Init graphics variables
@@ -742,4 +756,7 @@ void deInitEditor() {
   fclose(E.ctx.p->err_port);
 
   lisp_shutdown(E.ctx);
+
+  // Last: everything above may still log.
+  debugLogFree();
 }

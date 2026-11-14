@@ -108,11 +108,21 @@ narval path/to/file
 | Ctrl-x f      | open a file                                     |
 | Ctrl-x h k    | what does this key do?                          |
 | Ctrl-x h b    | every key binding                               |
+| Ctrl-x h l    | the debug log, from the start (`*debug-log*`)   |
 | Ctrl-x c s    | every setting, with its default                 |
 | Ctrl-x c l    | the packages                                    |
 
 After a prefix like Ctrl-x, pause and the keys available under it appear at the bottom of the
 screen.
+
+When something doesn't work (a package that won't load, a language server that won't start),
+`Ctrl-x h l` (`M-x debug-log`) shows everything narval logged since it started: the config and
+each package as they load, with timings, config errors, language servers and debug adapters
+starting and stopping, daemon windows, every status bar message. It keeps following new lines
+while the cursor is on the last one. Inside it, `l` shows less detail (debug, info, warn,
+error), `c` clears it, `a`/`z` go to the top and back to the end, `q` closes it. From Lisp,
+`(debug-log "warn")` opens it at a level, and `(log-message "text" "info")` adds a line.
+Debug builds also write every line to `~/.narval/debug.log`.
 
 ## Language servers
 

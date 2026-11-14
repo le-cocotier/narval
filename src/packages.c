@@ -386,6 +386,7 @@ static int loadPackage(const char *name, const char *dir_arg, LispContext ctx) {
   char *label;
   int ok = 0;
   int from_install = 0;
+  long long started;
 
   if (entry && (entry->state == PACKAGE_LOADED || entry->state == PACKAGE_LOADING))
     return 1;
@@ -435,6 +436,7 @@ static int loadPackage(const char *name, const char *dir_arg, LispContext ctx) {
   setString(&entry->version, version);
 
   fclose(fd_package);
+  started = os_monotonic_ms();
   if (loadRequires(name, manifestField(manifest, "requires"), ctx)) {
     // Form by form, like init.lisp: each bad form is reported as
     // add-package "name": init.lisp:LINE: reason, the rest of the package
@@ -451,6 +453,12 @@ static int loadPackage(const char *name, const char *dir_arg, LispContext ctx) {
   entry = findPackage(name);
   if (entry)
     entry->state = ok ? PACKAGE_LOADED : PACKAGE_FAILED;
+  if (ok)
+    logInfo("[package] %s%s%s loaded in %lld ms", name,
+            entry && entry->version ? " " : "", entry && entry->version ? entry->version : "",
+            os_monotonic_ms() - started);
+  else
+    logError("[package] %s failed to load", name);
   return ok;
 }
 
@@ -482,7 +490,7 @@ Lisp addPackage(const Lisp args, LispError *e, LispContext ctx) {
     *e = LISP_ERROR_ARG_TYPE;
     return lisp_null();
   }
-  appDebug("[PACKAGE] add-package %s\n", name);
+  appDebug("[package] add-package %s", name);
   return lisp_make_bool(loadPackage(name, stringArg(args, 1), ctx));
 }
 

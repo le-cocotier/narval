@@ -1212,6 +1212,30 @@ def lsp_install_declined(binary, repo):
         ed.quit()
 
 
+def debug_log_buffer(binary, repo):
+    """CTRL-x h l opens *debug-log*: what was logged since the start (the
+    config loading, the packages), and l shows less detail."""
+    with Narval(binary, repo, rows=30, cols=120) as ed:
+        with open(ed.path('d.txt'), 'w') as f:
+            f.write('text\n')
+        ed.start('d.txt')
+        ed.wait_for('text')
+        ed.keys(CTRL_X, 'h', 'l', delay=0.5)
+        ed.wait_for('ready in')
+        ed.keys('a', delay=0.3)              # the top: the start of the log
+        screen = '\n'.join(ed.text())
+        assert 'starting on d.txt' in screen, screen
+        assert 'config loaded in' in screen, screen
+        assert '[package] ' in screen, screen
+        ed.keys('l', 'l', delay=0.5)         # debug -> info -> warn
+        screen = '\n'.join(ed.text())
+        assert 'config loaded in' not in screen, screen
+        ed.keys('l', 'l', 'l', 'a', delay=0.5)    # error -> debug, everything again
+        ed.wait_for('config loaded in')
+        ed.keys('q', delay=0.3)
+        ed.quit()
+
+
 TESTS = [
     ('breakpoint-gutter', breakpoint_gutter),
     ('pane-cursors', pane_cursors),
@@ -1250,6 +1274,7 @@ TESTS = [
     ('stm32-build-failure-stops', stm32_build_failure_stops),
     ('stm32-project-settings', stm32_project_settings),
     ('stm32-debug', stm32_debug),
+    ('debug-log-buffer', debug_log_buffer),
 ]
 
 

@@ -36,22 +36,41 @@ extern EditorConfig E;
  * @note Updates global editor state E (status_msg, status_msg_time)
  * @see editorDrawMessageBar()
  */
+static void setStatusV(const int logged, const char *fmt, va_list ap) {
+  // A plain array: nothing to free at exit. Compared on its first bytes.
+  static char s_last_logged[256] = "";
+  char *msg;
+  utf8VaPrintf(E.status_msg, PATH_MAX, fmt, ap);
+  E.status_msg_time = time(NULL);
+  if (!*E.status_msg[0].character)
+    return;
+  msg = (char *)utf8ToString(E.status_msg);
+  if (!msg)
+    return;
+  // No screen in batch mode (narval --sync-packages): print it instead.
+  if (E.batch) {
+    printf("%s\n", msg);
+    fflush(stdout);
+  }
+  if (logged && strncmp(s_last_logged, msg, sizeof(s_last_logged) - 1) != 0) {
+    logInfo("[status] %s", msg);
+    snprintf(s_last_logged, sizeof(s_last_logged), "%s", msg);
+  }
+  gfree(msg);
+}
+
 void editorSetStatusMessage(const char *fmt, ...) {
   va_list ap;
-  char *msg;
   va_start(ap, fmt);
-  utf8VaPrintf(E.status_msg, PATH_MAX, fmt, ap);
+  setStatusV(1, fmt, ap);
   va_end(ap);
-  E.status_msg_time = time(NULL);
-  // No screen in batch mode (narval --sync-packages): print it instead.
-  if (E.batch && *E.status_msg[0].character) {
-    msg = (char *)utf8ToString(E.status_msg);
-    if (msg) {
-      printf("%s\n", msg);
-      fflush(stdout);
-      gfree(msg);
-    }
-  }
+}
+
+void editorShowStatus(const char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  setStatusV(0, fmt, ap);
+  va_end(ap);
 }
 
 /**
@@ -227,6 +246,8 @@ void editorTick(void) {
   dapTick();
   autosaveTick();
   fileCheckDiskChanges();
+  // Last: shows what the ticks above logged.
+  debugLogTick();
 }
 
 void editorCloseTerminals(void) {

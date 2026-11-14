@@ -144,6 +144,8 @@ int main(const int argc, char *argv[]) {
   int foreground = 0;
   int i;
   int rc;
+  // The debug log's clock starts here: its lines are timed from now.
+  logStartMs();
   if (argc >= 2 && (!strcmp(argv[1], "--version") || !strcmp(argv[1], "-v"))) {
     printf("Narval %s\n", NARVAL_VERSION);
     return 0;
@@ -210,12 +212,15 @@ int main(const int argc, char *argv[]) {
     return rc;
   }
   if (daemon) {
+    logInfo("narval %s starting as daemon \"%s\"", NARVAL_VERSION, name);
     rc = daemonMain(name);
     if (rc == 0)
       editorTeardown();
     return rc;
   }
 
+  logInfo("narval %s starting%s%s", NARVAL_VERSION, n_files ? " on " : "",
+          n_files ? files[0] : "");
   splash_screen = gcalloc(PATH_MAX, sizeof(Utf8Char));
   active = NULL;
   utf8Printf(splash_screen, PATH_MAX, "%s/assets/narval.txt", utilNarvalDir());
@@ -254,6 +259,7 @@ int main(const int argc, char *argv[]) {
   // (a load error over an invalid setting).
   settingsReportProblems();
   configShowErrors();
+  logInfo("ready in %lld ms (CTRL-x h l shows this log)", os_monotonic_ms() - logStartMs());
 
   while (!E.exit_requested) {
     editorRunLoop();

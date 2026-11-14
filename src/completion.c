@@ -218,7 +218,7 @@ static void lsp_on_initialize_error(LspClient *lsp, cJSON *error)
     memcpy(lsp->start_error, text, len);
     lsp->start_error[len] = '\0';
 
-    appDebug("[LSP] %s failed to initialize: %s\n", lsp->command, lsp->start_error);
+    logError("[lsp] %s failed to initialize: %s", lsp->command, lsp->start_error);
     editorSetStatusMessage("%s failed to start: %s", lsp->command, lsp->start_error);
 
     // No `initialized`, and not READY: nothing more is sent to it.
@@ -295,7 +295,7 @@ static void lsp_on_initialize_response(LspClient *lsp, const char *result_json)
     cJSON_Delete(root);
 
     lsp->state = LSP_READY;
-    appDebug("[LSP] handshake complete, state = READY\n");
+    logInfo("[lsp] %s ready", lsp->command);
     runHooks("lsp-ready", lisp_null());
 
     // Now (and only now) it's safe to open any buffers created before the
@@ -1858,9 +1858,11 @@ int lspStart(LspClient *lsp, const char *project_root, char *const server_argv[]
         gfree(msg);
         cJSON_Delete(req);
 
+        logInfo("[lsp] started %s in %s", server_argv[0], project_root);
         return 0;
     }
 
+    logError("[lsp] couldn't start %s", server_argv[0]);
     return -1;
 }
 
@@ -3690,7 +3692,7 @@ void lspFlushWrites(void)
         if (lsp->write_stall_ms < LSP_WRITE_STALL_MS)
             continue;
 
-        appDebug("[LSP] %s stopped reading its input: stopping it\n", lsp->command);
+        logWarn("[lsp] %s stopped reading its input: stopping it", lsp->command);
         editorSetStatusMessage("%s stopped responding and was stopped", lsp->command);
         lsp->write_stall_ms = 0;
         lsp->pending_count = 0;
@@ -3717,7 +3719,7 @@ void lspPoll(LspClient *lsp)
         os_proc_free(lsp->proc);
         lsp->proc = NULL;
         lsp->state = LSP_SHUTDOWN;
-        appDebug("[LSP] server exited\n");
+        logWarn("[lsp] %s exited", lsp->command);
     }
 }
 

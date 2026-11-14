@@ -118,7 +118,7 @@ void autosaveWrite(struct buffer_t *buf) {
   }
   if (!ok) {
     remove(tmp);
-    appDebug("autosave: couldn't write %s\n", path);
+    logWarn("[autosave] couldn't write %s", path);
   } else {
     os_hand_back(path);
     buf->autosaved_dirty = buf->dirty;

@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "utf8.h"
+#include "debug_log.h"
 
 /**
  * @brief Where the editor's screen is. Standalone, that is the terminal
@@ -77,16 +78,6 @@ int keyEscapeSequence(const Utf8Char *key, char *out, size_t size);
 // A name without modifiers is copied as is.
 void keyCanonicalName(const char *name, char *out, size_t size);
 
-void appDebug(const char *fmt, ...);
-
-// Path of the debug log appDebug() writes to (opened by this call if not
-// yet), or NULL when built without APP_DEBUG. Lets another subsystem —
-// currently just the spawned language server — send its own stderr there
-// too instead of onto the terminal narval is drawing on.
-const char *appDebugLogPath(void);
-
-// Closes the debug log at exit (its stdio buffer is the last thing narval
-// would otherwise still hold when the memory report is written).
-void appDebugClose(void);
+// appDebug(), appTrace(), appDebugLogPath(), appDebugClose(): debug_log.h.
 
 #endif

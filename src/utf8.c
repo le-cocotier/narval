@@ -382,7 +382,7 @@ Utf8Char* readUtf8Char(void) {
     readKeyBytes(&new_char->character[0], 1);
 
     if (new_char->character[0]) {
-        appDebug("%c\r\n", *new_char->character);
+        appTrace("%c", *new_char->character);
     }
 
     // Escape sequence handling

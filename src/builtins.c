@@ -1283,8 +1283,9 @@ Lisp editorSetPrefix(const Lisp args, LispError *e, LispContext ctx) {
   const char *prefix_name = lisp_string(lisp_car(args));
   struct prefix_t prefix = find_prefix(prefix_name);
   E.prefix_state = prefix.prefix_id;
-  editorSetStatusMessage("prefix %s", prefix.prefix_name);
-  appDebug("%s set\n", prefix_name);
+  // Not logged: every CTRL-x would add two lines to *debug-log*.
+  editorShowStatus("prefix %s", prefix.prefix_name);
+  appTrace("prefix %s set", prefix_name);
 
   return lisp_null();
 }
@@ -1701,7 +1702,7 @@ void runHooks(const char *event_name, const Lisp args) {
     hook_error = LISP_ERROR_NONE;
     lisp_apply(E.hooks[i].callback, args, &hook_error, E.ctx);
     if (hook_error != LISP_ERROR_NONE)
-      appDebug("[HOOK] \"%s\" callback raised an error\n", event_name);
+      logError("[hook] a \"%s\" hook raised an error", event_name);
   }
 }
 
@@ -1895,7 +1896,7 @@ Lisp lspRegisterServer(Lisp args, LispError *e, LispContext ctx) {
       editorSetStatusMessage("lsp-server: .%s already uses %s, ignoring %s "
                              "(two packages claim .%s)",
                              ext, cfg->argv[0], command, ext);
-      appDebug("lsp-server: .%s already registered with %s; ignoring %s",
+      logWarn("[lsp] lsp-server: .%s already registered with %s; ignoring %s",
                ext, cfg->argv[0], command);
     }
     return lisp_null();
@@ -2426,6 +2427,80 @@ Lisp l_findFile(Lisp args, LispError *e, LispContext ctx) {
     fileFinderOpenAt(lisp_string(lisp_car(args)));
   else
     fileFinderOpen();
+  return lisp_null();
+}
+
+// The level named by the first argument, `fallback` when there is none,
+// -1 when it names no level.
+static int levelArg(Lisp args, const int fallback) {
+  if (!lisp_is_pair(args) || lisp_is_null(lisp_car(args)))
+    return fallback;
+  if (lisp_type(lisp_car(args)) == LISP_STRING)
+    return logLevelFromName(lisp_string(lisp_car(args)));
+  if (lisp_type(lisp_car(args)) == LISP_SYMBOL)
+    return logLevelFromName(lisp_symbol_string(lisp_car(args)));
+  return -1;
+}
+
+/**
+ * @brief Lisp function: (debug-log ["level"]) — opens *debug-log*
+ * @details Everything narval logged since it started (config errors,
+ * packages, language servers, debug adapters, ...), following new lines
+ * as they come. "level" ("error", "warn", "info", "debug", the default)
+ * is the least important level shown.
+ */
+Lisp l_debugLog(Lisp args, LispError *e, LispContext ctx) {
+  const int level = levelArg(args, LOG_DEBUG);
+  (void)ctx;
+  if (level < 0) {
+    *e = LISP_ERROR_ARG_TYPE;
+    return lisp_null();
+  }
+  debugLogOpen((LogLevel)level);
+  return lisp_null();
+}
+
+/**
+ * @brief Lisp function: (debug-log-level) — in *debug-log*, shows one
+ * level less (debug, info, warn, error, then debug again).
+ */
+Lisp l_debugLogLevel(Lisp args, LispError *e, LispContext ctx) {
+  (void)args;
+  (void)e;
+  (void)ctx;
+  debugLogCycleLevel();
+  return lisp_null();
+}
+
+/**
+ * @brief Lisp function: (debug-log-clear) — forgets what was logged so far.
+ */
+Lisp l_debugLogClear(Lisp args, LispError *e, LispContext ctx) {
+  (void)args;
+  (void)e;
+  (void)ctx;
+  debugLogClearBuffer();
+  return lisp_null();
+}
+
+/**
+ * @brief Lisp function: (log-message "text" ["level"]) — adds a line to
+ * *debug-log* (and debug.log), at "info" unless told otherwise. For a
+ * package or a hook to say what it did.
+ */
+Lisp l_logMessage(Lisp args, LispError *e, LispContext ctx) {
+  int level;
+  (void)ctx;
+  if (!lisp_is_pair(args) || lisp_type(lisp_car(args)) != LISP_STRING) {
+    *e = LISP_ERROR_ARG_TYPE;
+    return lisp_null();
+  }
+  level = levelArg(lisp_cdr(args), LOG_INFO);
+  if (level < 0) {
+    *e = LISP_ERROR_ARG_TYPE;
+    return lisp_null();
+  }
+  logMessage((LogLevel)level, "%s", lisp_string(lisp_car(args)));
   return lisp_null();
 }
 

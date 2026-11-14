@@ -1,11 +1,16 @@
 #ifndef BUILTINS_H_
 #define BUILTINS_H_
 
+#include "data.h"
 #include "lisp.h"
 
 struct prefix_t find_prefix(const char *prefix_name);
 
 Lisp l_projectSearch(Lisp args, LispError *e, LispContext ctx);
+Lisp l_projectGrep(Lisp args, LispError *e, LispContext ctx);
+Lisp l_lspClients(Lisp args, LispError *e, LispContext ctx);
+// "off", "starting", "ready", "stopping" or "stopped", as (lsp-clients) says.
+const char *lspStateName(LspState state);
 Lisp l_queryReplace(Lisp args, LispError *e, LispContext ctx);
 Lisp l_projectQueryReplace(Lisp args, LispError *e, LispContext ctx);
 Lisp l_projectSearchGoto(Lisp args, LispError *e, LispContext ctx);

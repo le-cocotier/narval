@@ -1148,7 +1148,46 @@ static Lisp l_projectSwitch(Lisp args, LispError *e, LispContext ctx) {
   return lisp_null();
 }
 
+/**
+ * @brief (project-activate "/root") — makes the remembered project at
+ * `root` current, as project-switch does, without a picker or find-file.
+ * #f when it isn't a remembered project.
+ * @details What a dashboard's list of projects switches with. The project
+ * stays current until you move to another buffer, as after project-switch.
+ */
+static Lisp l_projectActivate(Lisp args, LispError *e, LispContext ctx) {
+  char canonical[OS_PATH_MAX];
+  int index;
+  (void)ctx;
+  if (!lisp_is_pair(args) || lisp_type(lisp_car(args)) != LISP_STRING) {
+    *e = LISP_ERROR_ARG_TYPE;
+    return lisp_null();
+  }
+  canonicalDir(lisp_string(lisp_car(args)), canonical, sizeof(canonical));
+  index = findProject(canonical);
+  if (index == -1 || E.projects[index].removed)
+    return lisp_false();
+  activate(index);
+  saveProjects();
+  return lisp_true();
+}
+
+/**
+ * @brief (project-trusted?) — whether the current project is trusted;
+ * #f without one.
+ */
+static Lisp l_projectTrustedP(Lisp args, LispError *e, LispContext ctx) {
+  (void)args;
+  (void)e;
+  (void)ctx;
+  if (E.current_project < 0 || E.current_project >= E.number_of_projects)
+    return lisp_false();
+  return lisp_make_bool(E.projects[E.current_project].trusted);
+}
+
 void projectRegisterBuiltins(void) {
+  registerBuiltin("project-activate", l_projectActivate);
+  registerBuiltin("project-trusted?", l_projectTrustedP);
   registerBuiltin("project-root", l_projectRoot);
   registerBuiltin("project-setting", l_projectSetting);
   registerBuiltin("project-name", l_projectName);

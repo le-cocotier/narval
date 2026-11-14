@@ -177,7 +177,7 @@ test('galloc', find_program('tools/check_galloc.sh'),
 # narval.exe's manifest too, so file names are UTF-8 for them as well.
 foreach t : ['utf8', 'keys', 'buffer', 'ansi_parser', 'os', 'completion', 'packages', 'highlight', 'lsp_symbols', 'breakpoints', 'lisp_lib',
            'utils', 'jsonrpc_stream', 'daemon_frame', 'macro', 'settings', 'lsp_install', 'lsp_completion', 'lsp_start',
-           'dap', 'debug_log']
+           'dap', 'debug_log', 'project_grep']
   test(t, executable('test_' + t,
     files('test/test_' + t + '.c', 'test/test.c') + extra_sources,
     c_args : core_args,

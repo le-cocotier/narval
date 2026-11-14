@@ -1236,6 +1236,95 @@ def debug_log_buffer(binary, repo):
         ed.quit()
 
 
+DASHBOARD_MAIN = """int main(void) {
+  /* TODO: read the arguments */
+  return 0;
+}
+"""
+
+DASHBOARD_MAKEFILE = """all:
+\t@echo dashboard-build-$$((6 * 7))
+"""
+
+
+def dashboard_project(ed):
+    """A small C project: a git repository with a Makefile and a TODO."""
+    os.makedirs(ed.path('proj'))
+    with open(ed.path('proj/main.c'), 'w') as f:
+        f.write(DASHBOARD_MAIN)
+    with open(ed.path('proj/Makefile'), 'w') as f:
+        f.write(DASHBOARD_MAKEFILE)
+    if shutil.which('git'):
+        subprocess.run(['git', 'init', '-q', ed.path('proj')], check=True)
+    else:
+        os.makedirs(ed.path('proj/.narval'))  # a project marker all the same
+
+
+def dashboard_on_start(binary, repo):
+    """Started in a project with no file, narval shows *dashboard*: its
+    commands (found from the Makefile), git state and TODOs. ENTER on the
+    TODO opens main.c at its line; CTRL-x D comes back, with main.c among
+    the recent files; b runs the build in a *run* pane."""
+    if not shutil.which('make'):
+        raise Skip('needs make')
+    with Narval(binary, repo, rows=40, cols=120) as ed:
+        dashboard_project(ed)
+        ed.start(cwd='proj')
+        ed.wait_for('◆ proj')
+        ed.wait_for('▸ Commands')
+        ed.wait_for('1 b  Build       make')
+        ed.wait_for('main.c:2  /* TODO: read the arguments */')
+        if shutil.which('git'):
+            ed.wait_for('▸ Git')
+            ed.wait_for('??  Makefile')
+        # TAB from section to section reaches the TODOs; ENTER jumps.
+        for _ in range(8):
+            if 'TODO: read' in ed.screen.display[ed.screen.cursor.y]:
+                break
+            ed.keys('\t', delay=0.2)
+        assert 'TODO: read' in ed.screen.display[ed.screen.cursor.y], ed.text()
+        ed.keys('\r', delay=0.5)
+        ed.wait_for('return 0;')
+        assert 'TODO: read' in ed.screen.display[ed.screen.cursor.y], ed.text()
+        ed.keys(CTRL_X, 'D', delay=0.5)
+        ed.wait_for('▸ Recent files')
+        lines = ed.text()
+        recent = lines.index(next(l for l in lines if l.startswith('▸ Recent files')))
+        assert lines[recent + 1].strip() == 'main.c', lines
+        ed.keys('b', delay=0.5)
+        ed.wait_for('dashboard-build-42')
+        ed.quit()
+
+
+def dashboard_extended(binary, repo):
+    """dashboard-commands replaces what's found, a package's section shows
+    up with dashboard-add-section and ENTER calls its action; q closes."""
+    with Narval(binary, repo, rows=40, cols=120) as ed:
+        dashboard_project(ed)
+        with open(ed.path('.narval/packages/personal-config/init.lisp'), 'a') as f:
+            f.write("""
+(define dashboard-commands '(("f" "Flash" "echo flashing")))
+(dashboard-add-section "extra" "Extra panel"
+  (lambda (root)
+    (list (string-append "root is " (dashboard--basename root))
+          (cons "Say hello" (lambda () (editor-message "hello from the panel"))))))
+""")
+        ed.start(cwd='proj')
+        ed.wait_for('▸ Extra panel')
+        ed.wait_for('root is proj')
+        ed.wait_for('1 f  Flash       echo flashing')
+        assert not any('make' in line for line in ed.text()), ed.text()
+        for _ in range(30):
+            if 'Say hello' in ed.screen.display[ed.screen.cursor.y]:
+                break
+            ed.keys(DOWN, delay=0.15)
+        ed.keys('\r', delay=0.4)
+        ed.wait_for('hello from the panel')
+        ed.keys('q', delay=0.4)
+        assert not any('▸ Extra panel' in line for line in ed.text()), ed.text()
+        ed.quit()
+
+
 TESTS = [
     ('breakpoint-gutter', breakpoint_gutter),
     ('pane-cursors', pane_cursors),
@@ -1275,6 +1364,8 @@ TESTS = [
     ('stm32-project-settings', stm32_project_settings),
     ('stm32-debug', stm32_debug),
     ('debug-log-buffer', debug_log_buffer),
+    ('dashboard-on-start', dashboard_on_start),
+    ('dashboard-extended', dashboard_extended),
 ]
 
 

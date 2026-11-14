@@ -181,6 +181,8 @@ void initBuiltins(void) {
   registerBuiltin("editor-explorer-sidebar-open", editorExplorerSidebarOpen);
   registerBuiltin("editor-explorer-close", editorExplorerClose);
   registerBuiltin("project-search", l_projectSearch);
+  registerBuiltin("project-grep", l_projectGrep);
+  registerBuiltin("lsp-clients", l_lspClients);
   registerBuiltin("project-search-goto", l_projectSearchGoto);
   registerBuiltin("query-replace", l_queryReplace);
   registerBuiltin("project-query-replace", l_projectQueryReplace);

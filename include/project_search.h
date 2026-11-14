@@ -47,6 +47,23 @@ int projectSearchFiles(const char *pattern, const char *root, char ***out_files)
 // it yet. -1 if it can't be opened.
 int projectSearchOpenFile(const char *abs_path);
 
+// One hit of projectGrep(): galloc'd strings, freed by projectGrepFree().
+typedef struct {
+  char *abs_path;
+  int line;   // 1-based
+  char *text; // the line, leading blanks dropped, tabs as spaces, capped
+} ProjectGrepHit;
+
+// The lines containing `pattern` (literally), searched like
+// projectSearchRun() — git grep in a repository (untracked files
+// included, ignored ones not), the project walker elsewhere — but
+// returned instead of shown: "*search*" is left alone.
+// At most `max` hits (negative: the usual cap). `root` NULL or "": the
+// current project (the working directory without one). Returns how many
+// are in *out_hits, or -1 for an empty pattern or no root.
+int projectGrep(const char *pattern, const char *root, int max, ProjectGrepHit **out_hits);
+void projectGrepFree(ProjectGrepHit *hits, int n);
+
 // Frees the stored results. Called on shutdown.
 void projectSearchFree(void);
 

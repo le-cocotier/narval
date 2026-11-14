@@ -115,6 +115,7 @@
 (add-package "explorer")
 (add-package "dired")    ; CTRL-x d, CTRL-x CTRL-j — and CTRL-x c p below
 (add-package "git")      ; CTRL-x g: status, stage, commit, push/pull, log, branches
+(add-package "dashboard") ; CTRL-x D: the project at a glance, and at startup in a project
 
 ;; Themes: exactly one should be loaded (the second one just overwrites
 ;; whatever colors the first one set). Fork either as a starting point

@@ -2348,19 +2348,105 @@ Lisp lspFormatBuffer(Lisp args, LispError *e, LispContext ctx) {
 
 /**
  * @brief Lisp function to search the whole project for a literal string
- * @details (project-search) prompts for the text, greps from the working
- * directory down (git grep inside a repo, plain grep -r otherwise), and
+ * @details (project-search) prompts for the text, greps from the project
+ * root down (git grep inside a repo, the project walker otherwise), and
  * shows the hits in a "*search*" buffer grouped by file. See
- * project_search.c for what runs and why.
- * @param args Lisp arguments (unused)
- * @return lisp_null()
+ * project_search.c for what runs and why. (project-search "text") searches
+ * for that text without prompting.
+ * @param args Lisp arguments: optionally the text
+ * @return the number of hits with a text given, lisp_null() otherwise
  */
 Lisp l_projectSearch(Lisp args, LispError *e, LispContext ctx) {
-  (void)args;
   (void)e;
   (void)ctx;
+  if (lisp_is_pair(args) && lisp_type(lisp_car(args)) == LISP_STRING)
+    return lisp_make_int(projectSearchRun(lisp_string(lisp_car(args)), NULL));
   projectSearchPrompt();
   return lisp_null();
+}
+
+/**
+ * @brief Lisp function: the lines of the project holding a text, as data
+ * @details (project-grep "text" [root [max]]) — a list of ("path" line
+ * "text"), path absolute and line 1-based, searched like project-search
+ * (literally; git grep in a repository) but shown nowhere: *search* keeps
+ * its results. `root` #f or "": the current project. `max` caps the hits.
+ * @return Lisp list, empty when nothing matched
+ */
+Lisp l_projectGrep(Lisp args, LispError *e, LispContext ctx) {
+  const char *pattern;
+  const char *root = NULL;
+  int max = -1;
+  ProjectGrepHit *hits;
+  Lisp result = lisp_null();
+  Lisp entry;
+  int n;
+  int i;
+  if (!lisp_is_pair(args) || lisp_type(lisp_car(args)) != LISP_STRING) {
+    *e = LISP_ERROR_ARG_TYPE;
+    return lisp_null();
+  }
+  pattern = lisp_string(lisp_car(args));
+  args = lisp_cdr(args);
+  if (lisp_is_pair(args)) {
+    if (lisp_type(lisp_car(args)) == LISP_STRING)
+      root = lisp_string(lisp_car(args));
+    args = lisp_cdr(args);
+  }
+  if (lisp_is_pair(args) && lisp_type(lisp_car(args)) == LISP_INT)
+    max = (int)lisp_int(lisp_car(args));
+  n = projectGrep(pattern, root, max, &hits);
+  for (i = n - 1; i >= 0; i--) {
+    entry = lisp_cons(lisp_make_string2(hits[i].text, ctx), lisp_null(), ctx);
+    entry = lisp_cons(lisp_make_int(hits[i].line), entry, ctx);
+    entry = lisp_cons(lisp_make_string2(hits[i].abs_path, ctx), entry, ctx);
+    result = lisp_cons(entry, result, ctx);
+  }
+  if (n > 0)
+    projectGrepFree(hits, n);
+  return result;
+}
+
+const char *lspStateName(const LspState state) {
+  switch (state) {
+  case LSP_INITIALIZING:
+    return "starting";
+  case LSP_READY:
+    return "ready";
+  case LSP_SHUTTING_DOWN:
+    return "stopping";
+  case LSP_SHUTDOWN:
+    return "stopped";
+  case LSP_NOT_STARTED:
+  default:
+    return "off";
+  }
+}
+
+/**
+ * @brief Lisp function: the language servers narval has started
+ * @details (lsp-clients) — a list of ("command" "language-id" "state"),
+ * one per server, state one of "off", "starting", "ready", "stopping",
+ * "stopped" (a server that failed to start says "off").
+ * @return Lisp list
+ */
+Lisp l_lspClients(Lisp args, LispError *e, LispContext ctx) {
+  Lisp result = lisp_null();
+  Lisp entry;
+  const LspClient *lsp;
+  int i;
+  (void)args;
+  (void)e;
+  for (i = E.number_of_lsp_clients - 1; i >= 0; i--) {
+    lsp = E.lsp_clients[i];
+    if (!lsp)
+      continue;
+    entry = lisp_cons(lisp_make_string2(lspStateName(lsp->state), ctx), lisp_null(), ctx);
+    entry = lisp_cons(lisp_make_string2(lsp->language_id, ctx), entry, ctx);
+    entry = lisp_cons(lisp_make_string2(lsp->command, ctx), entry, ctx);
+    result = lisp_cons(entry, result, ctx);
+  }
+  return result;
 }
 
 /**

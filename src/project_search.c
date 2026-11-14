@@ -207,14 +207,20 @@ static int plainSearchFile(const char *rel, const char *full, void *ctx) {
  * binaries skipped (-I). Elsewhere, the same search done here, over every
  * file the project walker visits.
  */
-static char *runSearch(const char *pattern, const char *root) {
+static char *runSearchIn(const char *pattern, const char *root, const int untracked) {
   char *argv[] = {"git",        "-C", (char *)root, "grep",          "-I", "-n",
-                  "--no-color", "-F", "-e",         (char *)pattern, NULL};
+                  "--no-color", "-F", "-e",         (char *)pattern, NULL, NULL};
   PlainSearch ps;
 
-  if (projectIsGitRepo(root))
+  if (projectIsGitRepo(root)) {
+    if (untracked) {
+      // Before the pattern's -e: git grep takes options first.
+      memmove(&argv[5], &argv[4], 6 * sizeof(char *));
+      argv[4] = "--untracked";
+    }
     return runArgvCaptureQuiet(argv, SEARCH_TIMEOUT_MS, SEARCH_MAX_OUTPUT,
                                NULL);
+  }
 
   memset(&ps, 0, sizeof(ps));
   ps.pattern = pattern;
@@ -224,6 +230,10 @@ static char *runSearch(const char *pattern, const char *root) {
     return NULL;
   projectWalkFiles(root, plainSearchFile, &ps);
   return ps.out;
+}
+
+static char *runSearch(const char *pattern, const char *root) {
+  return runSearchIn(pattern, root, 0);
 }
 
 // ─── Parsing ────────────────────────────────────────────────────────────────
@@ -813,6 +823,86 @@ int projectSearchFiles(const char *pattern, const char *root,
 
   *out_files = files;
   return n;
+}
+
+// ─── Hits as data ───────────────────────────────────────────────────────────
+
+int projectGrep(const char *pattern, const char *root, const int max,
+                ProjectGrepHit **out_hits) {
+  char resolved[PATH_MAX];
+  char abs[PATH_MAX];
+  char *cwd;
+  char *output;
+  char *saveptr = NULL;
+  char *line;
+  char *path;
+  char *text;
+  int line_no;
+  ProjectGrepHit *hits = NULL;
+  ProjectGrepHit *grown;
+  int n = 0;
+  size_t rlen;
+
+  *out_hits = NULL;
+  if (!pattern || !*pattern || max == 0)
+    return pattern && *pattern ? 0 : -1;
+  if (root && *root)
+    snprintf(resolved, sizeof(resolved), "%s", root);
+  else {
+    cwd = projectRootOrCwd();
+    if (!cwd)
+      return -1;
+    snprintf(resolved, sizeof(resolved), "%s", cwd);
+    gfree(cwd);
+  }
+  rlen = strlen(resolved);
+  while (rlen > 1 && resolved[rlen - 1] == '/')
+    resolved[--rlen] = '\0';
+
+  // The same search as project-search, but nothing shown: the hits go back
+  // to the caller and *search* keeps its own results. Files not added to
+  // git yet are searched too (not the ignored ones): a new file's TODOs
+  // are as much the project's as anyone's.
+  output = runSearchIn(pattern, resolved, 1);
+  if (!output)
+    return 0;
+
+  for (line = utilStrtok(output, "\n", &saveptr); line;
+       line = utilStrtok(NULL, "\n", &saveptr)) {
+    if ((max > 0 && n >= max) || n >= SEARCH_MAX_HITS)
+      break;
+    if (!parseGrepLine(line, &path, &line_no, &text))
+      continue;
+    if (os_path_is_absolute(path))
+      snprintf(abs, sizeof(abs), "%s", path);
+    else
+      snprintf(abs, sizeof(abs), "%s/%s", resolved, path);
+    grown = grealloc(hits, (size_t)(n + 1) * sizeof(ProjectGrepHit));
+    if (!grown)
+      break;
+    hits = grown;
+    hits[n].abs_path = utilStrdup(abs);
+    hits[n].line = line_no;
+    hits[n].text = cleanText(text);
+    if (!hits[n].abs_path || !hits[n].text) {
+      gfree(hits[n].abs_path);
+      gfree(hits[n].text);
+      break;
+    }
+    n++;
+  }
+  gfree(output);
+  *out_hits = hits;
+  return n;
+}
+
+void projectGrepFree(ProjectGrepHit *hits, const int n) {
+  int i;
+  for (i = 0; i < n; i++) {
+    gfree(hits[i].abs_path);
+    gfree(hits[i].text);
+  }
+  gfree(hits);
 }
 
 int projectSearchOpenFile(const char *abs_path) {

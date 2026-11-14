@@ -319,6 +319,7 @@ int breakpointsSave(const char *file) {
     remove(tmp);
     return -1;
   }
+  os_hand_back(file);
   return 0;
 }
 

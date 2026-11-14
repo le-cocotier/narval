@@ -669,6 +669,8 @@ Lisp l_writeDataFile(const Lisp args, LispError *e, LispContext ctx) {
   }
   if (!ok)
     remove(tmp);
+  else
+    os_hand_back(path);
   gfree(tmp);
   return lisp_make_bool(ok);
 }

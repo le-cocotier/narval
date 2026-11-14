@@ -88,6 +88,49 @@ static void testPaths(void) {
   CHECK(os_home_dir() != NULL);
 }
 
+// `sudo narval` loads the user's ~/.narval only when the sudo is real.
+static void testSudo(void) {
+  char err[256];
+  const char *home = getenv("HOME");
+  char *dir;
+
+  // Trusted: root, a user name, and $SUDO_UID that is exactly their uid.
+  CHECK(os_sudo_trusted(0, "giorgio", "501", 501) == !isWindows());
+  // Not root: a plain user who set SUDO_USER themselves.
+  CHECK(!os_sudo_trusted(501, "giorgio", "501", 501));
+  // $SUDO_UID isn't the named user's (someone else's account named).
+  CHECK(!os_sudo_trusted(0, "alice", "501", 502));
+  // Missing or empty variables.
+  CHECK(!os_sudo_trusted(0, NULL, "501", 501));
+  CHECK(!os_sudo_trusted(0, "", "501", 501));
+  CHECK(!os_sudo_trusted(0, "giorgio", NULL, 501));
+  CHECK(!os_sudo_trusted(0, "giorgio", "", 501));
+  // Not a plain number.
+  CHECK(!os_sudo_trusted(0, "giorgio", "501x", 501));
+  CHECK(!os_sudo_trusted(0, "giorgio", "+501", 501));
+  CHECK(!os_sudo_trusted(0, "giorgio", " 501", 501));
+  CHECK(!os_sudo_trusted(0, "giorgio", "-1", -1));
+  CHECK(!os_sudo_trusted(0, "giorgio", "99999999999999999999", 501));
+  // `sudo -u root` from root: root's own config, nothing to hand back.
+  CHECK(!os_sudo_trusted(0, "root", "0", 0));
+
+  // The tests themselves don't run under sudo: then the home is $HOME and
+  // handing back changes nothing.
+  if (os_sudo_user() == NULL) {
+    dir = os_home_dir();
+    CHECK(dir != NULL);
+    if (!isWindows() && home && *home && dir)
+      CHECK_STR(dir, home);
+    gfree(dir);
+    os_delete_tree(SCRATCH, err, sizeof(err));
+    CHECK_INT(os_mkdirs(SCRATCH "/sudo", err, sizeof(err)), 0);
+    CHECK(writeFile(SCRATCH "/sudo/f", "x"));
+    CHECK_INT(os_hand_back(SCRATCH "/sudo"), 0);
+    CHECK_INT(os_hand_back(SCRATCH "/missing"), 0);
+    CHECK_INT(os_delete_tree(SCRATCH, err, sizeof(err)), 0);
+  }
+}
+
 static void testProcess(const char *self) {
   const char *argv[3];
   OsSpawn spawn;
@@ -249,6 +292,7 @@ int main(int argc, char **argv) {
   testInit();
   testFiles();
   testPaths();
+  testSudo();
   testProcess(argv[0]);
   testWriteDoesNotBlock(argv[0]);
   testMissingProgram();

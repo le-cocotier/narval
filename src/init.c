@@ -399,6 +399,8 @@ static void initConfig(void) {
   lisp_log_path = home ? utilFormat("%s/.narval/lisp_log.err", home) : NULL;
   gfree(home);
   E.ctx.p->err_port = lisp_log_path ? fopen(lisp_log_path, "w+") : NULL;
+  if (E.ctx.p->err_port)
+    os_hand_back(lisp_log_path); // under sudo: still the user's file
   gfree(lisp_log_path);
   if (!E.ctx.p->err_port)
     E.ctx.p->err_port = tmpfile();
@@ -523,6 +525,7 @@ static void seedUserDir(void) {
   seedFile(data_dir, "config/init.lisp", "config/init.lisp");
   seedFile(data_dir, "config/personal-config.lisp", "packages/personal-config/init.lisp");
   seedFile(data_dir, "assets/narval.txt", "assets/narval.txt");
+  os_hand_back(utilNarvalDir()); // a first start under sudo: the user's
 }
 
 void initEditor() {

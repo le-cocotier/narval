@@ -85,6 +85,7 @@ void autosaveWrite(struct buffer_t *buf) {
   gfree(home);
   if (dir) {
     os_mkdirs(dir, err, sizeof(err));
+    os_hand_back(dir); // under sudo, the user's ~/.narval/autosave
     gfree(dir);
   }
 
@@ -119,6 +120,7 @@ void autosaveWrite(struct buffer_t *buf) {
     remove(tmp);
     appDebug("autosave: couldn't write %s\n", path);
   } else {
+    os_hand_back(path);
     buf->autosaved_dirty = buf->dirty;
   }
   buf->autosave_time = time(NULL);

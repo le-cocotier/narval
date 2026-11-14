@@ -22,6 +22,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <poll.h>
+#include <pwd.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1510,8 +1511,150 @@ char *os_getcwd(void) {
   return getcwd(buf, sizeof(buf)) ? gstrdup(buf) : NULL;
 }
 
+// ─── sudo ───────────────────────────────────────────────────────────────────
+
+int os_sudo_trusted(const long euid, const char *sudo_user, const char *sudo_uid,
+                    const long user_uid) {
+  const char *p;
+  unsigned long uid = 0;
+  if (euid != 0 || !sudo_user || !*sudo_user || !sudo_uid || !*sudo_uid)
+    return 0;
+  for (p = sudo_uid; *p; p++) {
+    if (*p < '0' || *p > '9' || p - sudo_uid >= 10)
+      return 0; // a sign, a space, junk, or too long to be a uid
+    uid = uid * 10 + (unsigned long)(*p - '0');
+  }
+  return uid != 0 && user_uid >= 0 && uid == (unsigned long)user_uid;
+}
+
+// Who ran `sudo narval`, looked up once: found is 0 when nobody did.
+static struct {
+  int looked;
+  int found;
+  uid_t uid;
+  gid_t gid;
+  char name[256];
+  char home[OS_PATH_MAX];
+} s_sudo;
+
+static int sudoLookup(void) {
+  const char *name;
+  const struct passwd *pw;
+  if (s_sudo.looked)
+    return s_sudo.found;
+  s_sudo.looked = 1;
+  name = getenv("SUDO_USER");
+  if (geteuid() != 0 || !name || !*name)
+    return 0;
+  pw = getpwnam(name);
+  if (!pw || !pw->pw_dir || pw->pw_dir[0] != '/' ||
+      !os_sudo_trusted((long)geteuid(), name, getenv("SUDO_UID"), (long)pw->pw_uid) ||
+      strlen(name) >= sizeof(s_sudo.name) || strlen(pw->pw_dir) >= sizeof(s_sudo.home))
+    return 0;
+  s_sudo.uid = pw->pw_uid;
+  s_sudo.gid = pw->pw_gid;
+  snprintf(s_sudo.name, sizeof(s_sudo.name), "%s", name);
+  snprintf(s_sudo.home, sizeof(s_sudo.home), "%s", pw->pw_dir);
+  s_sudo.found = 1;
+  return 1;
+}
+
+const char *os_sudo_user(void) { return sudoLookup() ? s_sudo.name : NULL; }
+
+static int handBackDir(int fd, int depth);
+
+// The entry `name` of the directory `dirfd`: root's becomes the sudo user's.
+static int handBackEntry(const int dirfd, const char *name, const int depth) {
+  struct stat st;
+  int fd;
+  int rc = 0;
+  if (fstatat(dirfd, name, &st, AT_SYMLINK_NOFOLLOW) != 0)
+    return errno == ENOENT ? 0 : -1; // gone meanwhile: nothing to give back
+  if (S_ISSOCK(st.st_mode) || S_ISFIFO(st.st_mode) || S_ISCHR(st.st_mode) ||
+      S_ISBLK(st.st_mode))
+    return 0;
+  if (!S_ISDIR(st.st_mode) && st.st_nlink > 1)
+    return 0; // could be a hard link to a file outside; leave it
+  if (st.st_uid == 0 &&
+      fchownat(dirfd, name, s_sudo.uid, s_sudo.gid, AT_SYMLINK_NOFOLLOW) != 0)
+    rc = -1;
+  // Into directories that are root's or the user's only; never through a
+  // link (O_NOFOLLOW), so a directory swapped for one meanwhile is skipped.
+  if (S_ISDIR(st.st_mode) && (st.st_uid == 0 || st.st_uid == s_sudo.uid)) {
+    fd = openat(dirfd, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+    if (fd < 0)
+      return -1;
+    if (handBackDir(fd, depth + 1) != 0)
+      rc = -1;
+    close(fd);
+  }
+  return rc;
+}
+
+// Everything in the directory open as `fd` (which stays open).
+static int handBackDir(const int fd, const int depth) {
+  DIR *dir;
+  struct dirent *entry;
+  int copy;
+  int rc = 0;
+  if (depth > 64)
+    return -1;
+  copy = dup(fd);
+  if (copy < 0)
+    return -1;
+  dir = fdopendir(copy);
+  if (!dir) {
+    close(copy);
+    return -1;
+  }
+  while ((entry = readdir(dir)) != NULL) {
+    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+      continue;
+    if (handBackEntry(fd, entry->d_name, depth) != 0)
+      rc = -1;
+  }
+  closedir(dir);
+  return rc;
+}
+
+int os_hand_back(const char *path) {
+  char real[PATH_MAX];
+  char parent[PATH_MAX];
+  char home[PATH_MAX];
+  const char *base;
+  char *slash;
+  size_t n;
+  int dirfd;
+  int rc;
+
+  if (!path || !*path || !sudoLookup())
+    return 0;
+  if (!realpath(path, real))
+    return errno == ENOENT ? 0 : -1;
+  // Only inside the user's own home (not the home itself).
+  if (!realpath(s_sudo.home, home))
+    return -1;
+  n = strlen(home);
+  if (strncmp(real, home, n) != 0 || real[n] != '/' || real[n + 1] == '\0')
+    return 0;
+  snprintf(parent, sizeof(parent), "%s", real);
+  slash = strrchr(parent, '/');
+  *slash = '\0';
+  base = real + (slash - parent) + 1;
+  dirfd = open(parent, O_RDONLY | O_DIRECTORY);
+  if (dirfd < 0)
+    return -1;
+  rc = handBackEntry(dirfd, base, 0);
+  close(dirfd);
+  return rc;
+}
+
 char *os_home_dir(void) {
   const char *home = getenv("HOME");
+  // sudo sets $HOME to root's (Linux, recent macOS) or leaves the user's:
+  // either way, the editor's own files are those of who ran it.
+  if (sudoLookup())
+    return gstrdup(s_sudo.home);
   return gstrdup((home && *home) ? home : "/");
 }
 

@@ -500,7 +500,10 @@ static FILE *debugLogFile(void)
         s_debug_log_tried = 1;
         s_debug_log = fopen(debugLogPath(), "w");
         if (s_debug_log)
+        {
             setvbuf(s_debug_log, NULL, _IOLBF, 0);
+            os_hand_back(debugLogPath());
+        }
     }
     return s_debug_log;
 }

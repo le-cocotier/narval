@@ -254,6 +254,7 @@ static void saveProjects(void) {
     for (i = 0; i < count && i < PROJECTS_REMEMBERED; i++)
       fprintf(f, "%c %s\n", sorted[i]->trusted ? '+' : '-', sorted[i]->root);
     fclose(f);
+    os_hand_back(path);
   }
   gfree(sorted);
 }
@@ -403,6 +404,7 @@ static void saveLspChoices(void) {
       fprintf(f, "- %s\t%s\n", c->server, c->project);
   }
   fclose(f);
+  os_hand_back(path);
 }
 
 /**

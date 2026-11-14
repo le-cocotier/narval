@@ -123,6 +123,11 @@ static int syncPackages(void) {
   return ok ? 0 : 1;
 }
 
+// Under `sudo narval`, ~/.narval is the user's (os_home_dir()): what root
+// wrote there this time — logs, autosaves, packages a git clone fetched —
+// goes back to them, so their own narval can still write it afterwards.
+static void handBackNarvalDir(void) { os_hand_back(utilNarvalDir()); }
+
 int main(const int argc, char *argv[]) {
   Utf8Char *splash_screen;
   EditorPane *active;
@@ -146,6 +151,11 @@ int main(const int argc, char *argv[]) {
   // Before anything uses ~/.narval: the first start after the rename from
   // beluga moves ~/.beluga there.
   utilNarvalDir();
+  // Also mends what an earlier sudo run left root's (one that crashed).
+  if (os_sudo_user()) {
+    handBackNarvalDir();
+    atexit(handBackNarvalDir);
+  }
   if (argc >= 2 && !strcmp(argv[1], "--sync-packages"))
     return syncPackages();
 

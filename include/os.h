@@ -398,9 +398,42 @@ char *os_realpath(const char *path);
 char *os_getcwd(void);
 
 // The user's home directory: $HOME, or %USERPROFILE% on Windows ("/" or
-// "C:/" when unset). A galloc'd copy the caller gfree()s; NULL only when
-// out of memory.
+// "C:/" when unset). Under `sudo narval` it's the home of the user who ran
+// sudo (os_sudo_user()), so their ~/.narval — init.lisp, packages — is the
+// one loaded, not root's. A galloc'd copy the caller gfree()s; NULL only
+// when out of memory.
 char *os_home_dir(void);
+
+/**
+ * @brief Whether a sudo invocation is to be believed: running as root
+ * (`euid` 0), `sudo_user` names an account, and `sudo_uid` is exactly that
+ * account's uid (`user_uid`, from the password database), which isn't
+ * root's. $SUDO_USER is only an environment variable — anyone can set it —
+ * so it counts for nothing unless all of that holds. Pure: no lookups, for
+ * the tests. Always 0 on Windows, which has no sudo.
+ */
+int os_sudo_trusted(long euid, const char *sudo_user, const char *sudo_uid, long user_uid);
+
+/**
+ * @brief The user who ran `sudo narval` (os_sudo_trusted() of the process's
+ * own euid, $SUDO_USER, $SUDO_UID and the password database): their login
+ * name, or NULL when narval isn't running under sudo (or on Windows).
+ * Looked up once.
+ */
+const char *os_sudo_user(void);
+
+/**
+ * @brief Under sudo, gives what root created at `path` (a file, or a
+ * directory and everything in it) back to the user who ran sudo, so that
+ * ~/.narval doesn't fill up with files their own narval can't write.
+ * @details Only inside that user's home directory, and only what root owns:
+ * nothing is followed through a symbolic link, a file with more than one
+ * hard link is left alone (it could be a link to a system file), and so are
+ * sockets (a root daemon's stays root's). Does nothing when not under sudo,
+ * and on Windows.
+ * @return 0, or -1 if something couldn't be changed.
+ */
+int os_hand_back(const char *path);
 
 int os_path_is_absolute(const char *path);
 

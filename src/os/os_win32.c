@@ -2710,6 +2710,27 @@ char *os_getcwd(void)
     return utf8;
 }
 
+// No sudo on Windows: never trusted, nothing to hand back.
+int os_sudo_trusted(long euid, const char *sudo_user, const char *sudo_uid, long user_uid)
+{
+    (void)euid;
+    (void)sudo_user;
+    (void)sudo_uid;
+    (void)user_uid;
+    return 0;
+}
+
+const char *os_sudo_user(void)
+{
+    return NULL;
+}
+
+int os_hand_back(const char *path)
+{
+    (void)path;
+    return 0;
+}
+
 char *os_home_dir(void)
 {
     const wchar_t *profile = _wgetenv(L"USERPROFILE");

@@ -561,7 +561,7 @@
 (map-key "c" '(dashboard-run-key "c") "dashboard")
 (map-key "ESCAPE" '(editor-set-prefix "no-prefix") "dashboard")
 (map-key "CTRL-x" '(editor-set-prefix "user") "dashboard")
-(map-key "D" dashboard "user")
+(map-key "D" dashboard "project")
 
 ;; ─── at startup ───────────────────────────────────────────────────────────
 ;; Started inside a project with no file to open, the dashboard takes the
@@ -572,7 +572,7 @@
             (if (and (dashboard--setting "dashboard-on-start")
                      (not (string=? (project-root) ""))
                      (dashboard--splash? (buffer-filename)))
-                (dashboard))))
+                (dashboard))))e
 
 ;; ─── on project-switch ────────────────────────────────────────────────────
 ;; A project picked with project-switch opens on its dashboard rather than

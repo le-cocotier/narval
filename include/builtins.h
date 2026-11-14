@@ -183,6 +183,10 @@ void bFree_structs(void);
 //   "project-open"  (root)                — a project became current for the
 //                                            first time this session, after
 //                                            its .narval/init.lisp loaded
+//   "project-switch" (root)               — a project was picked with
+//                                            project-switch; a hook that
+//                                            shows a buffer replaces the
+//                                            find-file that follows
 //   "terminal-exited" (name, exit-code)   — a terminal pane's program ended
 //                                            (-1: code unknown); see
 //                                            terminal-run

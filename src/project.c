@@ -1120,12 +1120,19 @@ static Lisp l_projectLspForget(Lisp args, LispError *e, LispContext ctx) {
   return lisp_null();
 }
 
-/** @brief project-switch's on-select: the chosen root becomes current. */
+/**
+ * @brief project-switch's on-select: the chosen root becomes current, then
+ * the "project-switch" hooks run with it.
+ * @details A hook that shows a buffer of its own (the dashboard package's
+ * *dashboard*) takes find-file's place; otherwise find-file opens in the
+ * project.
+ */
 static Lisp projectSwitchSelected(Lisp args, LispError *e, LispContext ctx) {
   const char *root;
+  const EditorPane *active;
   int index;
+  int buffer_before;
   (void)e;
-  (void)ctx;
   if (!lisp_is_pair(args) || lisp_type(lisp_car(args)) != LISP_STRING)
     return lisp_null();
   root = lisp_string(lisp_car(args));
@@ -1133,13 +1140,20 @@ static Lisp projectSwitchSelected(Lisp args, LispError *e, LispContext ctx) {
   if (index == -1 || E.projects[index].removed)
     return lisp_null();
   activate(index);
-  fileFinderOpenAt(E.projects[index].root);
+  active = splitScreenGetActivePane();
+  buffer_before = active ? active->buffer_id : -1;
+  runHooks("project-switch",
+           lisp_cons(lisp_make_string2(E.projects[index].root, ctx), lisp_null(), ctx));
+  active = splitScreenGetActivePane();
+  if ((active ? active->buffer_id : -1) == buffer_before)
+    fileFinderOpenAt(E.projects[index].root);
   return lisp_null();
 }
 
 /**
  * @brief (project-switch) — lists the remembered projects, most recent
- * first; choosing one makes it current and opens find-file in it.
+ * first; choosing one makes it current, runs the "project-switch" hooks
+ * and, unless one of them showed a buffer, opens find-file in it.
  */
 static Lisp l_projectSwitch(Lisp args, LispError *e, LispContext ctx) {
   (void)args;

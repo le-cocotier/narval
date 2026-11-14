@@ -1,7 +1,9 @@
 ;; ─── Dashboard ──────────────────────────────────────────────────────────────
 ;; (add-package "dashboard") — a start screen for the current project, in a
 ;; read-only *dashboard* buffer. It opens by itself when narval starts inside
-;; a project with no file to open (dashboard-on-start), and with CTRL-x D.
+;; a project with no file to open (dashboard-on-start), when a project is
+;; picked with project-switch, CTRL-x p p (dashboard-on-switch, in find-file's
+;; place), and with CTRL-x D.
 ;;
 ;; From top to bottom (dashboard-sections):
 ;;
@@ -32,6 +34,7 @@
 ;;       ("t" "Test" "make test")
 ;;       ("f" "Flash" "make flash")))   ; #f: found from the project's files
 ;;   (define dashboard-on-start #f)      ; don't replace the start screen
+;;   (define dashboard-on-switch #f)     ; project-switch opens find-file
 ;;   (define dashboard-sections '("project" "git" "commands" "todos"))
 ;;   (define dashboard-recent-count 10)
 ;;   (define dashboard-todo-count 5)     ; 0 hides the TODOs
@@ -53,6 +56,7 @@
 ;; ─── settings ─────────────────────────────────────────────────────────────
 
 (define dashboard-on-start #t)
+(define dashboard-on-switch #t)
 (define dashboard-sections '("project" "git" "commands" "recent" "todos" "status" "projects"))
 (define dashboard-commands #f)
 (define dashboard-recent-count 8)
@@ -568,4 +572,14 @@
             (if (and (dashboard--setting "dashboard-on-start")
                      (not (string=? (project-root) ""))
                      (dashboard--splash? (buffer-filename)))
+                (dashboard))))
+
+;; ─── on project-switch ────────────────────────────────────────────────────
+;; A project picked with project-switch opens on its dashboard rather than
+;; find-file. Read once the project is current, so its own
+;; .narval/init.lisp can turn it off.
+
+(add-hook "project-switch"
+          (lambda (root)
+            (if (dashboard--setting "dashboard-on-switch")
                 (dashboard))))

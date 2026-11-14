@@ -1296,6 +1296,51 @@ def dashboard_on_start(binary, repo):
         ed.quit()
 
 
+def dashboard_on_switch(binary, repo):
+    """A project picked with project-switch (CTRL-x p p) opens on its
+    dashboard in find-file's place; a project whose .narval/init.lisp sets
+    dashboard-on-switch to #f gets find-file instead."""
+    with Narval(binary, repo, rows=40, cols=120) as ed:
+        dashboard_project(ed)
+        os.makedirs(ed.path('other'))
+        with open(ed.path('other/notes.txt'), 'w') as f:
+            f.write('outside any project\n')
+        with open(ed.path('.narval/projects'), 'w') as f:
+            f.write('- %s\n' % ed.path('proj'))
+        ed.start('other/notes.txt')
+        ed.wait_for('outside any project')
+        assert not any('◆ proj' in line for line in ed.text()), ed.text()
+        ed.keys(CTRL_X, 'p', 'p', delay=0.5)
+        ed.wait_for('proj')
+        ed.keys('\r', delay=0.5)
+        ed.wait_for('◆ proj')
+        ed.wait_for('▸ Commands')
+        ed.wait_for('main.c:2  /* TODO: read the arguments */')
+        ed.quit()
+    with Narval(binary, repo, rows=40, cols=120) as ed:
+        dashboard_project(ed)
+        os.makedirs(ed.path('proj/.narval'), exist_ok=True)
+        with open(ed.path('proj/.narval/init.lisp'), 'w') as f:
+            f.write('(define dashboard-on-switch #f)\n')
+        os.makedirs(ed.path('other'))
+        with open(ed.path('other/notes.txt'), 'w') as f:
+            f.write('outside any project\n')
+        with open(ed.path('.narval/projects'), 'w') as f:
+            f.write('+ %s\n' % ed.path('proj'))
+        ed.start('other/notes.txt')
+        ed.wait_for('outside any project')
+        ed.keys(CTRL_X, 'p', 'p', delay=0.5)
+        ed.wait_for('proj')
+        ed.keys('\r', delay=0.5)
+        ed.wait_for('Makefile')  # find-file lists the project's files
+        ed.pump(0.5)
+        assert not any('◆ proj' in line for line in ed.text()), ed.text()
+        ed.keys('main.c', delay=0.3)
+        ed.keys('\r', delay=0.5)
+        ed.wait_for('return 0;')
+        ed.quit()
+
+
 def dashboard_extended(binary, repo):
     """dashboard-commands replaces what's found, a package's section shows
     up with dashboard-add-section and ENTER calls its action; q closes."""
@@ -1365,6 +1410,7 @@ TESTS = [
     ('stm32-debug', stm32_debug),
     ('debug-log-buffer', debug_log_buffer),
     ('dashboard-on-start', dashboard_on_start),
+    ('dashboard-on-switch', dashboard_on_switch),
     ('dashboard-extended', dashboard_extended),
 ]
 

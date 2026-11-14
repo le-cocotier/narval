@@ -68,6 +68,11 @@ long ptySessionPid(const struct buffer_t* buf)
     return buf->pty ? os_pty_pid(buf->pty) : -1;
 }
 
+int ptySessionExitCode(const struct buffer_t* buf, const int wait_ms)
+{
+    return buf->pty ? os_pty_exit_code(buf->pty, wait_ms) : -1;
+}
+
 void ptySessionClose(struct buffer_t* buf)
 {
     if (buf->pty)

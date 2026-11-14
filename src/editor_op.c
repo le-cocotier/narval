@@ -11,6 +11,7 @@
 
 #include "../include/ansi_parser.h"
 #include "../include/buffer.h"
+#include "../include/builtins.h"
 #include "../include/completion.h"
 #include "../include/lsp_install.h"
 #include "../include/dap.h"
@@ -161,6 +162,9 @@ void editorHandleStreams(const RunLoopWatch *w, const int *ready) {
   unsigned char chunk[4096];
   long n;
   int i;
+  int n_exited = 0;
+  char *exited_names[RUN_LOOP_MAX_TERMINALS];
+  int exited_codes[RUN_LOOP_MAX_TERMINALS];
 
   for (i = 0; i < w->n_terminals; i++) {
     if (!ready[w->first_terminal + i])
@@ -172,9 +176,22 @@ void editorHandleStreams(const RunLoopWatch *w, const int *ready) {
       b->y = b->term_state.cursor_y;
     }
     // The shell has exited: release it. The buffer keeps showing what
-    // it last drew.
-    if (n < 0)
+    // it last drew. "terminal-exited" hears of it once every terminal is
+    // read: a hook may open or close terminals, which w->terminals holds.
+    if (n < 0) {
+      exited_codes[n_exited] = ptySessionExitCode(b, 200);
+      exited_names[n_exited] = (char *)utf8ToString(b->filename);
+      if (exited_names[n_exited])
+        n_exited++;
       ptySessionClose(b);
+    }
+  }
+  for (i = 0; i < n_exited; i++) {
+    // (terminal-exited "name" exit-code): -1 when the code is unknown.
+    runHooks("terminal-exited",
+             lisp_cons(lisp_make_string2(exited_names[i], E.ctx),
+                       lisp_cons(lisp_make_int(exited_codes[i]), lisp_null(), E.ctx), E.ctx));
+    gfree(exited_names[i]);
   }
 
   // number_of_lsp_clients can't have changed since the streams were

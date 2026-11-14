@@ -732,6 +732,42 @@ static Lisp l_projectRoot(Lisp args, LispError *e, LispContext ctx) {
   return lisp_make_string2(root ? root : "", ctx);
 }
 
+/**
+ * @brief (project-setting "NAME" [default]) — NAME as the current
+ * project's .narval/init.lisp defines it, else as init.lisp (the global
+ * environment) does, else `default` (#f if not given).
+ * @details A package's own variables are global, so a project config's
+ * (define stm32-probe "stlink") is only seen by builtins: this is how a
+ * package's Lisp reads the project's value instead of its own default.
+ */
+static Lisp l_projectSetting(Lisp args, LispError *e, LispContext ctx) {
+  Lisp fallback = lisp_false();
+  Lisp symbol;
+  Lisp val;
+  Project *p;
+  int present = 0;
+  if (!lisp_is_pair(args) || (lisp_type(lisp_car(args)) != LISP_STRING &&
+                              lisp_type(lisp_car(args)) != LISP_SYMBOL)) {
+    *e = LISP_ERROR_ARG_TYPE;
+    return lisp_null();
+  }
+  symbol = lisp_type(lisp_car(args)) == LISP_SYMBOL
+               ? lisp_car(args)
+               : lisp_make_symbol(lisp_string(lisp_car(args)), ctx);
+  if (lisp_is_pair(lisp_cdr(args)))
+    fallback = lisp_car(lisp_cdr(args));
+  if (E.current_project >= 0 && E.current_project < E.number_of_projects) {
+    p = &E.projects[E.current_project];
+    if (!p->removed && p->has_config_env) {
+      val = lisp_env_lookup(p->config_env, symbol, &present);
+      if (present)
+        return val;
+    }
+  }
+  val = lisp_env_lookup(lisp_env(ctx), symbol, &present);
+  return present ? val : fallback;
+}
+
 /** @brief (project-name) — the current project root's last component, or "". */
 static Lisp l_projectName(Lisp args, LispError *e, LispContext ctx) {
   const char *root = projectCurrentRoot();
@@ -1114,6 +1150,7 @@ static Lisp l_projectSwitch(Lisp args, LispError *e, LispContext ctx) {
 
 void projectRegisterBuiltins(void) {
   registerBuiltin("project-root", l_projectRoot);
+  registerBuiltin("project-setting", l_projectSetting);
   registerBuiltin("project-name", l_projectName);
   registerBuiltin("project-list", l_projectList);
   registerBuiltin("project-add-marker", l_projectAddMarker);

@@ -178,6 +178,9 @@ void bFree_structs(void);
 //   "project-open"  (root)                — a project became current for the
 //                                            first time this session, after
 //                                            its .narval/init.lisp loaded
+//   "terminal-exited" (name, exit-code)   — a terminal pane's program ended
+//                                            (-1: code unknown); see
+//                                            terminal-run
 Lisp addHook(Lisp args, LispError *e, LispContext ctx);
 void runHooks(const char *event_name, Lisp args);
 
@@ -247,6 +250,14 @@ Lisp l_makeDirectories(Lisp args, LispError *e, LispContext ctx);
 // (process-start callback "program" "arg" ...) — background process-run;
 // callback gets (exit-code . "output") from the main loop when it exits.
 Lisp l_processStart(Lisp args, LispError *e, LispContext ctx);
+// (terminal-run "name" "shell command" | '("program" "arg" ...) [cwd [focus]])
+// — runs it in a terminal pane called `name`, replacing the last one; the
+// "terminal-exited" hook gets (name exit-code) when it ends.
+Lisp l_terminalRun(Lisp args, LispError *e, LispContext ctx);
+// (read-file "path" [max-bytes]) — the file's text, or #f.
+Lisp l_readFile(Lisp args, LispError *e, LispContext ctx);
+// (find-program "name") — its full path on PATH, or #f.
+Lisp l_findProgram(Lisp args, LispError *e, LispContext ctx);
 // (string-split "text" "sep" [limit]) — list of the pieces between seps.
 Lisp l_stringSplit(Lisp args, LispError *e, LispContext ctx);
 // (current-buffer-id) — id of the active pane's buffer.

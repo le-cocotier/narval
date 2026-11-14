@@ -26,6 +26,7 @@
 #include "../include/project_search.h"
 #include "../include/replace.h"
 #include "../include/split_screen.h"
+#include "../include/pty_session.h"
 #include "../include/subprocess.h"
 #include "../include/syntax_highlighter.h"
 #include "../include/terminal.h"
@@ -3006,6 +3007,205 @@ Lisp l_processStart(Lisp args, LispError *e, LispContext ctx) {
   id = asyncProcessStart(argv, callback);
   gfree(argv);
   return id >= 0 ? lisp_make_int(id) : lisp_false();
+}
+
+/**
+ * @brief Shows terminal buffer `id` in pane `pane`, or in a new pane split
+ * off the active one when `pane` is -1 (in the active pane itself when
+ * there's no room to split). Focuses it when `focus`, else gives the focus
+ * and the key prefix back to the pane that had them.
+ */
+static void showTerminalPane(const int id, int pane, const int focus, const int saved_prefix) {
+  ScreenLayout *layout = splitScreenGetLayout();
+  const int was_active = layout->active_pane;
+  struct prefix_t prefix;
+  if (pane < 0 || pane >= layout->num_panes) {
+    pane = splitScreenSplitActive(SPLIT_HORIZONTAL) == 0 ? splitScreenGetLayout()->active_pane
+                                                         : was_active;
+    layout = splitScreenGetLayout();
+  }
+  layout->panes[pane].buffer_id = id;
+  layout->panes[pane].shown_buffer_id = -1;
+  splitScreenSyncTerminalSizes();
+  if (focus) {
+    splitScreenFocusPane(pane);
+    prefix = find_prefix("term");
+    if (prefix.prefix_id != -1)
+      E.prefix_state = prefix.prefix_id;
+  } else {
+    splitScreenFocusPane(was_active);
+    E.prefix_state = saved_prefix;
+  }
+}
+
+/**
+ * @brief Lisp function: run a program in a terminal pane of its own
+ * @details (terminal-run "name" command [cwd [focus]]) — `command` is a
+ * string, run by the platform's shell (as shell-run does), or a list
+ * ("program" "arg" ...), run directly. It runs on a pseudo-terminal, so
+ * it can draw and read keys: a build with colours, a serial monitor, a
+ * gdbserver. `cwd` (#f or absent: the project root) is where it starts.
+ * A terminal of the same name is closed first (its program ended) and the
+ * new one takes its pane; otherwise the active pane is split. With
+ * `focus` #f the keys stay where they were; by default they go to the
+ * terminal (ESC gives the editor's keys back). When the program exits,
+ * the pane keeps its output and the "terminal-exited" hook is run with
+ * (name exit-code), the code -1 if unknown — how a build can go on to
+ * flash only when it succeeded.
+ * @return the terminal's buffer id, or #f if it couldn't start
+ */
+Lisp l_terminalRun(Lisp args, LispError *e, LispContext ctx) {
+  const char *name;
+  const char *cwd = NULL;
+  Lisp command;
+  Lisp it;
+  char **shell_argv = NULL;
+  const char **argv = NULL;
+  Utf8Char *uname;
+  struct buffer_t *old;
+  ScreenLayout *layout;
+  int focus = 1;
+  int saved_prefix = E.prefix_state;
+  int pane = -1;
+  int argc = 0;
+  int id = -1;
+  int i;
+  (void)ctx;
+  if (!lisp_is_pair(args) || !lisp_is_pair(lisp_cdr(args)) ||
+      lisp_type(lisp_car(args)) != LISP_STRING) {
+    *e = LISP_ERROR_TOO_FEW_ARGS;
+    return lisp_null();
+  }
+  name = lisp_string(lisp_car(args));
+  command = lisp_car(lisp_cdr(args));
+  args = lisp_cdr(lisp_cdr(args));
+  if (lisp_is_pair(args)) {
+    if (lisp_type(lisp_car(args)) == LISP_STRING && lisp_string(lisp_car(args))[0])
+      cwd = lisp_string(lisp_car(args));
+    if (lisp_is_pair(lisp_cdr(args)))
+      focus = lisp_is_true(lisp_car(lisp_cdr(args)));
+  }
+  if (!*name) {
+    *e = LISP_ERROR_ARG_TYPE;
+    return lisp_null();
+  }
+  if (lisp_type(command) == LISP_STRING) {
+    shell_argv = os_shell_argv(lisp_string(command));
+    argv = (const char **)shell_argv;
+  } else {
+    for (it = command; lisp_is_pair(it); it = lisp_cdr(it)) {
+      if (lisp_type(lisp_car(it)) != LISP_STRING) {
+        *e = LISP_ERROR_ARG_TYPE;
+        return lisp_null();
+      }
+      argc++;
+    }
+    if (argc == 0) {
+      *e = LISP_ERROR_TOO_FEW_ARGS;
+      return lisp_null();
+    }
+    argv = gcalloc((size_t)argc + 1, sizeof(*argv));
+    i = 0;
+    for (it = command; argv && lisp_is_pair(it); it = lisp_cdr(it))
+      argv[i++] = lisp_string(lisp_car(it));
+  }
+  uname = stringToUtf8((unsigned char *)name);
+  if (!argv || !uname)
+    goto done;
+
+  old = bufferFindById(bufferFindByFilename(uname));
+  if (old) {
+    if (old->type != TERMINAL_BUFF) {
+      editorSetStatusMessage("terminal-run: %s is already a buffer that isn't a terminal", name);
+      goto done;
+    }
+    layout = splitScreenGetLayout();
+    for (i = 0; i < layout->num_panes; i++)
+      if (layout->panes[i].buffer_id == old->buffer_id)
+        pane = i; // the new run goes where the last one was shown
+    ptySessionClose(old); // a live one would make bufferClose() ask
+    bufferClose(old->buffer_id);
+  }
+  ptySessionSetNextProgram(argv, cwd, NULL);
+  id = bufferCreate(uname, READ_AND_WRITE, TERMINAL_BUFF);
+  ptySessionSetNextProgram(NULL, NULL, NULL);
+  if (id >= 0 && bufferFindById(id))
+    showTerminalPane(id, pane, focus, saved_prefix);
+  else
+    id = -1;
+
+done:
+  gfree(uname);
+  if (shell_argv)
+    os_free_argv(shell_argv);
+  else
+    gfree((void *)argv);
+  if (id < 0) {
+    E.prefix_state = saved_prefix;
+    return lisp_false();
+  }
+  return lisp_make_int(id);
+}
+
+/**
+ * @brief Lisp function: a file's text
+ * @details (read-file "path" [max-bytes]) — the whole file as a string
+ * (up to `max-bytes`, 4 MiB by default: the rest is left out), or #f if
+ * it can't be read. For text files: reading stops at a NUL byte.
+ * @return Lisp string, or #f
+ */
+Lisp l_readFile(Lisp args, LispError *e, LispContext ctx) {
+  long max = 4L << 20;
+  FILE *f;
+  char *text;
+  size_t n;
+  Lisp result;
+  if (!lisp_is_pair(args) || lisp_type(lisp_car(args)) != LISP_STRING) {
+    *e = LISP_ERROR_ARG_TYPE;
+    return lisp_null();
+  }
+  if (lisp_is_pair(lisp_cdr(args)) && lisp_type(lisp_car(lisp_cdr(args))) == LISP_INT)
+    max = (long)lisp_int(lisp_car(lisp_cdr(args)));
+  if (max < 0)
+    max = 0;
+  f = fopen(lisp_string(lisp_car(args)), "rb");
+  if (!f)
+    return lisp_false();
+  text = galloc((size_t)max + 1);
+  if (!text) {
+    fclose(f);
+    return lisp_false();
+  }
+  n = fread(text, 1, (size_t)max, f);
+  fclose(f);
+  text[n] = '\0';
+  result = lisp_make_string2(text, ctx);
+  gfree(text);
+  return result;
+}
+
+/**
+ * @brief Lisp function: where a program is installed
+ * @details (find-program "name") — its full path, searched on PATH (on
+ * Windows with its .exe/.cmd/... extensions, and the PATH in the registry
+ * too), or #f when it isn't installed.
+ * @return Lisp string, or #f
+ */
+Lisp l_findProgram(Lisp args, LispError *e, LispContext ctx) {
+  char *found;
+  Lisp result;
+  if (!lisp_is_pair(args) || lisp_type(lisp_car(args)) != LISP_STRING) {
+    *e = LISP_ERROR_ARG_TYPE;
+    return lisp_null();
+  }
+  if (!lisp_string(lisp_car(args))[0])
+    return lisp_false();
+  found = os_find_program(lisp_string(lisp_car(args)));
+  if (!found)
+    return lisp_false();
+  result = lisp_make_string2(found, ctx);
+  gfree(found);
+  return result;
 }
 
 /**

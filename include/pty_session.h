@@ -11,6 +11,8 @@ int ptySessionSpawn(struct buffer_t* buf, const char* shell_path, int rows, int 
 // borrowed until then. NULL clears it.
 void ptySessionSetNextProgram(const char* const* argv, const char* cwd, const char* const* env);
 long ptySessionPid(const struct buffer_t* buf);          // -1 once closed
+// How the program exited (os_pty_exit_code()); -1 if it still runs or is closed.
+int ptySessionExitCode(const struct buffer_t* buf, int wait_ms);
 void ptySessionResize(const struct buffer_t* buf, int rows, int cols);
 long ptySessionWrite(const struct buffer_t* buf, const char* bytes, size_t len);
 OsStream *ptySessionOutput(const struct buffer_t* buf); // NULL once closed

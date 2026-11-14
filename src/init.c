@@ -215,6 +215,9 @@ void initBuiltins(void) {
   registerBuiltin("copy-paths", l_copyPaths);
   registerBuiltin("make-directories", l_makeDirectories);
   registerBuiltin("process-start", l_processStart);
+  registerBuiltin("terminal-run", l_terminalRun);
+  registerBuiltin("read-file", l_readFile);
+  registerBuiltin("find-program", l_findProgram);
   registerBuiltin("string-split", l_stringSplit);
   registerBuiltin("current-buffer-id", l_currentBufferId);
   registerBuiltin("editor-message", l_editorMessage);

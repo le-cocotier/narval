@@ -151,6 +151,8 @@
 ;;                          ; instead of "nodejs", not alongside it — both
 ;;                          ; register "ts" and only the first one wins it.
 ;; (add-package "lisp")     ; no server needed — highlighting + comment toggle only
+;; (add-package "stm32")    ; CTRL-x E: STM32 build, flash, openocd/gdb debug,
+;;                          ; serial monitor, clangd for arm-none-eabi (loads "c")
 ;; (add-package "markdown") ; marksman optional — highlighting, heading outline,
 ;;                          ; list continuation on ENTER work without it
 ;;

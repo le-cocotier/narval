@@ -889,6 +889,7 @@ struct OsPty {
   pid_t pid;
   OsStream out;
   int exited;
+  int exit_code; // -1 until reaped by os_pty_alive() / os_pty_exit_code()
 };
 
 /**
@@ -949,6 +950,7 @@ static OsPty *ptyStart(const char *shell, const char *const *argv, const char *c
 
   setCloexec(master);
   p->pid = pid;
+  p->exit_code = -1;
   streamInit(&p->out, master, 0);
   return p;
 }
@@ -1011,7 +1013,22 @@ int os_pty_alive(OsPty *p) {
   if (r == 0)
     return 1;
   p->exited = 1; // exited (r == pid) or not ours to wait for: either way, done
+  if (r == p->pid)
+    p->exit_code = WIFEXITED(status)     ? WEXITSTATUS(status)
+                   : WIFSIGNALED(status) ? 128 + WTERMSIG(status)
+                                         : -1;
   return 0;
+}
+
+int os_pty_exit_code(OsPty *p, const int wait_ms) {
+  int waited = 0;
+  if (!p)
+    return -1;
+  while (os_pty_alive(p) && waited < wait_ms) {
+    os_sleep_ms(10);
+    waited += 10;
+  }
+  return p->exited ? p->exit_code : -1;
 }
 
 void os_pty_close(OsPty *p) {

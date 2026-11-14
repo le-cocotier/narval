@@ -1012,6 +1012,139 @@ def project_root_start(binary, repo):
         ed.quit()
 
 
+STM32_IOC = """#MicroXplorer Configuration settings - do not modify
+Mcu.Family=STM32F4
+Mcu.Name=STM32F407V(E-G)Tx
+Mcu.UserName=STM32F407VGTx
+ProjectManager.TargetToolchain=Makefile
+"""
+
+STM32_MAKEFILE = """build/fw.elf: main.c
+\tmkdir -p build
+\tcc -g -O0 -o build/fw.elf main.c
+"""
+
+# Stands in for openocd: says what it was asked to do.
+FAKE_OPENOCD = """#!/bin/sh
+printf '%s\\n' "$@" > "$HOME/proj/openocd.args"
+echo "fake openocd: programmed"
+"""
+
+
+def stm32_project(ed):
+    """An STM32CubeMX-style Makefile project, built for the host so gdb
+    can debug it, and a fake openocd on PATH."""
+    os.makedirs(ed.path('proj/.git'))
+    os.makedirs(ed.path('bin'))
+    with open(ed.path('proj/main.c'), 'w') as f:
+        f.write(DEBUGGEE)
+    with open(ed.path('proj/blinky.ioc'), 'w') as f:
+        f.write(STM32_IOC)
+    with open(ed.path('proj/Makefile'), 'w') as f:
+        f.write(STM32_MAKEFILE)
+    with open(ed.path('bin/openocd'), 'w') as f:
+        f.write(FAKE_OPENOCD)
+    os.chmod(ed.path('bin/openocd'), 0o755)
+    ed.extra_env = {'PATH': ed.path('bin') + ':' + os.environ.get('PATH', '')}
+
+
+STM32 = (CTRL_X, 'E')
+
+
+def stm32_build_and_flash(binary, repo):
+    """CTRL-x E i finds the MCU in the .ioc; CTRL-x E f builds in *stm32*,
+    then flashes the .elf the build made, with openocd's target for it."""
+    if not shutil.which('make') or not shutil.which('cc'):
+        raise Skip('needs make and cc')
+    with Narval(binary, repo, rows=30, cols=140) as ed:
+        stm32_project(ed)
+        with open(ed.path('.narval/packages/personal-config/init.lisp'), 'a') as f:
+            f.write('\n(define LSP #f)\n(add-package "stm32")\n')
+        ed.start('proj/main.c')
+        ed.wait_for('square')
+        ed.keys(*STM32, 'i', delay=0.5)
+        ed.wait_for('STM32F407VGTx (STM32F4)')
+        ed.wait_for('target/stm32f4x.cfg with interface/stlink.cfg')
+        ed.wait_for('Build system  make')
+        ed.keys(CTRL_X, 'k', delay=0.3)
+        ed.keys(*STM32, 'f', delay=0.3)
+        ed.wait_for('Flash: done', 30)
+        with open(ed.path('proj/openocd.args')) as f:
+            args = f.read().split('\n')
+        assert args[:4] == ['-f', 'interface/stlink.cfg', '-f', 'target/stm32f4x.cfg'], args
+        assert args[5] == 'program {' + ed.path('proj/build/fw.elf') + '} verify reset exit', args
+        assert any('fake openocd: programmed' in line for line in ed.text()), ed.text()
+        ed.quit()
+
+
+def stm32_build_failure_stops(binary, repo):
+    """A build that fails stops there: nothing is flashed."""
+    if not shutil.which('make'):
+        raise Skip('needs make')
+    with Narval(binary, repo, rows=30, cols=140) as ed:
+        stm32_project(ed)
+        with open(ed.path('proj/Makefile'), 'w') as f:
+            f.write('all:\n\t@echo broken build; exit 2\n')
+        with open(ed.path('.narval/packages/personal-config/init.lisp'), 'a') as f:
+            f.write('\n(define LSP #f)\n(add-package "stm32")\n')
+        ed.start('proj/main.c')
+        ed.wait_for('square')
+        ed.keys(*STM32, 'f', delay=0.3)
+        ed.wait_for('Build failed (exit code 2): see *stm32*', 30)
+        ed.pump(0.5)
+        assert not os.path.exists(ed.path('proj/openocd.args'))
+        ed.quit()
+
+
+def stm32_project_settings(binary, repo):
+    """A setting in the project's .narval/init.lisp wins over the package's
+    default once the project is trusted (CTRL-x p t)."""
+    with Narval(binary, repo, rows=30, cols=140) as ed:
+        stm32_project(ed)
+        os.makedirs(ed.path('proj/.narval'))
+        with open(ed.path('proj/.narval/init.lisp'), 'w') as f:
+            f.write('(define stm32-openocd-target "target/custom.cfg")\n')
+        with open(ed.path('.narval/packages/personal-config/init.lisp'), 'a') as f:
+            f.write('\n(define LSP #f)\n(add-package "stm32")\n')
+        ed.start('proj/main.c')
+        ed.wait_for('square')
+        ed.keys(*STM32, 'i', delay=0.5)
+        ed.wait_for('target/stm32f4x.cfg')
+        ed.keys(CTRL_X, 'k', delay=0.3)
+        ed.keys(CTRL_X, 'p', 't', delay=0.5)
+        ed.wait_for('trusted')
+        ed.keys(*STM32, 'i', delay=0.5)
+        ed.wait_for('target/custom.cfg with interface/stlink.cfg')
+        ed.quit()
+
+
+def stm32_debug(binary, repo):
+    """CTRL-x E d builds, flashes, then attaches gdb (DAP) to the gdb
+    server through `target remote`: here gdbserver on a pipe, the way
+    openocd runs. The breakpoint set before is hit."""
+    if sys.platform == 'darwin':
+        raise Skip('gdb on macOS needs code signing to run programs')
+    if not gdb_with_dap() or not shutil.which('gdbserver') or not shutil.which('make'):
+        raise Skip('needs gdb 14 or later, gdbserver, make and cc')
+    with Narval(binary, repo, rows=30, cols=140) as ed:
+        stm32_project(ed)
+        with open(ed.path('.narval/packages/personal-config/init.lisp'), 'a') as f:
+            f.write('\n(define LSP #f)\n(add-package "stm32")\n'
+                    '(define stm32-gdb "gdb")\n'
+                    '(define stm32-gdb-server "remote")\n'
+                    '(define stm32-gdb-remote "| gdbserver - build/fw.elf")\n')
+        ed.start('proj/main.c')
+        ed.wait_for('square')
+        ed.keys(DOWN, DOWN, *DEBUG, 'b')
+        ed.keys(*STM32, 'd', delay=0.3)
+        ed.wait_for('stopped (breakpoint)', 40)
+        ed.wait_for('v = 3  (int)')
+        assert os.path.exists(ed.path('proj/openocd.args'))
+        ed.keys(*DEBUG, 'q', delay=0.5)
+        ed.pump(1)
+        ed.quit()
+
+
 FAKE_SERVER_INSTALL = """printf 'Password: '
 read answer
 mkdir -p "$HOME/bin"
@@ -1113,6 +1246,10 @@ TESTS = [
     ('daemon-prompt-other-windows', daemon_prompt_other_windows),
     ('daemon-debug-per-project', daemon_debug_per_project),
     ('terminal-long-burst', terminal_long_burst),
+    ('stm32-build-and-flash', stm32_build_and_flash),
+    ('stm32-build-failure-stops', stm32_build_failure_stops),
+    ('stm32-project-settings', stm32_project_settings),
+    ('stm32-debug', stm32_debug),
 ]
 
 

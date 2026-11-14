@@ -2063,6 +2063,16 @@ int os_pty_alive(OsPty *p)
     return p && WaitForSingleObject(p->process, 0) == WAIT_TIMEOUT;
 }
 
+int os_pty_exit_code(OsPty *p, const int wait_ms)
+{
+    DWORD code;
+    if (!p || WaitForSingleObject(p->process, (DWORD) (wait_ms > 0 ? wait_ms : 0)) != WAIT_OBJECT_0)
+        return -1;
+    if (!GetExitCodeProcess(p->process, &code))
+        return -1;
+    return (int) code;
+}
+
 void os_pty_close(OsPty *p)
 {
     HANDLE thread;

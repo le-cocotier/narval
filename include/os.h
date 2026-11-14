@@ -297,6 +297,11 @@ void os_pty_resize(OsPty *p, int rows, int cols);
 // 1 while the shell is running.
 int os_pty_alive(OsPty *p);
 
+// How what ran on it exited, once it has: its exit code (128 + the signal
+// that ended it, on Unix). Waits up to `wait_ms` for it to exit, since its
+// output can end a moment before it does. -1 while it still runs.
+int os_pty_exit_code(OsPty *p, int wait_ms);
+
 // Ends the shell and releases everything.
 void os_pty_close(OsPty *p);
 

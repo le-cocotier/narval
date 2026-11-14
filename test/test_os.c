@@ -280,6 +280,31 @@ static void testFindProgram(const char *self) {
   CHECK(os_find_program("./narval-no-such-program") == NULL);
 }
 
+// A program on a pseudo-terminal: its exit code once its output ends.
+static void testPtyExitCode(const char *self) {
+  const char *argv[3];
+  char buf[256];
+  OsPty *pty;
+  long n;
+  int i;
+  argv[0] = self;
+  argv[1] = "--child";
+  argv[2] = NULL;
+  pty = os_pty_spawn(argv, NULL, NULL, 24, 80);
+  CHECK(pty != NULL);
+  if (!pty)
+    return;
+  // Read until the output ends (the child exited), at most ~10s.
+  for (i = 0; i < 1000; i++) {
+    n = os_stream_read(os_pty_output(pty), buf, sizeof(buf), 10);
+    if (n < 0)
+      break;
+  }
+  CHECK_INT(os_pty_exit_code(pty, 2000), 3);
+  CHECK_INT(os_pty_alive(pty), 0);
+  os_pty_close(pty);
+}
+
 int main(int argc, char **argv) {
   if (argc > 1 && strcmp(argv[1], "--child") == 0) {
     printf("hello from the child\n");
@@ -297,5 +322,6 @@ int main(int argc, char **argv) {
   testWriteDoesNotBlock(argv[0]);
   testMissingProgram();
   testFindProgram(argv[0]);
+  testPtyExitCode(argv[0]);
   return testDone();
 }

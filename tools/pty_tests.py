@@ -1072,7 +1072,9 @@ def stm32_build_and_flash(binary, repo):
         with open(ed.path('proj/openocd.args')) as f:
             args = f.read().split('\n')
         assert args[:4] == ['-f', 'interface/stlink.cfg', '-f', 'target/stm32f4x.cfg'], args
-        assert args[5] == 'program {' + ed.path('proj/build/fw.elf') + '} verify reset exit', args
+        # narval passes the real path (/tmp is a link to /private/tmp on macOS).
+        elf = os.path.realpath(ed.path('proj/build/fw.elf'))
+        assert args[5] == 'program {' + elf + '} verify reset exit', args
         assert any('fake openocd: programmed' in line for line in ed.text()), ed.text()
         ed.quit()
 

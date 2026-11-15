@@ -19,6 +19,7 @@ import pty
 import select
 import shutil
 import signal
+import site
 import struct
 import subprocess
 import tempfile
@@ -121,9 +122,7 @@ class Narval:
                     os.dup2(slave, fd)
                 if slave > 2:
                     os.close(slave)
-                os.environ.update({'HOME': self.home, 'TERM': 'xterm-256color',
-                                   'SHELL': '/bin/sh', 'PS1': '$ '})
-                os.environ.update(self.extra_env)
+                os.environ.update(self.environment())
                 os.chdir(os.path.join(self.home, cwd) if cwd else self.home)
                 argv = [self.binary] + self.args + list(args)
                 os.execv(self.binary, argv)
@@ -153,13 +152,21 @@ class Narval:
     def path(self, name):
         return os.path.join(self.home, name)
 
+    def environment(self):
+        """What narval's environment changes from the tests' own."""
+        env = {'HOME': self.home, 'TERM': 'xterm-256color', 'SHELL': '/bin/sh', 'PS1': '$ ',
+               # Packages installed with pip --user live under the real
+               # HOME: keep them reachable (debugpy) with HOME moved.
+               'PYTHONUSERBASE': os.environ.get('PYTHONUSERBASE', site.getuserbase())}
+        env.update(self.extra_env)
+        return env
+
     def run(self, *args):
         """Runs narval with `args` to the end, outside the pty, with this
         HOME; (exit code, stdout + stderr)."""
         # The environment start() gives, which a daemon started here
         # passes on to its terminal panes.
-        env = dict(os.environ, HOME=self.home, TERM='xterm-256color',
-                   SHELL='/bin/sh', PS1='$ ', **self.extra_env)
+        env = dict(os.environ, **self.environment())
         result = subprocess.run([self.binary] + list(args), cwd=self.home, env=env,
                                 stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, timeout=_scaled(20))

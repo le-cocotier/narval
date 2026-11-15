@@ -404,6 +404,17 @@ static void forgetStoppedState(void) {
   clearWatchValues();
 }
 
+// The adapter reports paths as it was given them (debugpy: "/tmp/t.py");
+// buffers hold real paths ("/private/tmp/t.py" on macOS), and the two are
+// compared as strings. Takes `path`; the real one when it resolves.
+static char *realFramePath(char *path) {
+  char *real = path ? os_realpath(path) : NULL;
+  if (!real)
+    return path;
+  gfree(path);
+  return real;
+}
+
 const DapFrame *dapFrames(int *count, int *selected) {
   DapSession *c = currentSession();
   *count = c->frame_count;
@@ -1166,7 +1177,7 @@ static void onStackTrace(cJSON *response, void *ctx) {
     if (cJSON_GetNumberValue(cJSON_GetObjectItemCaseSensitive(source, "sourceReference")) > 0)
       s->frames[i].path = NULL;
     else
-      s->frames[i].path = jsonString(source, "path");
+      s->frames[i].path = realFramePath(jsonString(source, "path"));
     s->frames[i].line =
         (int)cJSON_GetNumberValue(cJSON_GetObjectItemCaseSensitive(item, "line")) - 1;
     if (s->frames[i].line < 0)

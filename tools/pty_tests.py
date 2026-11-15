@@ -228,14 +228,17 @@ def terminal_long_burst(binary, repo):
         line = ''.join(chr(ord('a') + i % 26) for i in range(2000))
         shell(ed, 'echo ' + line + ' > long.txt')
         got = ''
-        for _ in range(100):  # slower under a sanitizer, or a busy machine
+        # Slower under a sanitizer, or a busy machine: each character goes
+        # through the pane and its echo is drawn.
+        for _ in range(int(100 * pty_harness.TIME_SCALE)):
             ed.pump(0.1)
             if os.path.exists(ed.path('long.txt')):
                 with open(ed.path('long.txt')) as f:
                     got = f.read()
                 if got.endswith('\n'):
                     break
-        assert got == line + '\n', '%d bytes: %r' % (len(got), got[:80])
+        assert got == line + '\n', '%d bytes: %r; the screen:\n%s' % (
+            len(got), got[:80], '\n'.join(ed.text()))
         ed.quit()
 
 

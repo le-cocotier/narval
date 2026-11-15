@@ -48,8 +48,17 @@ def _scaled(seconds):
     return int(seconds * TIME_SCALE + 0.5)
 
 
+# The editor of the running test, for the watchdog to say where it was.
+_running = None
+
+
 def _on_alarm(signum, frame):
-    raise Timeout('watchdog: the test took too long')
+    message = 'watchdog: the test took too long'
+    if _running is not None:
+        message += ', waiting for %r' % (_running.waiting,)
+        if _running.screen is not None:
+            message += '; the screen:\n' + '\n'.join(_running.text())
+    raise Timeout(message)
 
 
 def install_config(repo, home):
@@ -88,6 +97,7 @@ class Narval:
         self.screen = pyte.Screen(cols, rows) if pyte else None
         self.output = bytearray()  # everything the editor wrote
         self.stream = pyte.ByteStream(self.screen) if pyte else None
+        self.waiting = None  # what wait_for is looking for, for the watchdog
 
     # ── Lifecycle ──────────────────────────────────────────────────────
 
@@ -101,6 +111,8 @@ class Narval:
         tmp = '/tmp' if os.path.isdir('/tmp') else None
         self.home = tempfile.mkdtemp(prefix='bt-', dir=tmp)
         install_config(self.repo, self.home)
+        global _running
+        _running = self
         self.previous_alarm = signal.signal(signal.SIGALRM, _on_alarm)
         signal.alarm(_scaled(self.timeout))
         return self
@@ -135,6 +147,8 @@ class Narval:
 
     def __exit__(self, kind, value, tb):
         if not self.shared_home:
+            global _running
+            _running = None
             signal.alarm(0)
             signal.signal(signal.SIGALRM, self.previous_alarm)
         if self.pid and self.status is None:
@@ -225,8 +239,10 @@ class Narval:
     def wait_for(self, needle, seconds=10):
         """Waits until `needle` is on screen (needs pyte)."""
         end = time.time() + seconds * TIME_SCALE
+        self.waiting = needle
         while time.time() < end:
             if any(needle in line for line in self.screen.display):
+                self.waiting = None
                 return True
             self.pump(0.1)
         raise AssertionError('%r never showed up; the screen:\n%s'

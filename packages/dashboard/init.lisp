@@ -572,7 +572,7 @@
             (if (and (dashboard--setting "dashboard-on-start")
                      (not (string=? (project-root) ""))
                      (dashboard--splash? (buffer-filename)))
-                (dashboard))))e
+                (dashboard))))
 
 ;; ─── on project-switch ────────────────────────────────────────────────────
 ;; A project picked with project-switch opens on its dashboard rather than

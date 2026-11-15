@@ -1265,7 +1265,7 @@ def dashboard_project(ed):
 def dashboard_on_start(binary, repo):
     """Started in a project with no file, narval shows *dashboard*: its
     commands (found from the Makefile), git state and TODOs. ENTER on the
-    TODO opens main.c at its line; CTRL-x D comes back, with main.c among
+    TODO opens main.c at its line; CTRL-x p D comes back, with main.c among
     the recent files; b runs the build in a *run* pane."""
     if not shutil.which('make'):
         raise Skip('needs make')
@@ -1288,7 +1288,7 @@ def dashboard_on_start(binary, repo):
         ed.keys('\r', delay=0.5)
         ed.wait_for('return 0;')
         assert 'TODO: read' in ed.screen.display[ed.screen.cursor.y], ed.text()
-        ed.keys(CTRL_X, 'D', delay=0.5)
+        ed.keys(CTRL_X,'p', 'D', delay=0.5)
         ed.wait_for('▸ Recent files')
         lines = ed.text()
         recent = lines.index(next(l for l in lines if l.startswith('▸ Recent files')))

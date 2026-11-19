@@ -1955,8 +1955,8 @@ int os_heap_in_use(long long *blocks, long long *bytes) {
 #define CLIPBOARD_COPY_CMD "pbcopy"
 #define CLIPBOARD_PASTE_CMD "pbpaste"
 #else
-#define CLIPBOARD_COPY_CMD "xclip -selection clipboard 2>/dev/null"
-#define CLIPBOARD_PASTE_CMD "xclip -selection clipboard -o 2>/dev/null"
+#define CLIPBOARD_COPY_CMD  "if [ -n \"$WAYLAND_DISPLAY\" ]; then wl-copy; else xclip -selection clipboard; fi 2>/dev/null"
+#define CLIPBOARD_PASTE_CMD "if [ -n \"$WAYLAND_DISPLAY\" ]; then wl-paste --no-newline; else xclip -selection clipboard -o; fi 2>/dev/null"
 #endif
 
 char *os_clipboard_get(void) {

@@ -112,6 +112,33 @@ def terminal_alternate_screen(binary, repo):
         ed.quit()
 
 
+def terminal_unbound_chord(binary, repo):
+    """In a terminal pane, a chord's unbound second key (CTRL-x h CTRL-x)
+    ends the chord: the shell has the keys again, and CTRL-x CTRL-c quits
+    without leaving the terminal's keys first."""
+    with Narval(binary, repo) as ed:
+        ed.start()
+        open_terminal(ed)
+        ed.keys(CTRL_X, 'h', CTRL_X, delay=0.3)
+        shell(ed, 'echo chord-$((40+2))')
+        ed.wait_for('chord-42', 5)
+        ed.keys(CTRL_X, '\x03', delay=0.3)
+        status = ed.wait_exit(5)
+        assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0, status
+
+
+def terminal_quit_ignored_hangup(binary, repo):
+    """A shell that ignores SIGHUP doesn't keep the editor from quitting."""
+    with Narval(binary, repo) as ed:
+        ed.start()
+        open_terminal(ed)
+        shell(ed, "trap '' HUP")
+        ed.pump(0.5)
+        ed.keys(CTRL_X, '\x03', delay=0.3)
+        status = ed.wait_exit(5)
+        assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0, status
+
+
 def terminal_vim(binary, repo):
     """vim (scroll regions, insert/delete line, the alternate screen):
     what it shows matches the file, and editing it works."""
@@ -1397,6 +1424,8 @@ TESTS = [
     ('lsp-install', lsp_install),
     ('lsp-install-declined', lsp_install_declined),
     ('terminal-alternate-screen', terminal_alternate_screen),
+    ('terminal-unbound-chord', terminal_unbound_chord),
+    ('terminal-quit-ignored-hangup', terminal_quit_ignored_hangup),
     ('terminal-vim', terminal_vim),
     ('terminal-colors', terminal_colors),
     ('terminal-wide-characters', terminal_wide_characters),

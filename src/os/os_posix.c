@@ -1031,14 +1031,28 @@ int os_pty_exit_code(OsPty *p, const int wait_ms) {
   return p->exited ? p->exit_code : -1;
 }
 
+// How long os_pty_close() gives a hung-up shell to exit before SIGKILL.
+#define PTY_HANGUP_WAIT_MS 500
+
 void os_pty_close(OsPty *p) {
   if (!p)
     return;
-  if (!p->exited) {
-    kill(p->pid, SIGHUP);
-    waitpid(p->pid, NULL, 0);
-  }
+  // Hang up first, as closing a terminal window does: with the master
+  // closed the kernel sends SIGHUP to the session (the shell and its
+  // foreground job), and anything still reading the pty gets EOF.
   streamClose(&p->out);
+  if (!p->exited) {
+    kill(-p->pid, SIGHUP); // the shell's process group (forkpty: setsid)
+    kill(p->pid, SIGHUP);
+    // Not a bare waitpid(): a shell or program that ignores SIGHUP (trap ''
+    // HUP, nohup, a stuck job) never exits, and the editor froze on quit or
+    // on killing the terminal buffer, its last frame still on screen.
+    if (os_pty_exit_code(p, PTY_HANGUP_WAIT_MS) < 0 && !p->exited) {
+      kill(-p->pid, SIGKILL);
+      kill(p->pid, SIGKILL);
+      os_pty_exit_code(p, PTY_HANGUP_WAIT_MS);
+    }
+  }
   gfree(p);
 }
 

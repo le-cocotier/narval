@@ -565,6 +565,7 @@ void editorProcessKeypress() {
   int match;
   int k;
   LspClient *lsp;
+  struct prefix_t term_prefix;
 
   // Focus may have moved since the last key: each pane its own cursor.
   splitScreenSyncCursor();
@@ -666,6 +667,21 @@ void editorProcessKeypress() {
   }
 
   if (buf->type == TERMINAL_BUFF) {
+    // A chord started in the terminal pane (CTRL-x p, CTRL-x h, ...) and
+    // this key isn't bound under it: the same one-shot consumption as the
+    // file-buffer case below, back to the pane's own "term" keys. Forwarding
+    // it to the shell instead left the prefix pending for good: everything
+    // typed went to the shell (or ran that prefix's commands), and CTRL-x
+    // CTRL-c couldn't quit since CTRL-x isn't bound under "help",
+    // "project", ...
+    if (E.prefix_state != 0 && !E.prefix[E.prefix_state].sticky) {
+      term_prefix = find_prefix("term");
+      if (E.prefix_state != term_prefix.prefix_id) {
+        E.prefix_state = term_prefix.prefix_id != -1 ? term_prefix.prefix_id : 0;
+        gfree(c);
+        return;
+      }
+    }
     ptyForwardKey(buf, c);
     gfree(c);
     return;

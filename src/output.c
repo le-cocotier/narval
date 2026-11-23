@@ -362,6 +362,7 @@ int editorPaneStickyRows(const EditorPane *pane, const struct buffer_t *buf, int
 }
 
 static void editorDrawPane(struct abuf *ab, EditorPane *pane) {
+  const char *row_bg = E.theme.BACKGROUND_COLOR; // the current row's background
   int file_row;
   char pos_buf[32];
   int pos_len;
@@ -552,11 +553,12 @@ static void editorDrawPane(struct abuf *ab, EditorPane *pane) {
         // it is in the file, and should look apart from the rows below.
         // The line the debugger stopped on outranks both.
         if (!is_sticky && debug_path && debugUiIsCurrentLine(debug_path, file_row))
-            abAppend(ab, E.theme.DEBUG_LINE_BACKGROUND, (int) strlen(E.theme.DEBUG_LINE_BACKGROUND));
+            row_bg = E.theme.DEBUG_LINE_BACKGROUND;
         else if (is_cursor_line || is_sticky)
-            abAppend(ab, E.theme.LINE_CURSOR_BACKGROUND, (int) strlen(E.theme.LINE_CURSOR_BACKGROUND));
+            row_bg = E.theme.LINE_CURSOR_BACKGROUND;
         else
-            abAppend(ab, E.theme.BACKGROUND_COLOR, (int) strlen(E.theme.BACKGROUND_COLOR));
+            row_bg = E.theme.BACKGROUND_COLOR;
+        abAppend(ab, row_bg, (int) strlen(row_bg));
         // Extension-based lookup against whatever packages have actually
         // registered via (syntax-define-language ...), rather than a
         // hardcoded "does the filename end in c or h" check — the old
@@ -654,7 +656,9 @@ static void editorDrawPane(struct abuf *ab, EditorPane *pane) {
           !(has_selection && sel_extends) && span.end >= row->size) {
         diag = lspUiWorstDiagnostic(&E.lsp_diagnostics, pane->buffer_id, file_row);
         if (diag)
-          filled += lspUiDrawInlineDiagnostic(ab, diag, content_width - filled);
+          filled += lspUiDrawInlineDiagnostic(
+              ab, diag, lspUiDiagnosticCount(&E.lsp_diagnostics, pane->buffer_id, file_row) - 1,
+              row_bg, content_width - filled);
       }
       for (i = filled; i < content_width; i++) {
         abAppend(ab, " ", 1);

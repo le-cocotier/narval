@@ -651,7 +651,15 @@ typedef struct
 
 // One line's git working-tree status, cached on the buffer — see
 // bufferRefreshGitInfo() in buffer.c.
-typedef enum { GIT_LINE_NONE = 0, GIT_LINE_ADDED, GIT_LINE_MODIFIED } GitLineStatus;
+// DELETED_BELOW: lines were deleted right after this one; DELETED_ABOVE:
+// before it (a deletion at the top of the file has no line before it).
+typedef enum {
+    GIT_LINE_NONE = 0,
+    GIT_LINE_ADDED,
+    GIT_LINE_MODIFIED,
+    GIT_LINE_DELETED_BELOW,
+    GIT_LINE_DELETED_ABOVE
+} GitLineStatus;
 
 typedef struct buffer_t
 {

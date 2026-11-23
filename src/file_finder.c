@@ -540,8 +540,6 @@ void fileFinderDraw(struct abuf *ab) {
   int is_sel;
   int row;
   const char *path;
-  char col[LIST_POPUP_MAX_WIDTH + 1];
-  int plen;
   if (!ff->visible)
     return;
 
@@ -552,8 +550,14 @@ void fileFinderDraw(struct abuf *ab) {
     scroll = ff->selected - FF_VISIBLE_ROWS + 1;
 
   // Title row shows the live query and the match count.
-  snprintf(title, sizeof(title), "Find file: %s_  (%d)", ff->query,
-           ff->match_count);
+  // "(3/14)" once you move off the first match, so you know where you are
+  // in a list longer than the box.
+  if (ff->selected > 0)
+    snprintf(title, sizeof(title), "Find file: %s_  (%d/%d)", ff->query,
+             ff->selected + 1, ff->match_count);
+  else
+    snprintf(title, sizeof(title), "Find file: %s_  (%d)", ff->query,
+             ff->match_count);
 
   content_w = (int)strlen(title);
   for (i = 0; i < visible_count; i++) {
@@ -599,13 +603,8 @@ void fileFinderDraw(struct abuf *ab) {
     popupRowBegin(ab, &style, origin_x, row, is_sel);
 
     path = ff->paths[ff->match[idx]];
-    plen = (int)strlen(path);
-    // Left-justify when it fits; when it doesn't, show the tail rather
-    // than the head — the basename is what you're scanning for.
-    snprintf(col, sizeof(col), "%-*s", content_w,
-             plen <= content_w ? path : path + plen - content_w);
-    col[content_w] = '\0';
-    abAppend(ab, col, content_w);
+    popupAppendLabel(ab, &style, is_sel, path, content_w, ff->query,
+                     POPUP_MATCH_FUZZY, 1);
 
     popupRowEnd(ab, &style);
   }

@@ -5,6 +5,10 @@
 
 #include "../include/popup_ui.h"
 #include "../include/append_buffer.h"
+#include "../include/galloc.h"
+#include "../include/utf8.h"
+
+#include <ctype.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -88,6 +92,16 @@ void popupStyleInit(PopupStyle *style) {
     selfg_r = blend(fg_r, 255, 60); selfg_g = blend(fg_g, 255, 60); selfg_b = blend(fg_b, 255, 60);
     snprintf(style->row_sel, sizeof(style->row_sel), "1;48;2;%d;%d;%d;38;2;%d;%d;%d",
             sel_r, sel_g, sel_b, selfg_r, selfg_g, selfg_b);
+
+    snprintf(style->dim_fg, sizeof(style->dim_fg), "38;2;%d;%d;%d",
+             blend(fg_r, bg_r, 45), blend(fg_g, bg_g, 45), blend(fg_b, bg_b, 45));
+    // Matched characters: the theme's type color (blue in both bundled
+    // themes) — distinct from the keyword-colored border and selection.
+    {
+        int m_r, m_g, m_b;
+        parseThemeRgb(E.theme.COLOR_TYPE, &m_r, &m_g, &m_b);
+        snprintf(style->match_fg, sizeof(style->match_fg), "38;2;%d;%d;%d", m_r, m_g, m_b);
+    }
 
     // Shadow: background darkened toward black — a flat dark patch is all
     // a terminal can offer in place of a real soft/alpha-blended shadow.
@@ -222,4 +236,134 @@ void popupDrawShadow(struct abuf *ab, const PopupStyle *style,
         }
     }
     AB_RESET(ab);
+}
+
+// ─── labels ─────────────────────────────────────────────────────────────────
+
+/**
+ * @brief Marks in `mask` (one entry per byte of `label`) the bytes `query`
+ * matched. Only ASCII bytes are compared, so a mark never lands inside a
+ * multi-byte character.
+ */
+static void markMatches(const char *label, const int len, const char *query,
+                        const PopupMatch match, unsigned char *mask) {
+    int i;
+    int j;
+    int qlen;
+    memset(mask, 0, (size_t) len);
+    if (!query || !query[0] || match == POPUP_MATCH_NONE) return;
+
+    if (match == POPUP_MATCH_FUZZY) {
+        // Matched from the end backwards, so the marks land in the file
+        // name rather than on the first matching letters of the directory
+        // ("lspui" marks include/lsp_ui.h's "lsp_ui", not "incLude/sp_ui").
+        qlen = (int) strlen(query);
+        j = qlen - 1;
+        for (i = len - 1; i >= 0 && j >= 0; i--) {
+            if ((unsigned char) label[i] < 0x80 &&
+                tolower((unsigned char) label[i]) == tolower((unsigned char) query[j])) {
+                mask[i] = 1;
+                j--;
+            }
+        }
+        if (j >= 0) memset(mask, 0, (size_t) len); // not a full match: mark nothing
+        return;
+    }
+
+    qlen = (int) strlen(query);
+    for (i = 0; i + qlen <= len; i++) {
+        for (j = 0; j < qlen; j++)
+            if (tolower((unsigned char) label[i + j]) != tolower((unsigned char) query[j]))
+                break;
+        if (j == qlen) {
+            memset(mask + i, 1, (size_t) qlen);
+            return;
+        }
+    }
+}
+
+void popupAppendLabel(struct abuf *ab, const PopupStyle *style, const int is_selected,
+                      const char *label, const int content_w, const char *query,
+                      const PopupMatch match, const int is_path) {
+    const int len = (int) strlen(label);
+    unsigned char *mask;
+    int *col_at; // column where each byte's character starts
+    int total = 0;
+    int dir_end = -1; // byte just past the last '/' (dimmed before it)
+    int from = 0;     // first byte drawn
+    int to = len;     // byte drawn up to (exclusive)
+    int used = 0;
+    int state = -1;   // 0 plain, 1 dim, 2 match: avoids an SGR per character
+    int want;
+    int i;
+    int n;
+    Utf8Char c;
+
+    if (content_w <= 0) return;
+    mask = galloc((size_t) len + 1);
+    col_at = galloc(sizeof(int) * ((size_t) len + 1));
+    if (!mask || !col_at) {
+        gfree(mask);
+        gfree(col_at);
+        return;
+    }
+    markMatches(label, len, query, match, mask);
+
+    for (i = 0; i < len; i += n) {
+        n = utf8CreateChar((const unsigned char *) label + i, &c);
+        if (n <= 0) n = 1;
+        col_at[i] = total;
+        total += utf8CharWidth(&c);
+        if (label[i] == '/') dir_end = i + 1;
+    }
+    col_at[len] = total;
+
+    // Too wide: keep the tail of a path, the head of anything else, and
+    // spend one column on "…" for the part left out.
+    if (total > content_w) {
+        if (is_path) {
+            for (from = 0; from < len; from++)
+                if (((unsigned char) label[from] & 0xC0) != 0x80 &&
+                    total - col_at[from] <= content_w - 1)
+                    break;
+            ab_sgr(ab, style->dim_fg);
+            abAppend(ab, "…", 3);
+            used = 1;
+            state = 1;
+        } else {
+            for (to = len; to > 0; to--)
+                if (((unsigned char) label[to] & 0xC0) != 0x80 && col_at[to] <= content_w - 1)
+                    break;
+        }
+    }
+
+    for (i = from; i < to; i += n) {
+        n = utf8CreateChar((const unsigned char *) label + i, &c);
+        if (n <= 0) n = 1;
+        if (i + n > to) break;
+        // The selected row's tinted background is too close to the dimmed
+        // color for it to stay legible, so it shows the directory plainly.
+        want = mask[i] ? 2 : (is_path && !is_selected && i < dir_end) ? 1 : 0;
+        if (want != state) {
+            popupRowStyle(ab, style, is_selected);
+            if (want == 1) ab_sgr(ab, style->dim_fg);
+            if (want == 2) {
+                ab_sgr(ab, "1");
+                ab_sgr(ab, style->match_fg);
+            }
+            state = want;
+        }
+        abAppend(ab, label + i, n);
+        used += utf8CharWidth(&c);
+    }
+    if (state == -1 || to < len) popupRowStyle(ab, style, is_selected);
+    if (to < len) {
+        abAppend(ab, "…", 3);
+        used++;
+    }
+    popupRowStyle(ab, style, is_selected);
+    for (; used < content_w; used++) abAppend(ab, " ", 1);
+
+    gfree(mask);
+    gfree(col_at);
 }

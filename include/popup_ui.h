@@ -34,6 +34,9 @@ typedef struct
                         // marker, layered on top of whatever bg (row or
                         // row_sel) is already active
     char shadow[24];    // drop-shadow cells: darkened bg only
+    char dim_fg[24];    // bare fg for secondary text (a path's directory):
+                        // the row's fg blended halfway into its bg
+    char match_fg[24];  // bare fg for the characters a query matched
 } PopupStyle;
 
 // Reads the live theme (E.theme) and fills in `style`.
@@ -76,6 +79,24 @@ void popupRowStyle(struct abuf *ab, const PopupStyle *style, int is_selected);
 // (in the chrome/accent color, matching the vertical frame's other side),
 // and a reset.
 void popupRowEnd(struct abuf *ab, const PopupStyle *style);
+
+// Label matching for popupAppendLabel(): where `query` is found in the
+// label, case-insensitively. POPUP_MATCH_FUZZY is find-file's rule (each
+// query character in order, anywhere after the previous one),
+// POPUP_MATCH_SUBSTRING the list popup's (the query as one run).
+typedef enum { POPUP_MATCH_NONE, POPUP_MATCH_FUZZY, POPUP_MATCH_SUBSTRING } PopupMatch;
+
+// Writes `label` into exactly `content_w` columns of a row opened with
+// popupRowBegin(), padding with spaces. The characters `query` matched are
+// drawn bold in the theme's type color. With `is_path`, everything up to
+// the last '/' is dimmed (except on the selected row) so the file name
+// stands out, and a label too wide for the row keeps its tail
+// ("…/dir/name.c"); otherwise it keeps its head ("a long label…"). Widths
+// are screen columns, so wide and multi-byte characters line up. Leaves
+// the row's base style active.
+void popupAppendLabel(struct abuf *ab, const PopupStyle *style, int is_selected,
+                      const char *label, int content_w, const char *query,
+                      PopupMatch match, int is_path);
 
 // One-cell-wide column of shadow down the right edge and one-row strip
 // along the bottom, offset down-right by a column/row so it reads as a

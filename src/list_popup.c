@@ -224,7 +224,6 @@ void listPopupDraw(struct abuf *ab) {
   int is_sel;
   int row;
   const char *label;
-  char label_col[LIST_POPUP_MAX_WIDTH + 1];
   if (!E.list_popup.visible)
     return;
   // Non-filterable popups never open with count == 0 (see
@@ -243,8 +242,12 @@ void listPopupDraw(struct abuf *ab) {
   // Title row: plain title, or "title: query_  (N)" while filterable —
   // same shape find-file's own popup uses, for a consistent feel.
   if (E.list_popup.filterable)
-    snprintf(title, sizeof(title), "%s: %s_  (%d)", E.list_popup.title,
-             E.list_popup.query, count);
+    if (E.list_popup.selected > 0) // "(3/14)": where you are in a long list
+      snprintf(title, sizeof(title), "%s: %s_  (%d/%d)", E.list_popup.title,
+               E.list_popup.query, E.list_popup.selected + 1, count);
+    else
+      snprintf(title, sizeof(title), "%s: %s_  (%d)", E.list_popup.title,
+               E.list_popup.query, count);
   else
     snprintf(title, sizeof(title), "%s", E.list_popup.title);
 
@@ -304,9 +307,9 @@ void listPopupDraw(struct abuf *ab) {
       if (lisp_is_pair(pair))
         label = lisp_string(lisp_car(pair));
     }
-    snprintf(label_col, sizeof(label_col), "%-*s", content_w, label);
-    label_col[content_w] = '\0'; // truncate if the label overruns content_w
-    abAppend(ab, label_col, content_w);
+    popupAppendLabel(ab, &style, is_sel, label, content_w,
+                     E.list_popup.filterable ? E.list_popup.query : NULL,
+                     POPUP_MATCH_SUBSTRING, 0);
 
     popupRowEnd(ab, &style);
 

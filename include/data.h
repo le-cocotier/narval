@@ -438,7 +438,7 @@ typedef struct
     // over thousands of items (find-file's project-wide file list) wants
     // its own C-side snapshot instead, same reasoning file_finder.c
     // already documents for why it isn't built on this popup.
-    int filterable;
+    int filterable;    // 0, LIST_FILTER_SUBSTRING or LIST_FILTER_FUZZY
     Lisp all_items;
     char query[128];
     int query_len;

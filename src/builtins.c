@@ -1835,7 +1835,12 @@ Lisp editorGotoLine(Lisp args, LispError *e, LispContext ctx) {
  * user's side, and list_popup.c's own doc comment for when this is (and
  * isn't) the right primitive to reach for. Omitting it, or every existing
  * 3- and 4-argument caller (outline, latex-insert-environment, ...),
- * keeps the old modal-arrows-only behavior exactly as it was.
+ * keeps the old modal-arrows-only behavior exactly as it was. Passing
+ * "fuzzy" instead of #t matches the query's letters in order rather than
+ * as one run ("ff" finds find-file).
+ *
+ * A label "left\tright" draws `right` dimmed in a column of its own (the
+ * command palette's key bindings).
  * @param args Lisp list of 3-5 arguments: (title items on-select [on-cancel]
  * [filterable?])
  * @return lisp_null()
@@ -1854,7 +1859,14 @@ Lisp editorListPopup(Lisp args, LispError *e, LispContext ctx) {
   on_cancel = lisp_is_pair(args) ? lisp_car(args) : lisp_null();
   if (lisp_is_pair(args))
     args = lisp_cdr(args);
-  filterable = lisp_is_pair(args) && lisp_is_true(lisp_car(args));
+  // #t: the labels containing the query; "fuzzy": the labels holding its
+  // letters in order (what the command palette uses).
+  filterable = 0;
+  if (lisp_is_pair(args) && lisp_type(lisp_car(args)) == LISP_STRING)
+    filterable = strcmp(lisp_string(lisp_car(args)), "fuzzy") == 0 ? LIST_FILTER_FUZZY
+                                                                     : LIST_FILTER_SUBSTRING;
+  else if (lisp_is_pair(args) && lisp_is_true(lisp_car(args)))
+    filterable = LIST_FILTER_SUBSTRING;
 
   listPopupOpen(title, items, on_select, on_cancel, filterable);
   return lisp_null();

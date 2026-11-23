@@ -13,9 +13,11 @@
 #include "../include/galloc.h"
 #include "../include/output.h"
 #include "../include/terminal.h"
+#include "../include/utils.h"
 #include "../include/which_key.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 extern EditorConfig E;
@@ -130,6 +132,72 @@ Lisp keyBindings(Lisp args, LispError *e, LispContext ctx) {
                       ctx);
     list = lisp_cons(entry, list, ctx);
   }
+  return list;
+}
+
+static int compareNames(const void *a, const void *b) {
+  return strcmp(*(const char *const *)a, *(const char *const *)b);
+}
+
+// The core library's names, sorted (see commandNamesMarkLibrary).
+static char **g_library_names = NULL;
+static int g_library_count = 0;
+
+void commandNamesMarkLibrary(void) {
+  Lisp alist;
+  Lisp it;
+  Lisp pair;
+  int cap = 0;
+  alist = lisp_table_to_alist(lisp_car(lisp_env(E.ctx)), E.ctx);
+  for (it = alist; lisp_is_pair(it); it = lisp_cdr(it))
+    cap++;
+  g_library_names = gcalloc((size_t)(cap > 0 ? cap : 1), sizeof(char *));
+  if (!g_library_names)
+    return;
+  for (it = alist; lisp_is_pair(it); it = lisp_cdr(it)) {
+    pair = lisp_car(it);
+    if (lisp_is_pair(pair) && lisp_type(lisp_car(pair)) == LISP_SYMBOL)
+      g_library_names[g_library_count++] = utilStrdup(lisp_symbol_string(lisp_car(pair)));
+  }
+  qsort(g_library_names, (size_t)g_library_count, sizeof(char *), compareNames);
+}
+
+static int isLibraryName(const char *name) {
+  return g_library_names && bsearch(&name, g_library_names, (size_t)g_library_count,
+                                    sizeof(char *), compareNames) != NULL;
+}
+
+Lisp commandNames(Lisp args, LispError *e, LispContext ctx) {
+  Lisp alist;
+  Lisp it;
+  Lisp pair;
+  Lisp list = lisp_null();
+  const char **names;
+  int count = 0;
+  int cap = 0;
+  int i;
+  (void)args;
+  (void)e;
+  alist = lisp_table_to_alist(lisp_car(lisp_env(ctx)), ctx);
+  for (it = alist; lisp_is_pair(it); it = lisp_cdr(it))
+    cap++;
+  names = gcalloc((size_t)(cap > 0 ? cap : 1), sizeof(char *));
+  if (!names)
+    return list;
+  for (it = alist; lisp_is_pair(it); it = lisp_cdr(it)) {
+    pair = lisp_car(it);
+    if (!lisp_is_pair(pair) || lisp_type(lisp_car(pair)) != LISP_SYMBOL)
+      continue;
+    if (lisp_type(lisp_cdr(pair)) != LISP_FUNC && lisp_type(lisp_cdr(pair)) != LISP_LAMBDA)
+      continue;
+    if (isLibraryName(lisp_symbol_string(lisp_car(pair))))
+      continue;
+    names[count++] = lisp_symbol_string(lisp_car(pair));
+  }
+  qsort(names, (size_t)count, sizeof(char *), compareNames);
+  for (i = count - 1; i >= 0; i--)
+    list = lisp_cons(lisp_make_string2(names[i], ctx), list, ctx);
+  gfree(names);
   return list;
 }
 

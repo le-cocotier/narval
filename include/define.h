@@ -34,6 +34,7 @@
 #define COMPLETION_MAX_ITEMS  16
 #define COMPLETION_MAX_WIDTH  40
 #define COMPLETION_POPUP_H    8   // max visible rows
+#define COMPLETION_DETAIL_WIDTH 32 // the detail column ("int (char *)"), at most
 #define DIAG_MAX 128
 #define LSP_INFO_MAX_LINES 12
 #define LSP_INFO_LINE_W 160

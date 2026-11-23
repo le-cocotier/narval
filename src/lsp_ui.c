@@ -88,52 +88,88 @@ static const char *kind_color(const int k) {
 // selection, drop shadow) is popup_ui.c's job; this function only knows
 // about completion-specific content (kind tags + labels).
 
+static int utf8_cols(const char *s, int len);
+
 void lspUiDrawCompletion(struct abuf *ab, CompletionPopup *popup) {
     int visible_count;
     int scroll;
+    int label_w;
+    int detail_w;
     int content_w;
     int i;
     int idx;
-    int label_len;
+    int len;
     int box_w;
+    int box_h;
+    int x;
+    int y;
+    int cursor_row;
+    int below;
+    int above;
     PopupStyle style;
     CompletionItem *it;
     int is_sel;
-    int row;
-    char label_col[COMPLETION_MAX_WIDTH];
     if (!popup->visible || popup->count == 0) return;
 
     visible_count = popup->count < COMPLETION_POPUP_H
                       ? popup->count : COMPLETION_POPUP_H;
 
+    // Under the cursor when it fits; otherwise on whichever side has more
+    // room, with fewer rows if even that is short. Never over the status
+    // bar, which starts after E.screenrows.
+    cursor_row = popup->origin_y - 1;
+    below = E.screenrows - cursor_row - 2; // rows left for items under it
+    above = cursor_row - 3;                // and over it
+    y = popup->origin_y;
+    if (visible_count > below) {
+        if (above > below) {
+            if (visible_count > above) visible_count = above;
+            y = cursor_row - (visible_count + 2);
+        } else if (below > 0) {
+            visible_count = below;
+        }
+    }
+    if (visible_count < 1) visible_count = 1;
+
     // Scroll window so selected item is always visible
     scroll = 0;
-    if (popup->selected >= COMPLETION_POPUP_H)
-        scroll = popup->selected - COMPLETION_POPUP_H + 1;
+    if (popup->selected >= visible_count)
+        scroll = popup->selected - visible_count + 1;
 
-    // Size the box to the longest visible label, capped at COMPLETION_MAX_WIDTH
-    content_w = 0;
+    // Two columns: the labels, then their details ("int (const char *)")
+    // dimmed, each sized to its longest visible entry and capped.
+    label_w = 0;
+    detail_w = 0;
     for (i = 0; i < visible_count; i++) {
         idx = i + scroll;
-        label_len = (int) strlen(popup->items[idx].label);
-        if (label_len > content_w) content_w = label_len;
+        len = utf8_cols(popup->items[idx].label, (int) strlen(popup->items[idx].label));
+        if (len > label_w) label_w = len;
+        len = utf8_cols(popup->items[idx].detail, (int) strlen(popup->items[idx].detail));
+        if (len > detail_w) detail_w = len;
     }
-    // +5 for the tag(3) + the space separating it from the label; the
-    // marker/border/margin overhead is popupRowBegin/End's job, not ours.
-    if (content_w > COMPLETION_MAX_WIDTH - 5) content_w = COMPLETION_MAX_WIDTH - 5;
+    if (label_w > COMPLETION_MAX_WIDTH - 5) label_w = COMPLETION_MAX_WIDTH - 5;
+    if (detail_w > COMPLETION_DETAIL_WIDTH) detail_w = COMPLETION_DETAIL_WIDTH;
+    // The details are the first thing to go on a narrow screen.
+    if (label_w + 5 + 4 + detail_w + 2 > E.screencols) detail_w = 0;
+    content_w = label_w + (detail_w ? detail_w + 2 : 0);
     box_w = content_w + 4 + 5; // border+marker+margin*2 (4) + tag+space (5)
+    box_h = visible_count + 2;
+
+    // Pulled left rather than running off the right edge.
+    x = popup->origin_x;
+    if (x + box_w > E.screencols)
+        x = E.screencols - box_w > 1 ? E.screencols - box_w : 1;
 
     popupStyleInit(&style);
 
-    popupDrawTop(ab, &style, popup->origin_x, popup->origin_y, box_w);
+    popupDrawTop(ab, &style, x, y, box_w);
 
     for (i = 0; i < visible_count; i++) {
         idx = i + scroll;
         it = &popup->items[idx];
         is_sel = (idx == popup->selected);
-        row = popup->origin_y + 1 + i;
 
-        popupRowBegin(ab, &style, popup->origin_x, row, is_sel);
+        popupRowBegin(ab, &style, x, y + 1 + i, is_sel);
 
         // Kind tag ("fn ", "var", "kwd"...) in its own fixed color — a
         // bare fg override, same trick as the selection marker — then
@@ -143,17 +179,21 @@ void lspUiDrawCompletion(struct abuf *ab, CompletionPopup *popup) {
         popupRowStyle(ab, &style, is_sel);
         abAppend(ab, " ", 1);
 
-        snprintf(label_col, sizeof(label_col), "%-*s", content_w, it->label);
-        // truncate if the label itself is longer than content_w
-        label_col[content_w] = '\0';
-        abAppend(ab, label_col, content_w);
+        // The typed word's letters stand out in each label.
+        popupAppendLabel(ab, &style, is_sel, it->label, label_w, popup->typed,
+                         POPUP_MATCH_FUZZY, 0);
+        if (detail_w) {
+            abAppend(ab, "  ", 2);
+            popupAppendLabel(ab, &style, is_sel, it->detail, detail_w, NULL,
+                             POPUP_MATCH_NONE, POPUP_LABEL_DIM);
+        }
         abAppend(ab, " ", 1);
 
-        popupRowEnd(ab, &style);
+        popupRowEndScroll(ab, &style, i, visible_count, popup->count, scroll);
     }
 
-    popupDrawBottom(ab, &style, popup->origin_x, popup->origin_y + 1 + visible_count, box_w);
-    popupDrawShadow(ab, &style, popup->origin_x, popup->origin_y, box_w, 2 + visible_count);
+    popupDrawBottom(ab, &style, x, y + 1 + visible_count, box_w);
+    popupDrawShadow(ab, &style, x, y, box_w, box_h);
 }
 
 
@@ -547,6 +587,7 @@ void lspParseCompletion(const char *json, CompletionPopup *popup,
     popup->selected = 0;
     popup->origin_x = screen_x + 1;
     popup->origin_y = screen_y + 2;  // one row below cursor
+    snprintf(popup->typed, sizeof(popup->typed), "%s", typed);
 
     root = cJSON_Parse(json);
     if (!root) return;

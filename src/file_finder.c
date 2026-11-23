@@ -604,9 +604,9 @@ void fileFinderDraw(struct abuf *ab) {
 
     path = ff->paths[ff->match[idx]];
     popupAppendLabel(ab, &style, is_sel, path, content_w, ff->query,
-                     POPUP_MATCH_FUZZY, 1);
+                     POPUP_MATCH_FUZZY, POPUP_LABEL_PATH);
 
-    popupRowEnd(ab, &style);
+    popupRowEndScroll(ab, &style, i, visible_count, ff->match_count, scroll);
   }
 
   popupDrawBottom(ab, &style, origin_x, origin_y + 3 + rows, box_w);

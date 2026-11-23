@@ -65,13 +65,25 @@ static int isAsciiChar(const Utf8Char *c, const char ch)
  */
 static int rowMatchesAt(const Row *row, const int i, const char *needle)
 {
+    // Walks `needle` one UTF-8 character at a time, so a prefix like "▸ "
+    // matches too (comparing byte n of the needle with character n of the
+    // row only ever worked for ASCII). Returns the characters matched.
     int n;
+    int b;
+    int len;
+    const Utf8Char *c;
     if (!needle[0]) return 0;
     n = 0;
-    while (needle[n])
+    b = 0;
+    while (needle[b])
     {
-        if (i + n >= row->size || !isAsciiChar(&row->characters[i + n], needle[n]))
+        if (i + n >= row->size)
             return 0;
+        c = &row->characters[i + n];
+        len = c->length;
+        if (len <= 0 || strncmp(needle + b, (const char *)c->character, (size_t)len) != 0)
+            return 0;
+        b += len;
         n++;
     }
     return n;

@@ -170,6 +170,37 @@
         (string-append (car parts) " ⇄ " (car (cdr parts)))
         s)))
 
+;; The mark in front of a changed file, colored by its first characters
+;; (see the syntax rules under "drawing"): the change that matters most for
+;; the file, staged or not.
+(define (dashboard--git-mark xy)
+  (cond ((string=? xy "??") "?")
+        ((or (string=? (substring xy 0 1) "D") (string=? (substring xy 1 2) "D")) "✖")
+        ((or (string=? (substring xy 0 1) "A") (string=? (substring xy 0 1) "R")) "✚")
+        ((or (string=? (substring xy 0 1) "U") (string=? (substring xy 1 2) "U")) "!")
+        (else "●")))
+
+;; "4 files: 2 modified, 1 added, 1 untracked"
+(define (dashboard--change-summary changes)
+  (let* ((marks (map (lambda (line) (dashboard--git-mark (substring line 0 2))) changes))
+         (count-of (lambda (m) (length (filter (lambda (x) (string=? x m)) marks))))
+         (parts (filter (lambda (s) (not (string=? s "")))
+                        (map (lambda (entry)
+                               (let ((n (count-of (car entry))))
+                                 (if (= n 0) "" (string-append (number->string n) " " (cdr entry)))))
+                             '(("●" . "modified") ("✚" . "added") ("✖" . "deleted")
+                               ("!" . "conflicted") ("?" . "untracked")))))
+         (total (length changes)))
+    (string-append (number->string total) (if (= total 1) " file" " files")
+                   (if (pair? parts)
+                       (string-append ": " (dashboard--join-strings parts ", "))
+                       ""))))
+
+(define (dashboard--join-strings parts sep)
+  (cond ((null? parts) "")
+        ((null? (cdr parts)) (car parts))
+        (else (string-append (car parts) sep (dashboard--join-strings (cdr parts) sep)))))
+
 ;; "XY path" or "R  old -> new" -> the path now
 (define (dashboard--status-path line)
   (let* ((path (substring line 3 (string-length line)))
@@ -199,7 +230,8 @@
                    (shown (dashboard--take changes dashboard-git-count))
                    (rows (map (lambda (line)
                                 (let ((path (dashboard--status-path line)))
-                                  (cons (string-append (substring line 0 2) "  " path)
+                                  (cons (string-append (dashboard--git-mark (substring line 0 2))
+                                                       " " (substring line 0 2) "  " path)
                                         (if (dashboard--starts-with? line " D")
                                             #f
                                             (dashboard--join root path)))))
@@ -209,8 +241,7 @@
                      (string-append "Changes   "
                                     (if (= count 0)
                                         "none, the tree is clean"
-                                        (string-append (number->string count)
-                                                       (if (= count 1) " file" " files")))))
+                                        (dashboard--change-summary changes))))
                rows
                (if (> count (length shown))
                    (list (string-append "… " (number->string (- count (length shown))) " more"))
@@ -334,7 +365,16 @@
                                      (dashboard--setting "dashboard-recent-count"))))
         (if (null? shown)
             (list "None yet")
-            (map (lambda (p) (cons (dashboard--relative p root) p)) shown)))))
+            (map (lambda (p) (cons (dashboard--name-then-dir (dashboard--relative p root)) p))
+                 shown)))))
+
+;; "src/output.c" -> "output.c          src/": the name is what you scan for.
+(define (dashboard--name-then-dir rel)
+  (let* ((name (dashboard--basename rel))
+         (dir (substring rel 0 (- (string-length rel) (string-length name)))))
+    (if (string=? dir "")
+        name
+        (string-append (dashboard--pad name 22) " " dir))))
 
 ;; TODOs --------------------------------------------------------------------
 
@@ -409,11 +449,29 @@
 (syntax-add-line-prefix "dashboard" "◆ " "type")
 (syntax-add-line-prefix "dashboard" "▸ " "keyword")
 (syntax-add-line-prefix "dashboard" "  keys " "comment")
+;; Changed files in the git section, by their mark (dashboard--git-mark).
+(syntax-add-line-prefix "dashboard" "  ● " "number")
+(syntax-add-line-prefix "dashboard" "  ✚ " "added")
+(syntax-add-line-prefix "dashboard" "  ✖ " "removed")
+(syntax-add-line-prefix "dashboard" "  ! " "removed")
+(syntax-add-line-prefix "dashboard" "  ? " "comment")
 
 (define (dashboard--row row)
   (if (pair? row)
       (cons (string-append "  " (car row)) (cdr row))
       (cons (string-append "  " row) #f)))
+
+;; "▸ Git ─────────…", the rule running to the pane's edge (at most 78).
+(define (dashboard--header title)
+  (let* ((head (string-append "▸ " title " "))
+         (width (min (- (pane-width) 2) 78))
+         (n (- width (string-length head))))
+    (if (> n 2)
+        (string-append head (dashboard--repeat "─" n))
+        (string-append "▸ " title))))
+
+(define (dashboard--repeat s n)
+  (if (<= n 0) "" (string-append s (dashboard--repeat s (- n 1)))))
 
 ;; The section's rows, or '() to leave it out.
 (define (dashboard--build name root)
@@ -422,7 +480,7 @@
         '()
         (let ((rows ((cdr (cdr entry)) root)))
           (if (pair? rows)
-              (cons (cons (string-append "▸ " (car (cdr entry))) #f)
+              (cons (cons (dashboard--header (car (cdr entry))) #f)
                     (map dashboard--row rows))
               '())))))
 

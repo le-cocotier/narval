@@ -97,6 +97,7 @@ void listPopupOpen(const char *title, const Lisp items, const Lisp on_select,
   E.list_popup.selected = 0;
   E.list_popup.on_select = on_select;
   E.list_popup.on_cancel = on_cancel;
+  E.list_popup.on_move = lisp_null();
   E.list_popup.filterable = filterable;
   E.list_popup.query[0] = '\0';
   E.list_popup.query_len = 0;
@@ -118,6 +119,24 @@ void listPopupOpen(const char *title, const Lisp items, const Lisp on_select,
   // still be typed into productively... in practice this is always
   // non-empty in the filterable case too, since callers pass real data.
   E.list_popup.visible = filterable || E.list_popup.count > 0;
+}
+
+/** @brief Calls on_move with the highlighted item's value, if both exist. */
+static void listPopupNotifyMove(void) {
+  LispError err;
+  Lisp item;
+  if (!E.list_popup.visible || lisp_is_null(E.list_popup.on_move) || E.list_popup.count == 0)
+    return;
+  item = lisp_list_ref(E.list_popup.items, E.list_popup.selected);
+  if (!lisp_is_pair(item))
+    return;
+  err = LISP_ERROR_NONE;
+  lisp_apply(E.list_popup.on_move, lisp_cons(lisp_cdr(item), lisp_null(), E.ctx), &err, E.ctx);
+}
+
+void listPopupSetOnMove(const Lisp on_move) {
+  E.list_popup.on_move = on_move;
+  listPopupNotifyMove();
 }
 
 int listPopupHandleKey(const Utf8Char *key) {
@@ -143,13 +162,17 @@ int listPopupHandleKey(const Utf8Char *key) {
     return 1;
   }
   if (is_single && (c == ARROW_DOWN || c == CTRL_KEY('n'))) {
-    if (E.list_popup.selected < E.list_popup.count - 1)
+    if (E.list_popup.selected < E.list_popup.count - 1) {
       E.list_popup.selected++;
+      listPopupNotifyMove();
+    }
     return 1;
   }
   if (is_single && (c == ARROW_UP || c == CTRL_KEY('p'))) {
-    if (E.list_popup.selected > 0)
+    if (E.list_popup.selected > 0) {
       E.list_popup.selected--;
+      listPopupNotifyMove();
+    }
     return 1;
   }
   if (is_single && c == '\r') { // ENTER — select the highlighted item
@@ -178,6 +201,7 @@ int listPopupHandleKey(const Utf8Char *key) {
         E.list_popup.query[E.list_popup.query_len] = '\0';
         E.list_popup.selected = 0;
         listPopupRebuildFilter();
+        listPopupNotifyMove();
       }
       return 1;
     }
@@ -193,6 +217,7 @@ int listPopupHandleKey(const Utf8Char *key) {
         E.list_popup.query[E.list_popup.query_len] = '\0';
         E.list_popup.selected = 0;
         listPopupRebuildFilter();
+        listPopupNotifyMove();
       }
       return 1;
     }

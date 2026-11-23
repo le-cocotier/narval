@@ -17,6 +17,11 @@
 // behaves exactly as before (every key not already bound above is
 // swallowed, not typed into a query).
 void listPopupOpen(const char *title, Lisp items, Lisp on_select, Lisp on_cancel, int filterable);
+// Calls `on_move` with the highlighted item's value now and each time the
+// highlight moves to another item (arrows, typing), until the popup
+// closes. For a live preview: the theme picker applies each theme as you
+// go. Call right after listPopupOpen; opening a popup clears it.
+void listPopupSetOnMove(Lisp on_move);
 
 // Input handling — returns 1 if the key was consumed by the popup.
 // Call this before normal keybind dispatch while the popup is visible.

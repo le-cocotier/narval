@@ -645,6 +645,78 @@ Lisp editorOpenConfig(Lisp args, LispError *e, LispContext ctx) {
 
 // ─── Theme ──────────────────────────────────────────────────────────────────
 
+static const char *const THEME_ROLES[] = {
+    "background", "line-cursor-background", "keyword", "type",    "string",
+    "comment",    "number",                 "default", "added",   "removed",
+    "debug-line-background"};
+#define THEME_ROLE_COUNT ((int)(sizeof(THEME_ROLES) / sizeof(THEME_ROLES[0])))
+
+/** @brief The E.theme field a role name stands for, NULL if none. */
+static char **themeSlot(const char *role) {
+  return !strcmp(role, "background")               ? &E.theme.BACKGROUND_COLOR
+         : !strcmp(role, "line-cursor-background") ? &E.theme.LINE_CURSOR_BACKGROUND
+         : !strcmp(role, "keyword")                ? &E.theme.COLOR_KEYWORD
+         : !strcmp(role, "type")                   ? &E.theme.COLOR_TYPE
+         : !strcmp(role, "string")                 ? &E.theme.COLOR_STRING
+         : !strcmp(role, "comment")                ? &E.theme.COLOR_COMMENT
+         : !strcmp(role, "number")                 ? &E.theme.COLOR_NUMBER
+         : !strcmp(role, "default")                ? &E.theme.COLOR_DEFAULT
+         : !strcmp(role, "added")                  ? &E.theme.COLOR_ADDED
+         : !strcmp(role, "removed")                ? &E.theme.COLOR_REMOVED
+         : !strcmp(role, "debug-line-background")  ? &E.theme.DEBUG_LINE_BACKGROUND
+                                                   : NULL;
+}
+
+/**
+ * @brief (editor-theme-colors) — the current colors as a list of
+ * (role r g b), one per role: what editor-set-theme-color takes, so a
+ * theme can be put back exactly as it was (the theme preview does this
+ * on ESC).
+ */
+Lisp editorThemeColors(Lisp args, LispError *e, LispContext ctx) {
+  Lisp list = lisp_null();
+  char **slot;
+  const char *p;
+  int kind;
+  int mode;
+  int r;
+  int g;
+  int b;
+  int i;
+  (void)args;
+  (void)e;
+  for (i = THEME_ROLE_COUNT - 1; i >= 0; i--) {
+    slot = themeSlot(THEME_ROLES[i]);
+    p = slot && *slot ? strchr(*slot, '[') : NULL;
+    r = g = b = 0;
+    if (!p || sscanf(p + 1, "%d;%d;%d;%d;%d", &kind, &mode, &r, &g, &b) != 5)
+      continue;
+    list = lisp_cons(lisp_cons(lisp_make_string2(THEME_ROLES[i], ctx),
+                               lisp_cons(lisp_make_int(r),
+                                         lisp_cons(lisp_make_int(g),
+                                                   lisp_cons(lisp_make_int(b), lisp_null(), ctx),
+                                                   ctx),
+                                         ctx),
+                               ctx),
+                     list, ctx);
+  }
+  return list;
+}
+
+/**
+ * @brief (editor-load-file path) — evaluates every form in a Lisp file, as
+ * the config is loaded: a failing form is reported and the rest still run.
+ * Returns #t when the file was read and every form ran.
+ */
+Lisp editorLoadFile(Lisp args, LispError *e, LispContext ctx) {
+  (void)e;
+  (void)ctx;
+  if (!lisp_is_pair(args) || lisp_type(lisp_car(args)) != LISP_STRING)
+    return lisp_false();
+  return lisp_make_bool(configLoadFile(lisp_string(lisp_car(args)), lisp_string(lisp_car(args)),
+                                       NULL) == 0);
+}
+
 /**
  * @brief Lisp function to set one theme color
  * @details (editor-set-theme-color role r g b) — role is one of
@@ -677,18 +749,7 @@ Lisp editorSetThemeColor(Lisp args, LispError *e, LispContext ctx) {
   ansi = galloc(24); // "\x1b[38;2;255;255;255m" + NUL fits well within this
   snprintf(ansi, 24, "\x1b[%d;2;%d;%d;%dm", is_background ? 48 : 38, r, g, b);
 
-  slot = !strcmp(role, "background")               ? &E.theme.BACKGROUND_COLOR
-         : !strcmp(role, "line-cursor-background") ? &E.theme.LINE_CURSOR_BACKGROUND
-         : !strcmp(role, "keyword")                ? &E.theme.COLOR_KEYWORD
-         : !strcmp(role, "type")                   ? &E.theme.COLOR_TYPE
-         : !strcmp(role, "string")                 ? &E.theme.COLOR_STRING
-         : !strcmp(role, "comment")                ? &E.theme.COLOR_COMMENT
-         : !strcmp(role, "number")                 ? &E.theme.COLOR_NUMBER
-         : !strcmp(role, "default")                ? &E.theme.COLOR_DEFAULT
-         : !strcmp(role, "added")                  ? &E.theme.COLOR_ADDED
-         : !strcmp(role, "removed")                ? &E.theme.COLOR_REMOVED
-         : !strcmp(role, "debug-line-background")  ? &E.theme.DEBUG_LINE_BACKGROUND
-                                                   : NULL;
+  slot = themeSlot(role);
   if (slot) {
     // Every color is galloc'd (initEditor() copies the fallback ones), so
     // the one replaced here can be freed: a second theme, or a
@@ -1821,7 +1882,7 @@ Lisp editorGotoLine(Lisp args, LispError *e, LispContext ctx) {
 
 /**
  * @brief Lisp function to open a generic modal list picker
- * @details (editor-list-popup title items on-select [on-cancel] [filterable?])
+ * @details (editor-list-popup title items on-select [on-cancel] [filterable?] [on-move])
  * — a primitive any Lisp package can use to show a selectable list
  * without writing its own C popup. `items` is a list of (label . value)
  * pairs where label is a string; `on-select` is called with the chosen
@@ -1836,7 +1897,11 @@ Lisp editorGotoLine(Lisp args, LispError *e, LispContext ctx) {
  * isn't) the right primitive to reach for. Omitting it, or every existing
  * 3- and 4-argument caller (outline, latex-insert-environment, ...),
  * keeps the old modal-arrows-only behavior exactly as it was.
- * @param args Lisp list of 3-5 arguments: (title items on-select [on-cancel]
+ *
+ * `on-move` (optional) is called with the highlighted pair's cdr when the
+ * popup opens and each time the highlight moves: a live preview, as the
+ * theme picker (CTRL-x c t) does.
+ * @param args Lisp list of 3-6 arguments: (title items on-select [on-cancel]
  * [filterable?])
  * @return lisp_null()
  */
@@ -1845,6 +1910,7 @@ Lisp editorListPopup(Lisp args, LispError *e, LispContext ctx) {
   Lisp items;
   Lisp on_select;
   Lisp on_cancel;
+  Lisp on_move;
   int filterable;
   args = lisp_cdr(args);
   items = lisp_car(args);
@@ -1855,8 +1921,13 @@ Lisp editorListPopup(Lisp args, LispError *e, LispContext ctx) {
   if (lisp_is_pair(args))
     args = lisp_cdr(args);
   filterable = lisp_is_pair(args) && lisp_is_true(lisp_car(args));
+  if (lisp_is_pair(args))
+    args = lisp_cdr(args);
+  on_move = lisp_is_pair(args) ? lisp_car(args) : lisp_null();
 
   listPopupOpen(title, items, on_select, on_cancel, filterable);
+  if (!lisp_is_null(on_move))
+    listPopupSetOnMove(on_move);
   return lisp_null();
 }
 

@@ -396,44 +396,49 @@ static DiagSeverity diag_worst_on_line(DiagnosticList *diags,
 // diags  : &E.lsp_diagnostics
 // buf_id : active buffer id
 // line   : file line number (0-based) for this screen row
+// The theme's color for a diagnostic severity (fg escape sequence): the
+// same as the diff colors, so a light theme gets legible ones too.
+static const char *diag_color(const DiagSeverity s) {
+    switch (s) {
+        case DIAG_ERROR:   return E.theme.COLOR_REMOVED;
+        case DIAG_WARNING: return E.theme.COLOR_NUMBER;
+        case DIAG_INFO:    return E.theme.COLOR_TYPE;
+        default:           return E.theme.COLOR_COMMENT;
+    }
+}
+
 void lspUiDrawGutter(struct abuf *ab, DiagnosticList *diags,
                      const int buf_id, const int line, const GitLineStatus git_status) {
     const DiagSeverity s = diag_worst_on_line(diags, buf_id, line);
+    const char *glyph = NULL;
+    const char *color = NULL;
     switch (s) {
-        case DIAG_ERROR:
-            ab_sgr(ab, "1;31");         // bold red
-            abAppend(ab, "●", 3);
-            break;
-        case DIAG_WARNING:
-            ab_sgr(ab, "1;33");         // bold yellow
-            abAppend(ab, "◆", 3);
-            break;
-        case DIAG_INFO:
-            ab_sgr(ab, "2;36");         // dim cyan
-            abAppend(ab, "●", 3);
-            break;
-        case DIAG_HINT:
-            ab_sgr(ab, "2;37");         // dim white
-            abAppend(ab, "·", 2);       // U+00B7 is 2 bytes, not 1 — was truncating the glyph
-            break;
-        default:
-            // No diagnostic on this line — fall back to the git diff
-            // status, if any, so the two gutters can share one column
-            // without needing a wider layout.
-            switch (git_status) {
-                case GIT_LINE_ADDED:
-                    ab_sgr(ab, "32");       // green
-                    abAppend(ab, "+", 1);
-                    break;
-                case GIT_LINE_MODIFIED:
-                    ab_sgr(ab, "33");       // yellow
-                    abAppend(ab, "~", 1);
-                    break;
-                default:
-                    abAppend(ab, " ", 1);
-                    break;
-            }
-            break;
+        case DIAG_ERROR:   glyph = "●"; break;
+        case DIAG_WARNING: glyph = "◆"; break;
+        case DIAG_INFO:    glyph = "●"; break;
+        case DIAG_HINT:    glyph = "·"; break;
+        default: break;
+    }
+    if (glyph) {
+        color = diag_color(s);
+        ab_sgr(ab, s <= DIAG_WARNING ? "1" : "2");
+    } else {
+        // No diagnostic on this line: the git status, if any, shares the
+        // column as a thin bar (added, changed) or an edge mark where
+        // lines were deleted.
+        switch (git_status) {
+            case GIT_LINE_ADDED:         glyph = "▎"; color = E.theme.COLOR_ADDED; break;
+            case GIT_LINE_MODIFIED:      glyph = "▎"; color = E.theme.COLOR_NUMBER; break;
+            case GIT_LINE_DELETED_BELOW: glyph = "▁"; color = E.theme.COLOR_REMOVED; break;
+            case GIT_LINE_DELETED_ABOVE: glyph = "▔"; color = E.theme.COLOR_REMOVED; break;
+            default: break;
+        }
+    }
+    if (glyph) {
+        abAppend(ab, color, (int) strlen(color));
+        abAppend(ab, glyph, (int) strlen(glyph));
+    } else {
+        abAppend(ab, " ", 1);
     }
     AB_RESET(ab);
     abAppend(ab, " ", 1);  // gutter padding
@@ -747,6 +752,16 @@ int lspUiClipToColumns(const char *s, const int nbytes, const int max_cols, int 
     return i;
 }
 
+int lspUiDiagnosticCount(const DiagnosticList *diags, const int buffer_id, const int line)
+{
+    int i;
+    int n = 0;
+    for (i = 0; i < diags->count; i++)
+        if (diags->entries[i].buffer_id == buffer_id && diags->entries[i].line == line)
+            n++;
+    return n;
+}
+
 const Diagnostic *lspUiWorstDiagnostic(const DiagnosticList *diags, const int buffer_id,
                                        const int line)
 {
@@ -762,37 +777,86 @@ const Diagnostic *lspUiWorstDiagnostic(const DiagnosticList *diags, const int bu
     return worst;
 }
 
-int lspUiDrawInlineDiagnostic(struct abuf *ab, const Diagnostic *d, const int max_cols)
+// (R, G, B) of a theme color escape ("\x1b[38;2;R;G;Bm" or 48;2).
+static void theme_rgb(const char *ansi, int *r, int *g, int *b) {
+    const char *p = ansi ? strchr(ansi, '[') : NULL;
+    int kind;
+    int mode;
+    *r = *g = *b = 0;
+    if (p) sscanf(p + 1, "%d;%d;%d;%d;%d", &kind, &mode, r, g, b);
+}
+
+int lspUiDrawInlineDiagnostic(struct abuf *ab, const Diagnostic *d, const int others,
+                              const char *row_bg, const int max_cols)
 {
-    // Three columns of gap, the marker the gutter uses, a space: below
-    // eight columns there's no room left for a word of the message.
+    // Three columns of gap, then the message in a box tinted with its
+    // severity's color: the marker the gutter uses, the first line of the
+    // message (clipped with "…"), and "+2" when the line has more.
     static const char gap[] = "   ";
     const char *marker;
     const char *color;
+    char tint[32];
+    char more[16] = "";
+    int fr, fg, fb, br, bg, bb;
     int msg_len;
+    int msg_cols;
     int bytes;
     int cols;
+    int room;
+    int more_cols;
     if (!d || max_cols < 8)
         return 0;
     switch (d->severity)
     {
-        case DIAG_ERROR:   color = "31"; marker = "● "; break;
-        case DIAG_WARNING: color = "33"; marker = "◆ "; break;
-        case DIAG_INFO:    color = "36"; marker = "● "; break;
-        default:           color = "37"; marker = "· "; break;
+        case DIAG_ERROR:   marker = "● "; break;
+        case DIAG_WARNING: marker = "◆ "; break;
+        case DIAG_INFO:    marker = "● "; break;
+        default:           marker = "· "; break;
     }
+    color = diag_color(d->severity);
+    // The tint: the severity's color an eighth of the way over the
+    // theme's background.
+    theme_rgb(color, &fr, &fg, &fb);
+    theme_rgb(E.theme.BACKGROUND_COLOR, &br, &bg, &bb);
+    snprintf(tint, sizeof(tint), "48;2;%d;%d;%d", br + (fr - br) / 8, bg + (fg - bg) / 8,
+             bb + (fb - bb) / 8);
+    if (others > 0)
+        snprintf(more, sizeof(more), " +%d", others);
+    more_cols = (int) strlen(more);
+
     // Just the first line: clangd puts the notes on the next ones.
     msg_len = (int) strcspn(d->message, "\r\n");
-    bytes = lspUiClipToColumns(d->message, msg_len, max_cols - 5, &cols);
+    lspUiClipToColumns(d->message, msg_len, 1 << 20, &msg_cols);
+    room = max_cols - 3 - 2 - 1 - more_cols - 1; // gap, marker, pad, more, pad
+    if (room < 3)
+        return 0;
+    if (msg_cols > room)
+        bytes = lspUiClipToColumns(d->message, msg_len, room - 1, &cols);
+    else
+        bytes = lspUiClipToColumns(d->message, msg_len, room, &cols);
 
     abAppend(ab, gap, 3);
-    ab_sgr(ab, color);
+    ab_sgr(ab, tint);
+    abAppend(ab, color, (int) strlen(color));
+    abAppend(ab, " ", 1);
     ab_sgr(ab, "3"); // italic: it's not part of the file
     abAppend(ab, marker, (int) strlen(marker));
     abAppend(ab, d->message, bytes);
+    if (msg_cols > room) {
+        abAppend(ab, "…", 3);
+        cols++;
+    }
     ab_sgr(ab, "23");
+    if (more[0]) {
+        ab_sgr(ab, "2");
+        abAppend(ab, more, more_cols);
+        ab_sgr(ab, "22");
+    }
+    abAppend(ab, " ", 1);
+    // Back to the row's own background and text color.
+    abAppend(ab, row_bg, (int) strlen(row_bg));
     abAppend(ab, E.theme.COLOR_DEFAULT, (int) strlen(E.theme.COLOR_DEFAULT));
-    return 5 + cols;
+    return 3 + 1 + 2 + cols + more_cols + 1;
 }
 
 /**

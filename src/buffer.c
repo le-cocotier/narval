@@ -729,12 +729,17 @@ void bufferRefreshGitInfo(struct buffer_t *buf) {
               if (idx >= 0 && idx < buf->git_lines_count)
                 buf->git_lines[idx] = status2;
             }
-          } else if (new_start > 0) {
-            // Pure deletion: no added/changed line of its own to mark —
-            // flag the line right before it as the nearest visible anchor.
-            idx = new_start - 1;
-            if (idx >= 0 && idx < buf->git_lines_count)
-              buf->git_lines[idx] = GIT_LINE_MODIFIED;
+          } else {
+            // Pure deletion: no line of its own to mark. "-U0" puts
+            // new_start on the line before the gap (0 when the deleted
+            // lines were the first ones), so mark that line's bottom
+            // edge, or the first line's top edge. A line already marked
+            // as changed keeps that mark.
+            idx = new_start > 0 ? new_start - 1 : 0;
+            if (idx >= 0 && idx < buf->git_lines_count &&
+                buf->git_lines[idx] == GIT_LINE_NONE)
+              buf->git_lines[idx] =
+                  new_start > 0 ? GIT_LINE_DELETED_BELOW : GIT_LINE_DELETED_ABOVE;
           }
         }
       }

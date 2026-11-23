@@ -52,9 +52,14 @@ const char *lspUiDiagnosticAtCursor(DiagnosticList *diags,
 int lspUiClipToColumns(const char *s, int nbytes, int max_cols, int *cols);
 // The most severe diagnostic on `line` of the buffer, or NULL.
 const Diagnostic *lspUiWorstDiagnostic(const DiagnosticList *diags, int buffer_id, int line);
-// Draws "   ● message" in the severity's color, clipped to max_cols (nothing
-// when that's too narrow to read). @return the columns drawn.
-int lspUiDrawInlineDiagnostic(struct abuf *ab, const Diagnostic *d, int max_cols);
+// Draws "   ● message +2" in the severity's color on a tint of it, clipped
+// to max_cols with "…" (nothing when that's too narrow to read). `others`:
+// the line's other diagnostics; `row_bg`: the row's background escape, put
+// back after. @return the columns drawn.
+int lspUiDrawInlineDiagnostic(struct abuf *ab, const Diagnostic *d, int others,
+                              const char *row_bg, int max_cols);
+// How many diagnostics `line` of the buffer has.
+int lspUiDiagnosticCount(const DiagnosticList *diags, int buffer_id, int line);
 // Draws "   // text" in the comment color (a struct layout note), clipped to
 // max_cols. @return the columns drawn.
 int lspUiDrawEolNote(struct abuf *ab, const char *text, int max_cols);

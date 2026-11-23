@@ -245,19 +245,44 @@ void popupDrawShadow(struct abuf *ab, const PopupStyle *style,
  * matched. Only ASCII bytes are compared, so a mark never lands inside a
  * multi-byte character.
  */
+static int findSubstring(const char *label, const int len, const char *query,
+                         const int qlen, const int last) {
+    int i;
+    int j;
+    int found = -1;
+    for (i = 0; i + qlen <= len; i++) {
+        for (j = 0; j < qlen; j++)
+            if (tolower((unsigned char) label[i + j]) != tolower((unsigned char) query[j]))
+                break;
+        if (j == qlen) {
+            found = i;
+            if (!last) break;
+        }
+    }
+    return found;
+}
+
 static void markMatches(const char *label, const int len, const char *query,
-                        const PopupMatch match, unsigned char *mask) {
+                        const PopupMatch match, const int prefer_last, unsigned char *mask) {
     int i;
     int j;
     int qlen;
     memset(mask, 0, (size_t) len);
     if (!query || !query[0] || match == POPUP_MATCH_NONE) return;
 
+    qlen = (int) strlen(query);
+    // The query as one run first: the way a completion's typed prefix or a
+    // file name typed whole reads best. In a path, its last occurrence (the
+    // file name rather than a directory).
+    i = findSubstring(label, len, query, qlen, prefer_last);
+    if (i >= 0) {
+        memset(mask + i, 1, (size_t) qlen);
+        return;
+    }
     if (match == POPUP_MATCH_FUZZY) {
         // Matched from the end backwards, so the marks land in the file
         // name rather than on the first matching letters of the directory
         // ("lspui" marks include/lsp_ui.h's "lsp_ui", not "incLude/sp_ui").
-        qlen = (int) strlen(query);
         j = qlen - 1;
         for (i = len - 1; i >= 0 && j >= 0; i--) {
             if ((unsigned char) label[i] < 0x80 &&
@@ -269,22 +294,13 @@ static void markMatches(const char *label, const int len, const char *query,
         if (j >= 0) memset(mask, 0, (size_t) len); // not a full match: mark nothing
         return;
     }
-
-    qlen = (int) strlen(query);
-    for (i = 0; i + qlen <= len; i++) {
-        for (j = 0; j < qlen; j++)
-            if (tolower((unsigned char) label[i + j]) != tolower((unsigned char) query[j]))
-                break;
-        if (j == qlen) {
-            memset(mask + i, 1, (size_t) qlen);
-            return;
-        }
-    }
 }
 
 void popupAppendLabel(struct abuf *ab, const PopupStyle *style, const int is_selected,
                       const char *label, const int content_w, const char *query,
-                      const PopupMatch match, const int is_path) {
+                      const PopupMatch match, const int flags) {
+    const int is_path = (flags & POPUP_LABEL_PATH) != 0;
+    const int all_dim = (flags & POPUP_LABEL_DIM) != 0 && !is_selected;
     const int len = (int) strlen(label);
     unsigned char *mask;
     int *col_at; // column where each byte's character starts
@@ -307,7 +323,7 @@ void popupAppendLabel(struct abuf *ab, const PopupStyle *style, const int is_sel
         gfree(col_at);
         return;
     }
-    markMatches(label, len, query, match, mask);
+    markMatches(label, len, query, match, is_path, mask);
 
     for (i = 0; i < len; i += n) {
         n = utf8CreateChar((const unsigned char *) label + i, &c);
@@ -326,6 +342,7 @@ void popupAppendLabel(struct abuf *ab, const PopupStyle *style, const int is_sel
                 if (((unsigned char) label[from] & 0xC0) != 0x80 &&
                     total - col_at[from] <= content_w - 1)
                     break;
+            popupRowStyle(ab, style, is_selected);
             ab_sgr(ab, style->dim_fg);
             abAppend(ab, "…", 3);
             used = 1;
@@ -343,7 +360,7 @@ void popupAppendLabel(struct abuf *ab, const PopupStyle *style, const int is_sel
         if (i + n > to) break;
         // The selected row's tinted background is too close to the dimmed
         // color for it to stay legible, so it shows the directory plainly.
-        want = mask[i] ? 2 : (is_path && !is_selected && i < dir_end) ? 1 : 0;
+        want = mask[i] ? 2 : (all_dim || (is_path && !is_selected && i < dir_end)) ? 1 : 0;
         if (want != state) {
             popupRowStyle(ab, style, is_selected);
             if (want == 1) ab_sgr(ab, style->dim_fg);
@@ -366,4 +383,32 @@ void popupAppendLabel(struct abuf *ab, const PopupStyle *style, const int is_sel
 
     gfree(mask);
     gfree(col_at);
+}
+
+void popupRowEndScroll(struct abuf *ab, const PopupStyle *style, const int row,
+                       const int visible, const int total, const int scroll) {
+    int size;
+    int start;
+    if (total <= visible || visible <= 0) {
+        popupRowEnd(ab, style);
+        return;
+    }
+    // The thumb's length is the share of the list shown, its place how far
+    // down the shown part is; at least one row so it never vanishes.
+    size = visible * visible / total;
+    if (size < 1) size = 1;
+    start = (total - visible) > 0 ? scroll * (visible - size) / (total - visible) : 0;
+    if (start > visible - size) start = visible - size;
+    abAppend(ab, " ", 1);
+    if (row >= start && row < start + size) {
+        ab_sgr(ab, style->chrome);
+        ab_sgr(ab, "1");
+        abAppend(ab, "┃", 3);
+    } else {
+        // The track, dimmed so the thumb reads against it.
+        ab_sgr(ab, style->chrome);
+        ab_sgr(ab, style->dim_fg);
+        abAppend(ab, "│", 3);
+    }
+    AB_RESET(ab);
 }

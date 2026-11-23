@@ -86,9 +86,13 @@ void popupRowEnd(struct abuf *ab, const PopupStyle *style);
 // POPUP_MATCH_SUBSTRING the list popup's (the query as one run).
 typedef enum { POPUP_MATCH_NONE, POPUP_MATCH_FUZZY, POPUP_MATCH_SUBSTRING } PopupMatch;
 
+// popupAppendLabel() flags.
+#define POPUP_LABEL_PATH 1 // dim the directory, keep the tail when too wide
+#define POPUP_LABEL_DIM 2  // the whole label is secondary text (dimmed)
+
 // Writes `label` into exactly `content_w` columns of a row opened with
 // popupRowBegin(), padding with spaces. The characters `query` matched are
-// drawn bold in the theme's type color. With `is_path`, everything up to
+// drawn bold in the theme's type color. With POPUP_LABEL_PATH, everything up to
 // the last '/' is dimmed (except on the selected row) so the file name
 // stands out, and a label too wide for the row keeps its tail
 // ("…/dir/name.c"); otherwise it keeps its head ("a long label…"). Widths
@@ -96,7 +100,14 @@ typedef enum { POPUP_MATCH_NONE, POPUP_MATCH_FUZZY, POPUP_MATCH_SUBSTRING } Popu
 // the row's base style active.
 void popupAppendLabel(struct abuf *ab, const PopupStyle *style, int is_selected,
                       const char *label, int content_w, const char *query,
-                      PopupMatch match, int is_path);
+                      PopupMatch match, int flags);
+
+// popupRowEnd() with a scrollbar: when `total` entries don't all fit in
+// the `visible` rows (the first one shown being entry `scroll`), the right
+// border of row `row` (0-based among the shown ones) is drawn as part of
+// the thumb ("┃") or of the track ("│").
+void popupRowEndScroll(struct abuf *ab, const PopupStyle *style, int row,
+                       int visible, int total, int scroll);
 
 // One-cell-wide column of shadow down the right edge and one-row strip
 // along the bottom, offset down-right by a column/row so it reads as a

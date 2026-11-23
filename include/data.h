@@ -394,6 +394,7 @@ typedef struct
     int visible; // is the popup shown?
     int origin_x; // screen col where popup appears
     int origin_y; // screen row where popup appears
+    char typed[64]; // the word typed so far, highlighted in the labels
 } CompletionPopup;
 
 /**

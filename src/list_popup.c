@@ -311,7 +311,7 @@ void listPopupDraw(struct abuf *ab) {
                      E.list_popup.filterable ? E.list_popup.query : NULL,
                      POPUP_MATCH_SUBSTRING, 0);
 
-    popupRowEnd(ab, &style);
+    popupRowEndScroll(ab, &style, i, visible_count, count, scroll);
 
     if (lisp_is_pair(it))
       it = lisp_cdr(it);

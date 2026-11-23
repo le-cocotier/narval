@@ -16,6 +16,8 @@
 #include "../include/debug_ui.h"
 #include "../include/lsp_ui.h"
 #include "../include/buffer_switcher.h"
+#include "../include/status_bar.h"
+#include "../include/color.h"
 #include "../include/file_finder.h"
 #include "../include/list_popup.h"
 #include "../include/which_key.h"
@@ -858,109 +860,6 @@ void editorScroll() {
     active->x_offset++;
     active->cursor_x--;
   }
-}
-
-/**
- * @brief Renders the status bar at the bottom of the screen
- * @details Displays filename, line count, dirty flag, and current cursor
- * position in an inverted color bar. Right-aligns the cursor position
- * indicator.
- * @param ab Pointer to append buffer structure for accumulating output
- * @note Uses ANSI escape codes for color inversion
- */
-void editorDrawStatusBar(struct abuf *ab) {
-  // TO MODIFY
-  int len;
-  int offset = 0;
-
-  char status[E.screencols];
-  char buf_status[1024] = "";
-  char marker, dirty_marker;
-  char mode_buf[24];
-  char *mode_str = "";
-  char *string_filename = NULL;
-
-  EditorPane *active = splitScreenGetActivePane();
-  Buffer *buf = bufferFindById(active->buffer_id);
-  Buffer *b = NULL;
-  ScreenLayout *layout = splitScreenGetLayout();
-
-  // Positioned explicitly rather than inheriting wherever the pane loop
-  // happened to leave the cursor. That implicit coupling held only while
-  // the last thing drawn was always the bottom-right pane; once dividers
-  // were drawn after the panes (needed to support arbitrary splits), the
-  // status bar started rendering at the last divider instead of at the
-  // bottom of the screen. E.screenrows already excludes these two rows.
-  char bar_pos[32];
-  int bar_pos_len = snprintf(bar_pos, sizeof(bar_pos), "\x1b[%d;1H", E.screenrows + 1);
-  char git_status[80] = "";
-  int first_buffer_id;
-  char crumbs[256];
-  int crumbs_len;
-  int crumbs_cols;
-  abAppend(ab, bar_pos, bar_pos_len);
-
-  abAppend(ab, "\x1b[7m", 4); // inverting colors
-
-  // Pane count rather than the old " [V-SPLIT]"/" [H-SPLIT]": layout->mode
-  // only records the *last* split direction, which stopped describing the
-  // screen once panes could be split repeatedly and in both directions.
-  if (layout->num_panes > 1) {
-    snprintf(mode_buf, sizeof(mode_buf), " [%d panes]", layout->num_panes);
-    mode_str = mode_buf;
-  }
-
-  if (buf && buf->git_available) {
-    snprintf(git_status, sizeof(git_status), " (%s%s)", buf->git_branch,
-             buf->git_dirty ? "*" : "");
-  }
-
-  // Build buffer status showing all buffers with dirty indicators
-  if (E.buffers != NULL) {
-    first_buffer_id = E.buffers->buffer_id;
-    b = E.buffers;
-    do {
-      string_filename = (char *)utf8ToString(b->filename);
-      marker = (b->buffer_id == active->buffer_id) ? '>' : ' ';
-      dirty_marker = b->dirty ? '*' : ' ';
-      offset +=
-          snprintf(&buf_status[offset], sizeof(buf_status) - offset, "%c%d:%s%c ",
-                   marker, b->buffer_id,
-                   b->filename ? string_filename : "[No Name]", dirty_marker);
-      gfree(string_filename);
-      b = b->next;
-    } while (b->buffer_id != first_buffer_id);
-  }
-
-  len = snprintf(status, sizeof(status), "%s%s%s", buf_status, git_status, mode_str);
-
-  if (len > E.screencols) {
-    len = E.screencols;
-  }
-
-  // Where the cursor is, right-aligned: "point › main". The buffer list
-  // gives way to it when the bar is too narrow for both.
-  crumbs_len = 0;
-  crumbs_cols = 0;
-  if (E.constantes.BREADCRUMBS && buf && buf->type == FILE_BUFF) {
-    crumbs_len = lspUiBreadcrumbs(buf, buf->y, crumbs, sizeof(crumbs));
-    crumbs_len = lspUiClipToColumns(crumbs, crumbs_len, E.screencols / 2, &crumbs_cols);
-  }
-  if (crumbs_cols > 0 && len > E.screencols - crumbs_cols - 2)
-    len = E.screencols - crumbs_cols - 2 > 0 ? E.screencols - crumbs_cols - 2 : 0;
-
-  abAppend(ab, status, len);
-  while (len < E.screencols - (crumbs_cols ? crumbs_cols + 1 : 0)) {
-    abAppend(ab, " ", 1);
-    ++len;
-  }
-  if (crumbs_cols) {
-    abAppend(ab, crumbs, crumbs_len);
-    abAppend(ab, " ", 1);
-  }
-
-  abAppend(ab, "\x1b[m", 3); // normal text mode
-  abAppend(ab, "\r\n", 2);
 }
 
 /**

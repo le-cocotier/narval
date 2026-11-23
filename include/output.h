@@ -40,7 +40,7 @@ void editorScroll();
 // as drawn: what a click on one of the pane's first rows lands on.
 int editorPaneStickyRows(const EditorPane *pane, const struct buffer_t *buf, int *rows);
 
-void editorDrawStatusBar(struct abuf *ab);
+// editorDrawStatusBar() lives in status_bar.h.
 
 void editorDrawMessageBar(struct abuf *ab);
 

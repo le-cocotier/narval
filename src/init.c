@@ -20,6 +20,7 @@
 #include "../include/project.h"
 #include "../include/project_search.h"
 #include "../include/split_screen.h"
+#include "../include/status_bar.h"
 #include "../include/terminal.h"
 #include "../include/os.h"
 #include "../include/utils.h"
@@ -189,6 +190,7 @@ void initBuiltins(void) {
   registerBuiltin("find-file", l_findFile);
   // project-root, project-list, project-trust, ... (project.c)
   projectRegisterBuiltins();
+  statusBarRegisterBuiltins();
   registerBuiltin("syntax-define-language", l_syntaxDefineLanguage);
   registerBuiltin("syntax-add-keyword", l_syntaxAddKeyword);
   registerBuiltin("syntax-add-type", l_syntaxAddType);
@@ -676,6 +678,10 @@ void initEditor() {
   E.theme.COLOR_ADDED = themeColor(ANSI_FG_RGB(152, 195, 121));
   E.theme.COLOR_REMOVED = themeColor(ANSI_FG_RGB(224, 108, 117));
   E.theme.DEBUG_LINE_BACKGROUND = themeColor(ANSI_BG_RGB(77, 68, 38));
+  E.theme.STATUS_BAR_FG = themeColor(ANSI_FG_RGB(171, 178, 191));
+  E.theme.STATUS_BAR_BG = themeColor(ANSI_BG_RGB(33, 37, 43));
+  E.theme.STATUS_ACCENT_FG = themeColor(ANSI_FG_RGB(40, 44, 52));
+  E.theme.STATUS_ACCENT_BG = themeColor(ANSI_BG_RGB(97, 175, 239));
 
   E.projects = NULL;
   E.number_of_projects = 0;

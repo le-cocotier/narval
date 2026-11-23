@@ -1,6 +1,7 @@
 #include "../include/lisp_gc.h"
 #include "../include/async_process.h"
 #include "../include/daemon.h"
+#include "../include/status_bar.h"
 
 extern EditorConfig E;
 
@@ -48,6 +49,7 @@ static void visitRoots(LispRootVisitor visit, LispContext ctx) {
   visit(&E.ctx_data, ctx);
   lispGcVisitListPopup(&E.list_popup, visit, ctx);
   asyncProcessVisitLispRoots(visit, ctx);
+  statusBarVisitLispRoots(visit, ctx);
   daemonVisitLispRoots(visit, ctx);
 }
 

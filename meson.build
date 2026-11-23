@@ -90,6 +90,7 @@ src_files = files(
   'src/debug_log.c',
   'src/input.c',
   'src/output.c',
+  'src/status_bar.c',
   'src/terminal.c',
   'src/builtins.c',
   'src/builtins_edit.c',

@@ -20,6 +20,7 @@
 #include "../include/project.h"
 #include "../include/project_search.h"
 #include "../include/split_screen.h"
+#include "../include/status_bar.h"
 #include "../include/terminal.h"
 #include "../include/os.h"
 #include "../include/utils.h"
@@ -189,6 +190,7 @@ void initBuiltins(void) {
   registerBuiltin("find-file", l_findFile);
   // project-root, project-list, project-trust, ... (project.c)
   projectRegisterBuiltins();
+  statusBarRegisterBuiltins();
   registerBuiltin("syntax-define-language", l_syntaxDefineLanguage);
   registerBuiltin("syntax-add-keyword", l_syntaxAddKeyword);
   registerBuiltin("syntax-add-type", l_syntaxAddType);

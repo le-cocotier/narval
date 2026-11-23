@@ -130,7 +130,7 @@ typedef struct theme
     char* COLOR_REMOVED; // diff "-" lines
     char* DEBUG_LINE_BACKGROUND; // the line the debugger stopped on
     // Status bar: the bar itself, and the highlighted block for the
-    // active buffer on its left (see editorDrawStatusBar() in output.c).
+    // active buffer on its left (see editorDrawStatusBar() in status_bar.c).
     char* STATUS_BAR_FG;
     char* STATUS_BAR_BG;
     char* STATUS_ACCENT_FG;

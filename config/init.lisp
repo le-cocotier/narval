@@ -78,6 +78,25 @@
 ;; after the lines that use them, "total += i   total = 3, i = 2".
 (define DEBUG-INLINE-VALUES #t)
 
+;; The status bar's segments, in order: the first list after the start of
+;; the row, the second flush right. Built in: "buffer" (the active one),
+;; "project", "git", "diagnostics" (E2 W1), "macro" (● REC), "debug",
+;; "mode", "panes", "breadcrumbs", "buffers" (the other open ones), "kind",
+;; "position", "percent", "clock". When the row is too narrow, "buffers"
+;; and "breadcrumbs" give way first. Omitting this keeps the default:
+;; (status-bar-segments
+;;  '("buffer" "git" "diagnostics" "macro" "debug" "mode" "panes" "breadcrumbs" "buffers")
+;;  '("kind" "position" "percent"))
+;; A segment of your own: a function returning the text ("" hides it),
+;; called twice a second at most. It goes before "breadcrumbs" unless you
+;; list it yourself:
+;; (status-bar-add-segment "selection"
+;;   (lambda ()
+;;     (let ((r (region-bounds)))
+;;       (if (pair? r)
+;;           (string-append "Sel " (number->string (+ 1 (- (list-ref r 2) (car r)))) " lines")
+;;           ""))))
+
 ;; Prefixes need to exist before anything below tries to (map-key ... "user")
 ;; or "term" — including packages, which load next. A package that tried to
 ;; bind under a not-yet-registered prefix would silently fall back to

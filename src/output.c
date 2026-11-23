@@ -16,6 +16,9 @@
 #include "../include/debug_ui.h"
 #include "../include/lsp_ui.h"
 #include "../include/buffer_switcher.h"
+#include "../include/color.h"
+#include "../include/dap.h"
+#include "../include/macro.h"
 #include "../include/file_finder.h"
 #include "../include/list_popup.h"
 #include "../include/which_key.h"
@@ -812,106 +815,253 @@ void editorScroll() {
   }
 }
 
+// ── Status bar ──────────────────────────────────────────────────────────────
+//
+//  ▌ 1:main.c* ▐ develop* E2 W1 ● REC  point › main   2:buffer.c 3:*search*   c  Ln 42/310, Col 7  13%
+//  └ accent ──┘ └ info ───────────────┘ └ breadcrumbs ┘ └ other buffers ───┘   └ right ──────────────┘
+//
+// The active buffer always comes first and the cursor position always last,
+// so neither can be pushed off the screen by a long list of open buffers:
+// when the row is too narrow, the other buffers go first, then the
+// breadcrumbs, then the info segment, then the long position form, and the
+// active name is clipped last.
+
+// Terminal columns taken by a UTF-8 string (wide characters count 2).
+static int statusTextCols(const char *s) {
+  Utf8Char c;
+  int cols = 0;
+  while (*s) {
+    s += utf8CreateChar((const unsigned char *)s, &c);
+    cols += utf8CharWidth(&c);
+  }
+  return cols;
+}
+
+// Append at most max_cols columns of s; returns the columns written. A
+// string that doesn't fit is cut one column short and ends with "…".
+static int statusAppendClipped(struct abuf *ab, const char *s, int max_cols) {
+  Utf8Char c;
+  const char *p = s;
+  int cols = 0;
+  int n;
+  int w;
+  if (max_cols <= 0) return 0;
+  if (statusTextCols(s) <= max_cols) {
+    abAppend(ab, s, (int)strlen(s));
+    return statusTextCols(s);
+  }
+  while (*p) {
+    n = utf8CreateChar((const unsigned char *)p, &c);
+    w = utf8CharWidth(&c);
+    if (cols + w > max_cols - 1) break;
+    abAppend(ab, p, n);
+    cols += w;
+    p += n;
+  }
+  abAppend(ab, "\xe2\x80\xa6", 3); // …
+  return cols + 1;
+}
+
+// " 3:name* " for one buffer, into out.
+static void statusBufferLabel(const Buffer *b, char *out, size_t size) {
+  char *name = b->filename ? (char *)utf8ToString(b->filename) : NULL;
+  snprintf(out, size, "%d:%s%s", b->buffer_id, name ? name : "[No Name]",
+           b->dirty ? "*" : "");
+  gfree(name);
+}
+
+// What the buffer holds, for the right side: the syntax override, the
+// file's extension, or a word for the non-file buffer kinds.
+static void statusBufferKind(const Buffer *b, char *out, size_t size) {
+  out[0] = '\0';
+  if (b->type == TERMINAL_BUFF) {
+    snprintf(out, size, "terminal");
+  } else if (b->syntax[0]) {
+    snprintf(out, size, "%s", b->syntax);
+  } else if (b->filename) {
+    utf8FilenameExtension(b->filename, out, size);
+  }
+  if (b->crlf && strlen(out) + 6 < size) strcat(out, " CRLF");
+  if (b->state == READ_ONLY && strlen(out) + 4 < size) strcat(out, " RO");
+}
+
 /**
- * @brief Renders the status bar at the bottom of the screen
- * @details Displays filename, line count, dirty flag, and current cursor
- * position in an inverted color bar. Right-aligns the cursor position
- * indicator.
+ * @brief Renders the status bar, the second-to-last screen row
+ * @details Left: the active buffer in the accent colors, its git branch,
+ * LSP error/warning counts, macro recording, debugger state and the active
+ * sticky mode. Middle: the breadcrumbs (BREADCRUMBS) and the other open
+ * buffers. Right: file kind, line/column and position in the file.
+ * Colors come from the "status-bar*" theme roles.
  * @param ab Pointer to append buffer structure for accumulating output
- * @note Uses ANSI escape codes for color inversion
  */
 void editorDrawStatusBar(struct abuf *ab) {
-  // TO MODIFY
-  int len;
-  int offset = 0;
-
-  char status[E.screencols];
-  char buf_status[1024] = "";
-  char marker, dirty_marker;
-  char mode_buf[24];
-  char *mode_str = "";
-  char *string_filename = NULL;
-
   EditorPane *active = splitScreenGetActivePane();
   Buffer *buf = bufferFindById(active->buffer_id);
-  Buffer *b = NULL;
   ScreenLayout *layout = splitScreenGetLayout();
-
-  // Positioned explicitly rather than inheriting wherever the pane loop
-  // happened to leave the cursor. That implicit coupling held only while
-  // the last thing drawn was always the bottom-right pane; once dividers
-  // were drawn after the panes (needed to support arbitrary splits), the
-  // status bar started rendering at the last divider instead of at the
-  // bottom of the screen. E.screenrows already excludes these two rows.
+  const int width = E.screencols;
   char bar_pos[32];
-  int bar_pos_len = snprintf(bar_pos, sizeof(bar_pos), "\x1b[%d;1H", E.screenrows + 1);
-  char git_status[80] = "";
-  int first_buffer_id;
+  char name[304] = "";
+  char git[80] = "";
+  char err[16] = "";
+  char warn[16] = "";
+  char tail[96] = "";
+  char rec[16] = "";
   char crumbs[256];
-  int crumbs_len;
-  int crumbs_cols;
-  abAppend(ab, bar_pos, bar_pos_len);
+  int crumbs_len = 0;
+  int crumbs_cols = 0;
+  char right_long[128] = "";
+  char right_short[48] = "";
+  char kind[40] = "";
+  char label[300];
+  const char *right;
+  const char *mode = NULL;
+  int errors = 0;
+  int warnings = 0;
+  int name_cols;
+  int info_cols;
+  int right_cols;
+  int used = 0;
+  int room;
+  int off;
+  int i;
+  Buffer *b;
+  const char *bar = E.theme.STATUS_BAR_BG;
+  const char *bar_fg = E.theme.STATUS_BAR_FG;
 
-  abAppend(ab, "\x1b[7m", 4); // inverting colors
+  // Positioned explicitly: the status bar sits right under the panes
+  // (E.screenrows already excludes it and the message bar), whatever was
+  // drawn last.
+  snprintf(bar_pos, sizeof(bar_pos), "\x1b[%d;1H", E.screenrows + 1);
+  abAppend(ab, bar_pos, (int)strlen(bar_pos));
 
-  // Pane count rather than the old " [V-SPLIT]"/" [H-SPLIT]": layout->mode
-  // only records the *last* split direction, which stopped describing the
-  // screen once panes could be split repeatedly and in both directions.
-  if (layout->num_panes > 1) {
-    snprintf(mode_buf, sizeof(mode_buf), " [%d panes]", layout->num_panes);
-    mode_str = mode_buf;
+  if (buf) {
+    statusBufferLabel(buf, label, sizeof(label));
+    snprintf(name, sizeof(name), " %s ", label);
+
+    for (i = 0; i < E.lsp_diagnostics.count; ++i) {
+      if (E.lsp_diagnostics.entries[i].buffer_id != buf->buffer_id) continue;
+      if (E.lsp_diagnostics.entries[i].severity == DIAG_ERROR) errors++;
+      else if (E.lsp_diagnostics.entries[i].severity == DIAG_WARNING) warnings++;
+    }
+
+    // Sticky prefixes are modes (terminal, explorer, memory ...); a
+    // one-shot prefix like CTRL-x is already shown by which-key.
+    if (E.prefix_state > 0 && E.prefix_state < E.number_of_prefix &&
+        E.prefix[E.prefix_state].sticky)
+      mode = E.prefix[E.prefix_state].prefix_name;
+
+    if (buf->git_available)
+      snprintf(git, sizeof(git), " %s%s", buf->git_branch, buf->git_dirty ? "*" : "");
+    if (errors) snprintf(err, sizeof(err), " E%d", errors);
+    if (warnings) snprintf(warn, sizeof(warn), " W%d", warnings);
+    if (macroIsRecording()) snprintf(rec, sizeof(rec), " \xe2\x97\x8f REC"); // ●
+    off = 0;
+    if (dapState() == DAP_RUNNING || dapState() == DAP_STARTING)
+      off += snprintf(tail + off, sizeof(tail) - off, " [debug: running]");
+    else if (dapState() == DAP_STOPPED)
+      off += snprintf(tail + off, sizeof(tail) - off, " [debug: paused]");
+    if (mode && off < (int)sizeof(tail))
+      off += snprintf(tail + off, sizeof(tail) - off, " [%s]", mode);
+    if (layout->num_panes > 1 && off < (int)sizeof(tail))
+      snprintf(tail + off, sizeof(tail) - off, " [%d panes]", layout->num_panes);
+
+    if (E.constantes.BREADCRUMBS && buf->type == FILE_BUFF)
+      crumbs_len = lspUiBreadcrumbs(buf, buf->y, crumbs, sizeof(crumbs));
+
+    statusBufferKind(buf, kind, sizeof(kind));
+    if (buf->type == TERMINAL_BUFF) {
+      snprintf(right_long, sizeof(right_long), " %s ", kind);
+      snprintf(right_short, sizeof(right_short), " %s ", kind);
+    } else {
+      int pct = buf->numrows > 1 ? (int)((long)buf->y * 100 / (buf->numrows - 1)) : 100;
+      if (pct > 100) pct = 100;
+      snprintf(right_long, sizeof(right_long), "  %s%sLn %d/%d, Col %d  %3d%% ",
+               kind, kind[0] ? "  " : "", buf->y + 1, buf->numrows ? buf->numrows : 1,
+               buf->x + 1, pct);
+      snprintf(right_short, sizeof(right_short), " %d:%d ", buf->y + 1, buf->x + 1);
+    }
   }
 
-  if (buf && buf->git_available) {
-    snprintf(git_status, sizeof(git_status), " (%s%s)", buf->git_branch,
-             buf->git_dirty ? "*" : "");
+  name_cols = statusTextCols(name);
+  info_cols = statusTextCols(git) + statusTextCols(err) + statusTextCols(warn) +
+              statusTextCols(rec) + statusTextCols(tail);
+  right = right_long;
+  right_cols = statusTextCols(right_long);
+  if (name_cols + right_cols > width) {
+    right = right_short;
+    right_cols = statusTextCols(right_short);
+  }
+  if (right_cols > width) right_cols = 0, right = "";
+
+  // Accent block: the active buffer, clipped only when nothing else is left.
+  abAppend(ab, E.theme.STATUS_ACCENT_BG, (int)strlen(E.theme.STATUS_ACCENT_BG));
+  abAppend(ab, E.theme.STATUS_ACCENT_FG, (int)strlen(E.theme.STATUS_ACCENT_FG));
+  abAppend(ab, ANSI_BOLD, (int)strlen(ANSI_BOLD));
+  used += statusAppendClipped(ab, name, width - right_cols);
+  abAppend(ab, ANSI_RESET, (int)strlen(ANSI_RESET));
+  abAppend(ab, bar, (int)strlen(bar));
+  abAppend(ab, bar_fg, (int)strlen(bar_fg));
+
+  // Info: branch, diagnostic counts (in the diff colors), mode, panes.
+  if (info_cols && used + info_cols + right_cols <= width) {
+    abAppend(ab, git, (int)strlen(git));
+    if (err[0]) {
+      abAppend(ab, E.theme.COLOR_REMOVED, (int)strlen(E.theme.COLOR_REMOVED));
+      abAppend(ab, err, (int)strlen(err));
+    }
+    if (warn[0]) {
+      abAppend(ab, E.theme.COLOR_NUMBER, (int)strlen(E.theme.COLOR_NUMBER));
+      abAppend(ab, warn, (int)strlen(warn));
+    }
+    if (rec[0]) {
+      abAppend(ab, E.theme.COLOR_REMOVED, (int)strlen(E.theme.COLOR_REMOVED));
+      abAppend(ab, rec, (int)strlen(rec));
+    }
+    abAppend(ab, bar_fg, (int)strlen(bar_fg));
+    abAppend(ab, tail, (int)strlen(tail));
+    used += info_cols;
   }
 
-  // Build buffer status showing all buffers with dirty indicators
-  if (E.buffers != NULL) {
-    first_buffer_id = E.buffers->buffer_id;
+  // Where the cursor is in the code ("point › main"), up to half the row.
+  room = width - used - right_cols - 2;
+  if (crumbs_len > 0 && room > 8) {
+    crumbs_len = lspUiClipToColumns(crumbs, crumbs_len,
+                                    room < width / 2 ? room : width / 2, &crumbs_cols);
+    abAppend(ab, "  ", 2);
+    abAppend(ab, crumbs, crumbs_len);
+    used += 2 + crumbs_cols;
+  }
+
+  // The other buffers, dimmed, in whatever room is left.
+  room = width - used - right_cols;
+  if (room > 4 && E.buffers != NULL && E.number_of_buffer > 1) {
+    char list[1024] = "  ";
+    int list_off = 2;
     b = E.buffers;
     do {
-      string_filename = (char *)utf8ToString(b->filename);
-      marker = (b->buffer_id == active->buffer_id) ? '>' : ' ';
-      dirty_marker = b->dirty ? '*' : ' ';
-      offset +=
-          snprintf(&buf_status[offset], sizeof(buf_status) - offset, "%c%d:%s%c ",
-                   marker, b->buffer_id,
-                   b->filename ? string_filename : "[No Name]", dirty_marker);
-      gfree(string_filename);
+      if (!buf || b->buffer_id != buf->buffer_id) {
+        statusBufferLabel(b, label, sizeof(label));
+        if (list_off < (int)sizeof(list))
+          list_off += snprintf(list + list_off, sizeof(list) - list_off, "%s ", label);
+      }
       b = b->next;
-    } while (b->buffer_id != first_buffer_id);
+    } while (b != E.buffers);
+    if (list_off > 2) {
+      abAppend(ab, ANSI_DIM, (int)strlen(ANSI_DIM));
+      used += statusAppendClipped(ab, list, room);
+      abAppend(ab, ANSI_RESET, (int)strlen(ANSI_RESET));
+      abAppend(ab, bar, (int)strlen(bar));
+      abAppend(ab, bar_fg, (int)strlen(bar_fg));
+    }
   }
 
-  len = snprintf(status, sizeof(status), "%s%s%s", buf_status, git_status, mode_str);
-
-  if (len > E.screencols) {
-    len = E.screencols;
-  }
-
-  // Where the cursor is, right-aligned: "point › main". The buffer list
-  // gives way to it when the bar is too narrow for both.
-  crumbs_len = 0;
-  crumbs_cols = 0;
-  if (E.constantes.BREADCRUMBS && buf && buf->type == FILE_BUFF) {
-    crumbs_len = lspUiBreadcrumbs(buf, buf->y, crumbs, sizeof(crumbs));
-    crumbs_len = lspUiClipToColumns(crumbs, crumbs_len, E.screencols / 2, &crumbs_cols);
-  }
-  if (crumbs_cols > 0 && len > E.screencols - crumbs_cols - 2)
-    len = E.screencols - crumbs_cols - 2 > 0 ? E.screencols - crumbs_cols - 2 : 0;
-
-  abAppend(ab, status, len);
-  while (len < E.screencols - (crumbs_cols ? crumbs_cols + 1 : 0)) {
+  while (used < width - right_cols) {
     abAppend(ab, " ", 1);
-    ++len;
+    used++;
   }
-  if (crumbs_cols) {
-    abAppend(ab, crumbs, crumbs_len);
-    abAppend(ab, " ", 1);
-  }
+  abAppend(ab, right, (int)strlen(right));
 
-  abAppend(ab, "\x1b[m", 3); // normal text mode
+  abAppend(ab, ANSI_RESET, (int)strlen(ANSI_RESET));
   abAppend(ab, "\r\n", 2);
 }
 

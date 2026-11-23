@@ -665,72 +665,120 @@ static void editorDrawPane(struct abuf *ab, EditorPane *pane) {
 }
 
 /**
- * @brief Renders all panes based on current split configuration
- */
-/**
  * @brief Draws every pane, then the dividers between them.
  * @details Dividers are derived from the panes' own rectangles rather than
  * from a single global split mode, which is what lets the layout nest
  * arbitrarily: splitScreenSplitActive() always leaves one column (or row)
  * unclaimed between the two halves it makes, so any pane whose right edge
  * stops short of the screen has a gap there, and the same for its bottom
- * edge. Drawing a rule down/along each such edge fills exactly those gaps,
- * for any number of panes in any arrangement.
+ * edge.
  *
- * The old version only understood a two-pane layout and read the split
- * direction from layout->mode, so it drew a full-height rule at pane 0's
- * width — which also painted over pane 0's last text column, since that
- * layout left no room for the divider to sit in.
- *
- * Each rule is bounded to its own pane's span, not the whole screen, so a
- * divider between two stacked panes on the right doesn't cut across the
- * pane on the left. Neighbouring panes may name the same gap; drawing it
- * twice is harmless.
+ * The gaps are first marked on a grid, then each cell gets its box-drawing
+ * character from which of its four neighbours are dividers too, so rules
+ * meet in proper joints (├ ┤ ┬ ┴ ┼) instead of crossing or stopping short.
+ * A cell that no pane claimed and that sits between dividers (where four
+ * panes meet) is filled in as a joint. The rules around the active pane are
+ * drawn in the theme's accent (keyword) color and the others in its
+ * comment color, so the focused pane is visible at a glance.
  */
 static void editorDrawAllPanes(struct abuf *ab) {
   const ScreenLayout *layout = splitScreenGetLayout();
-  int i;
+  const EditorPane *active = splitScreenGetActivePane();
+  const int rows = E.screenrows;
+  const int cols = E.screencols;
+  unsigned char *grid;
   const EditorPane *p;
   char pos_buf[32];
+  const char *glyph;
+  int i;
   int y;
-  int len;
   int x;
+  int len;
+  int up, down, left, right;
+  int in_pane;
+  int on_ring;
+  int last_color = -1;
 
   for (i = 0; i < layout->num_panes; i++)
     editorDrawPane(ab, &layout->panes[i]);
 
+  if (layout->num_panes < 2 || rows <= 0 || cols <= 0)
+    return;
+  grid = gcalloc((size_t)rows * (size_t)cols, 1);
+  if (!grid)
+    return;
+#define DIV(yy, xx) ((yy) >= 0 && (yy) < rows && (xx) >= 0 && (xx) < cols && grid[(yy) * cols + (xx)])
+
   for (i = 0; i < layout->num_panes; i++) {
     p = &layout->panes[i];
+    // The gap on this pane's right edge, and the one under it.
+    if (p->origin_x + p->width < cols)
+      for (y = p->origin_y; y < p->origin_y + p->height && y < rows; y++)
+        if (y >= 0) grid[y * cols + p->origin_x + p->width] = 1;
+    if (p->origin_y + p->height < rows)
+      for (x = p->origin_x; x < p->origin_x + p->width && x < cols; x++)
+        if (x >= 0) grid[(p->origin_y + p->height) * cols + x] = 1;
+  }
 
-    // Vertical rule down the gap on this pane's right edge.
-    if (p->origin_x + p->width < E.screencols) {
-      for (y = 0; y < p->height; y++) {
-        len = snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;%dH",
-                           p->origin_y + y + 1, p->origin_x + p->width + 1);
-        abAppend(ab, pos_buf, len);
-        // "│" is U+2502, a 3-byte UTF-8 sequence — sizeof(literal)-1 here
-        // instead of a hand-counted length avoids a repeat of the bug this
-        // line used to have: a hardcoded length of 9 (right for the plain-
-        // ASCII "-" rule below, wrong for this one) silently truncated the
-        // trailing "\x1b[0m" reset down to a dangling, unterminated "\x1b[",
-        // corrupting the escape sequence stream from the very next divider
-        // row onward — invisible while every split rendered at whatever
-        // size the terminal started at, and only actually reachable once
-        // resizing (which redraws the dividers at their new positions) was
-        // wired up for real.
-        abAppend(ab, "\x1b[1m│\x1b[0m", sizeof("\x1b[1m│\x1b[0m") - 1);
+  // Where four panes meet, the middle cell belongs to no pane's rule.
+  for (y = 0; y < rows; y++) {
+    for (x = 0; x < cols; x++) {
+      if (grid[y * cols + x]) continue;
+      if (!((DIV(y - 1, x) || DIV(y + 1, x)) && (DIV(y, x - 1) || DIV(y, x + 1))))
+        continue;
+      in_pane = 0;
+      for (i = 0; i < layout->num_panes && !in_pane; i++) {
+        p = &layout->panes[i];
+        in_pane = x >= p->origin_x && x < p->origin_x + p->width &&
+                  y >= p->origin_y && y < p->origin_y + p->height;
       }
-    }
-
-    // Horizontal rule along the gap under this pane.
-    if (p->origin_y + p->height < E.screenrows) {
-      len = snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;%dH",
-                         p->origin_y + p->height + 1, p->origin_x + 1);
-      abAppend(ab, pos_buf, len);
-      for (x = 0; x < p->width; x++)
-        abAppend(ab, "\x1b[1m-\x1b[0m", sizeof("\x1b[1m-\x1b[0m") - 1);
+      if (!in_pane) grid[y * cols + x] = 2;
     }
   }
+
+  for (y = 0; y < rows; y++) {
+    for (x = 0; x < cols; x++) {
+      if (!grid[y * cols + x]) continue;
+      up = DIV(y - 1, x);
+      down = DIV(y + 1, x);
+      left = DIV(y, x - 1);
+      right = DIV(y, x + 1);
+      glyph = (up && down && left && right) ? "┼"
+            : (up && down && right)         ? "├"
+            : (up && down && left)          ? "┤"
+            : (left && right && down)       ? "┬"
+            : (left && right && up)         ? "┴"
+            : (down && right)               ? "┌"
+            : (down && left)                ? "┐"
+            : (up && right)                 ? "└"
+            : (up && left)                  ? "┘"
+            : (up || down)                  ? "│"
+            : (left || right)               ? "─"
+                                            : "│";
+      // On the ring of cells just outside the active pane?
+      on_ring = active &&
+                x >= active->origin_x - 1 && x <= active->origin_x + active->width &&
+                y >= active->origin_y - 1 && y <= active->origin_y + active->height;
+
+      len = snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;%dH", y + 1, x + 1);
+      abAppend(ab, pos_buf, len);
+      if (on_ring != last_color) {
+        abAppend(ab, "\x1b[0m", 4);
+        abAppend(ab, E.theme.BACKGROUND_COLOR, (int)strlen(E.theme.BACKGROUND_COLOR));
+        if (on_ring) {
+          abAppend(ab, "\x1b[1m", 4);
+          abAppend(ab, E.theme.COLOR_KEYWORD, (int)strlen(E.theme.COLOR_KEYWORD));
+        } else {
+          abAppend(ab, E.theme.COLOR_COMMENT, (int)strlen(E.theme.COLOR_COMMENT));
+        }
+        last_color = on_ring;
+      }
+      abAppend(ab, glyph, (int)strlen(glyph));
+    }
+  }
+  abAppend(ab, "\x1b[0m", 4);
+#undef DIV
+  gfree(grid);
 }
 
 /**

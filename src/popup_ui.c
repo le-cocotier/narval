@@ -87,9 +87,13 @@ void popupStyleInit(PopupStyle *style) {
 
     // Selected row: background nudged 30% toward the accent (a tint, not a
     // full accent fill — legible without turning into a flat color block),
-    // text pushed toward white for contrast against that tint.
+    // text pushed away from the background for contrast against that tint:
+    // toward white on a dark theme, toward black on a light one.
     sel_r = blend(bg_r, ac_r, 30); sel_g = blend(bg_g, ac_g, 30); sel_b = blend(bg_b, ac_b, 30);
-    selfg_r = blend(fg_r, 255, 60); selfg_g = blend(fg_g, 255, 60); selfg_b = blend(fg_b, 255, 60);
+    {
+        const int ink = (bg_r * 299 + bg_g * 587 + bg_b * 114) / 1000 > 128 ? 0 : 255;
+        selfg_r = blend(fg_r, ink, 60); selfg_g = blend(fg_g, ink, 60); selfg_b = blend(fg_b, ink, 60);
+    }
     snprintf(style->row_sel, sizeof(style->row_sel), "1;48;2;%d;%d;%d;38;2;%d;%d;%d",
             sel_r, sel_g, sel_b, selfg_r, selfg_g, selfg_b);
 

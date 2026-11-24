@@ -76,6 +76,8 @@ void initBuiltins(void) {
   registerBuiltin("editor-open-file", editorOpenFile);
   registerBuiltin("editor-open-config", editorOpenConfig);
   registerBuiltin("editor-set-theme-color", editorSetThemeColor);
+  registerBuiltin("editor-theme-colors", editorThemeColors);
+  registerBuiltin("editor-load-file", editorLoadFile);
   registerBuiltin("editor-insert-char", editorPrintC);
   registerBuiltin("add-package", addPackage);
   registerBuiltin("package-loaded?", packageLoaded);

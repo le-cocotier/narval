@@ -18,12 +18,14 @@ void lispGcVisitListPopup(ListPopup *popup, LispRootVisitor visit, LispContext c
     popup->all_items = lisp_null();
     popup->on_select = lisp_null();
     popup->on_cancel = lisp_null();
+    popup->on_move = lisp_null();
     return;
   }
   visit(&popup->items, ctx);
   visit(&popup->all_items, ctx);
   visit(&popup->on_select, ctx);
   visit(&popup->on_cancel, ctx);
+  visit(&popup->on_move, ctx);
 }
 
 static void visitRoots(LispRootVisitor visit, LispContext ctx) {

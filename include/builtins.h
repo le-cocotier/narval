@@ -96,6 +96,8 @@ Lisp editorOpenConfig(Lisp args, LispError *e, LispContext ctx);
 
 // Theme — (editor-set-theme-color role r g b), see src/builtins.c
 Lisp editorSetThemeColor(Lisp args, LispError *e, LispContext ctx);
+Lisp editorThemeColors(Lisp args, LispError *e, LispContext ctx);
+Lisp editorLoadFile(Lisp args, LispError *e, LispContext ctx);
 Lisp editorOpenFilePath(Lisp args, LispError *e, LispContext ctx);
 
 // Directory listing / scratch buffers — file explorer, tree dump, etc.

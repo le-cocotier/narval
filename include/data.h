@@ -434,6 +434,7 @@ typedef struct
     int selected;      // 0-based index into items
     Lisp on_select;    // (lambda (value) ...), called with the chosen pair's cdr
     Lisp on_cancel;    // (lambda () ...) or lisp_null() — called on ESC
+    Lisp on_move;      // (lambda (value) ...) or lisp_null() — called when the highlight moves
 
     // ── optional live filtering (5th arg to editor-list-popup) ──────────
     // all_items is the complete, never-mutated list passed in; items above

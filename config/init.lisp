@@ -138,10 +138,15 @@
 (add-package "command-palette") ; ALT-p: every command, fuzzy-filtered, with its keys
 
 ;; Themes: exactly one should be loaded (the second one just overwrites
-;; whatever colors the first one set). Fork either as a starting point
-;; for your own — see packages/theme-dark/init.lisp for the interface.
+;; whatever colors the first one set). Fork one as a starting point for
+;; your own — see packages/theme-dark/init.lisp for the interface. Bundled:
+;; theme-dark, theme-light, theme-nord, theme-gruvbox, theme-dracula,
+;; theme-solarized-light.
 (add-package "theme-dark")
 ;; (add-package "theme-light")
+;; CTRL-x c t: try every theme live, and keep the one you pick (it wins
+;; over the line above from then on).
+(add-package "themes")
 
 ;; Per-language packages: each registers its own
 ;; (lsp-server "ext" "language-id" "command" "arg1" ...) — which spawns

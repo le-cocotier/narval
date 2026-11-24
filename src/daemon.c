@@ -92,6 +92,7 @@ typedef struct
     int prefix_state;
     Utf8Char *prompt_input;
     int prompt_is_command;
+    int prompt_command_selected;
     int quit_times_buffer;
     int which_key_prefix;
     long which_key_since;
@@ -166,6 +167,7 @@ static void viewSave(ClientView *v) {
   v->prefix_state = E.prefix_state;
   v->prompt_input = E.prompt_input;
   v->prompt_is_command = E.prompt_is_command;
+  v->prompt_command_selected = E.prompt_command_selected;
   v->prompt_matches = E.prompt_matches;
   v->prompt_match_count = E.prompt_match_count;
   v->prompt_match_selected = E.prompt_match_selected;
@@ -194,6 +196,7 @@ static void viewLoad(ClientView *v) {
   E.prefix_state = v->prefix_state;
   E.prompt_input = v->prompt_input;
   E.prompt_is_command = v->prompt_is_command;
+  E.prompt_command_selected = v->prompt_command_selected;
   E.prompt_matches = v->prompt_matches;
   E.prompt_match_count = v->prompt_match_count;
   E.prompt_match_selected = v->prompt_match_selected;

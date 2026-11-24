@@ -1092,6 +1092,7 @@ Lisp editorOpenTerminal(Lisp args, LispError *e, LispContext ctx) {
 Lisp editorExecuteCommand(Lisp args, LispError *e, const LispContext ctx) {
   Utf8Char *name;
   char *name_str;
+  char *picked;
   int present;
   Lisp sym;
   Lisp val;
@@ -1101,14 +1102,24 @@ Lisp editorExecuteCommand(Lisp args, LispError *e, const LispContext ctx) {
   // allocates Lisp memory, and the panel redraws on every keystroke.
   whichKeyBuildCommandList();
   E.prompt_is_command = 1;
+  E.prompt_command_selected = 0;
   name = editorPrompt("M-x: %u", NULL, 0);
   E.prompt_is_command = 0;
-  whichKeyFreeCommandList();
-  if (!name)
+  if (!name) {
+    whichKeyFreeCommandList();
     return lisp_null();
+  }
 
+  // What's typed needn't be a whole name: ENTER runs the match the panel
+  // highlights ("sv" runs editor-save), the name itself when it is one.
   name_str = (char *)utf8ToString(name);
   gfree(name);
+  picked = whichKeyCommandPick(name_str);
+  whichKeyFreeCommandList();
+  if (picked) {
+    gfree(name_str);
+    name_str = picked;
+  }
 
   present = 0;
   sym = lisp_make_symbol(name_str, ctx);

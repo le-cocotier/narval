@@ -39,7 +39,7 @@
  * make this return "no-prefix"'s own id, and every "no-prefix" keybind
  * would then match unconditionally, the same as an actual "*" one does.
  */
-static int starPrefixId(void) {
+int starPrefixId(void) {
   static int id = -2; // -2: not yet looked up: distinct from -1 (find_prefix's
                       // own not-found)
   if (id == -2)
@@ -242,11 +242,18 @@ Utf8Char *editorPromptEx(const char *prompt, Utf8Char *placeHolder,
     // Alt+a types "a" here too, Shift+Tab completes like TAB.
     if (keyFallback(c, &fallback))
       *c = fallback;
-    if (*c->character == DEL_KEY || *c->character == BACKSPACE) {
+    if (E.prompt_is_command && c->length == 1 &&
+        (*c->character == ARROW_DOWN || *c->character == ARROW_UP)) {
+      // M-x: choose which match ENTER runs (whichKeyCommandPick clamps it)
+      E.prompt_command_selected += *c->character == ARROW_DOWN ? 1 : -1;
+      if (E.prompt_command_selected < 0)
+        E.prompt_command_selected = 0;
+    } else if (*c->character == DEL_KEY || *c->character == BACKSPACE) {
       if (buf_len != 0) {
         --buf_len;
         END_OF_STRING(buf[buf_len]);
       }
+      E.prompt_command_selected = 0;
     } else if (*c->character == ESCAPE) {
       editorSetStatusMessage("Aborted");
       gfree(c);
@@ -301,6 +308,7 @@ Utf8Char *editorPromptEx(const char *prompt, Utf8Char *placeHolder,
       (buf + buf_len)->length = c->length;
       memcpy((buf + buf_len)->character, c->character, c->length);
       buf_len++;
+      E.prompt_command_selected = 0;
     }
     // A 0 character is editorReadKey()'s "no key came in time": it
     // mustn't end a run of TABs, or a second TAB pressed after a pause

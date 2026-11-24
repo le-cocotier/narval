@@ -21,6 +21,11 @@ void whichKeyDraw(struct abuf *ab);
 // redrawn ~20x/second.
 void whichKeyBuildCommandList(void);
 void whichKeyFreeCommandList(void);
+// The command ENTER at M-x runs for what's been typed: the match the arrow
+// keys highlighted (E.prompt_command_selected, 0 for the best), as a
+// galloc'd string, or NULL when nothing matches. Call before
+// whichKeyFreeCommandList().
+char *whichKeyCommandPick(const char *typed);
 
 // Drop the cached key-sequence -> command-name mapping, so it's rebuilt on
 // the next draw. Call after keybindings change at runtime.

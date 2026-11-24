@@ -51,6 +51,7 @@ static void ab_sgr(struct abuf *ab, const char *codes) {
 
 #define WK_MAX_ROWS       8    // panel never eats more than this many rows
 #define WK_ENTRY_MAX     64
+#define WK_COMMAND_ENTRY_MAX 96 // an M-x entry: command, tab, its keys
 #define WK_MIN_COL_WIDTH 18
 
 // How long a prefix must stay pending before the panel appears. Long enough
@@ -71,6 +72,7 @@ static int g_bind_names_count = 0;
 
 static char **g_commands = NULL;    // M-x candidates
 static int g_command_count = 0;
+static char **g_command_keys = NULL; // parallel to g_commands: its keys, or NULL
 
 static long monotonic_ms(void) {
     return (long) os_monotonic_ms();
@@ -199,6 +201,210 @@ const char *whichKeyBindingName(const int index) {
     return g_bind_names[index];
 }
 
+/**
+ * @brief The keys that set prefix `prefix_id`, as typed from no prefix
+ * ("CTRL-x p" for "project"), into `out`; 0 when nothing reaches it.
+ * @details Several keys can set one prefix (CTRL-x sets "user" from no
+ * prefix and from the debugger): the shortest route wins.
+ */
+static int prefixKeys(const int prefix_id, const int depth, char *out, const size_t size) {
+    char want[WK_ENTRY_MAX];
+    char outer[WK_ENTRY_MAX];
+    char route[WK_ENTRY_MAX];
+    const int star = starPrefixId();
+    int found = 0;
+    int i;
+    out[0] = '\0';
+    if (prefix_id == 0)
+        return 1; // no-prefix: nothing to type first
+    if (depth > 4 || !g_bind_names)
+        return 0;
+    snprintf(want, sizeof(want), "editor-set-prefix %s", E.prefix[prefix_id].prefix_name);
+    for (i = 0; i < E.number_of_keybinds; i++) {
+        if (E.key_binds[i].prefix_id == star || !g_bind_names[i] ||
+            strcmp(g_bind_names[i], want) != 0)
+            continue;
+        if (!prefixKeys(E.key_binds[i].prefix_id, depth + 1, outer, sizeof(outer)))
+            continue;
+        snprintf(route, sizeof(route), "%s%s%s", outer, outer[0] ? " " : "",
+                 E.key_binds[i].key_sequence);
+        if (!found || strlen(route) < strlen(out)) {
+            snprintf(out, size, "%s", route);
+            found = 1;
+        }
+    }
+    return found;
+}
+
+/**
+ * @brief Fill g_command_keys: for each M-x candidate, the shortest key
+ * sequence that runs it from no prefix, in the buffer M-x was opened from
+ * (another language's bindings don't count).
+ */
+static void buildCommandKeys(void) {
+    const struct buffer_t *buf = bufferFindById(splitScreenGetActivePane()->buffer_id);
+    const int star = starPrefixId();
+    char outer[WK_ENTRY_MAX];
+    char full[WK_ENTRY_MAX];
+    char **slot;
+    int i;
+    int lo;
+    int hi;
+    int mid;
+    int cmp;
+    if (g_command_count <= 0)
+        return;
+    g_command_keys = gcalloc((size_t) g_command_count, sizeof(char *));
+    if (!g_command_keys)
+        return;
+    buildBindNames();
+    if (!g_bind_names)
+        return;
+    for (i = 0; i < E.number_of_keybinds; i++) {
+        if (!g_bind_names[i] || keyBindScope(&E.key_binds[i], buf) == 0)
+            continue;
+        if (E.key_binds[i].prefix_id == star)
+            outer[0] = '\0';
+        else if (!prefixKeys(E.key_binds[i].prefix_id, 0, outer, sizeof(outer)))
+            continue;
+        // g_commands is sorted: binary search for this binding's command
+        lo = 0;
+        hi = g_command_count - 1;
+        slot = NULL;
+        while (lo <= hi) {
+            mid = (lo + hi) / 2;
+            cmp = strcmp(g_commands[mid], g_bind_names[i]);
+            if (cmp == 0) {
+                slot = &g_command_keys[mid];
+                break;
+            }
+            if (cmp < 0)
+                lo = mid + 1;
+            else
+                hi = mid - 1;
+        }
+        if (!slot)
+            continue;
+        snprintf(full, sizeof(full), "%s%s%s", outer, outer[0] ? " " : "",
+                 strcmp(E.key_binds[i].key_sequence, " ") == 0 ? "SPACE"
+                                                                : E.key_binds[i].key_sequence);
+        if (!*slot || strlen(full) < strlen(*slot)) {
+            gfree(*slot);
+            *slot = utilStrdup(full);
+        }
+    }
+}
+
+static int isWordStart(const char *name, const char *p) {
+    return p == name || p[-1] == '-' || p[-1] == '_';
+}
+
+/**
+ * @brief How well a command name matches what's typed at M-x: lower is
+ * better, -1 for no match.
+ * @details The name itself, then names starting with it (what M-x always
+ * listed), then the rest holding the typed letters in order, tightest
+ * first: letters that start a word earn a bonus, so "sv" finds
+ * editor-save before dashboard-activate. A package's internals (name--part)
+ * only show for what they start with, as before.
+ */
+static int commandScore(const char *name, const char *typed) {
+    const size_t typed_len = strlen(typed);
+    const char *s;
+    const char *p;
+    const char *q;
+    int best = -1;
+    int bonus;
+    int score;
+    if (typed_len == 0)
+        return 0;
+    if (strcmp(name, typed) == 0)
+        return 0;
+    if (strncmp(name, typed, typed_len) == 0)
+        return 1;
+    if (strstr(name, "--"))
+        return -1;
+    for (s = name; *s; s++) {
+        if (*s != typed[0])
+            continue;
+        bonus = isWordStart(name, s);
+        for (p = s + 1, q = typed + 1; *p && *q; p++)
+            if (*p == *q) {
+                bonus += isWordStart(name, p);
+                q++;
+            }
+        if (*q)
+            break; // and no later start can match either
+        score = 2 + 2 * (int) (p - s) - 3 * bonus;
+        if (score < 2)
+            score = 2;
+        if (best < 0 || score < best)
+            best = score;
+    }
+    return best;
+}
+
+typedef struct {
+    int index; // into g_commands
+    int score;
+} RankedCommand;
+
+static int compareRanked(const void *a, const void *b) {
+    const RankedCommand *x = a;
+    const RankedCommand *y = b;
+    if (x->score != y->score)
+        return x->score - y->score;
+    return x->index - y->index; // alphabetical among equals
+}
+
+/**
+ * @brief The M-x candidates matching `typed`, best first, into a gcalloc'd
+ * array the caller frees; *count gets its length. NULL when none match.
+ */
+static RankedCommand *rankCommands(const char *typed, int *count) {
+    RankedCommand *ranked;
+    int i;
+    int score;
+    *count = 0;
+    if (!g_commands || g_command_count == 0)
+        return NULL;
+    ranked = gcalloc((size_t) g_command_count, sizeof(RankedCommand));
+    if (!ranked)
+        return NULL;
+    for (i = 0; i < g_command_count; i++) {
+        score = commandScore(g_commands[i], typed);
+        if (score < 0)
+            continue;
+        ranked[*count].index = i;
+        ranked[*count].score = score;
+        (*count)++;
+    }
+    if (*count == 0) {
+        gfree(ranked);
+        return NULL;
+    }
+    qsort(ranked, (size_t) *count, sizeof(RankedCommand), compareRanked);
+    return ranked;
+}
+
+char *whichKeyCommandPick(const char *typed) {
+    RankedCommand *ranked;
+    int count;
+    int pick;
+    char *name;
+    ranked = rankCommands(typed, &count);
+    if (!ranked)
+        return NULL;
+    pick = E.prompt_command_selected;
+    if (pick >= count)
+        pick = count - 1;
+    if (pick < 0)
+        pick = 0;
+    name = utilStrdup(g_commands[ranked[pick].index]);
+    gfree(ranked);
+    return name;
+}
+
 void whichKeyBuildCommandList(void) {
     Lisp alist;
     int cap;
@@ -250,9 +456,14 @@ void whichKeyBuildCommandList(void) {
         }
         g_commands[j + 1] = k;
     }
+    buildCommandKeys();
 }
 
-void whichKeyFreeCommandList(void) { freeStrings(&g_commands, &g_command_count); }
+void whichKeyFreeCommandList(void) {
+    int count = g_command_count;
+    freeStrings(&g_command_keys, &count);
+    freeStrings(&g_commands, &g_command_count);
+}
 
 /**
  * @brief Width of a UTF-8 string in terminal columns.
@@ -267,32 +478,55 @@ static int displayWidth(const char *s) {
     int w = 0;
     const unsigned char *p;
     for (p = (const unsigned char *) s; *p; p++)
-        if ((*p & 0xC0) != 0x80) // skip UTF-8 continuation bytes
+        if (*p == '\t')
+            w += 2; // drawn as two spaces (see abAppendPadded)
+        else if ((*p & 0xC0) != 0x80) // skip UTF-8 continuation bytes
             w++;
     return w;
 }
 
 /**
  * @brief Append `s` followed by enough spaces to fill `width` columns.
+ * @details A tab in `s` splits it in two: it's drawn as two spaces, and
+ * what follows it in `dim` (an SGR, then `base` again), for an M-x
+ * entry's keys. NULL `dim` draws the tab as plain spaces.
  * @return columns actually written.
  */
-static int abAppendPadded(struct abuf *ab, const char *s, const int width, const int budget) {
+static int abAppendPadded(struct abuf *ab, const char *s, const int width, const int budget,
+                          const char *dim, const char *base) {
     int w = displayWidth(s);
     int bytes;
     int cols;
     const unsigned char *p;
+    const unsigned char *start;
     int pad;
     int i;
+    int dimmed = 0;
     if (w > budget) w = budget; // caller guarantees budget >= 0
     bytes = 0; cols = 0;
-    for (p = (const unsigned char *) s; *p; p++) {
+    start = (const unsigned char *) s;
+    for (p = start; *p; p++) {
+        if (*p == '\t') {
+            abAppend(ab, (const char *) start, bytes);
+            for (i = 0; i < 2 && cols < w; i++, cols++)
+                abAppend(ab, " ", 1);
+            if (dim) {
+                ab_sgr(ab, dim);
+                dimmed = 1;
+            }
+            start = p + 1;
+            bytes = 0;
+            continue;
+        }
         if ((*p & 0xC0) != 0x80) {
             if (cols >= w) break;
             cols++;
         }
         bytes++;
     }
-    abAppend(ab, s, bytes);
+    abAppend(ab, (const char *) start, bytes);
+    if (dimmed && base)
+        ab_sgr(ab, base);
     pad = width - cols;
     if (pad > budget - cols) pad = budget - cols;
     for (i = 0; i < pad; i++) abAppend(ab, " ", 1);
@@ -378,7 +612,7 @@ static void drawPanel(struct abuf *ab, const char *title,
                  count - first - shown);
     else
         snprintf(header, sizeof(header), " %s", title);
-    abAppendPadded(ab, header, E.screencols, E.screencols);
+    abAppendPadded(ab, header, E.screencols, E.screencols, NULL, NULL);
     AB_RESET(ab);
 
     for (r = 0; r < rows; r++) {
@@ -395,7 +629,8 @@ static void drawPanel(struct abuf *ab, const char *title,
                 break;
             if (idx == selected)
                 ab_sgr(ab, style.row_sel);
-            used += abAppendPadded(ab, entries[idx], col_w, budget);
+            used += abAppendPadded(ab, entries[idx], col_w, budget, style.dim_fg,
+                                   idx == selected ? style.row_sel : style.row);
             if (idx == selected) {
                 AB_RESET(ab);
                 ab_sgr(ab, style.row);
@@ -408,40 +643,61 @@ static void drawPanel(struct abuf *ab, const char *title,
 }
 
 /**
- * @brief M-x help: the commands whose names start with what's been typed.
+ * @brief M-x help: the commands matching what's been typed, best first,
+ * each with the keys that run it; the one ENTER runs highlighted.
  */
 static void drawCommandHelp(struct abuf *ab) {
     char *typed;
-    size_t typed_len;
-    char **matches;
+    RankedCommand *ranked;
+    char **entries;
+    char *storage;
+    char *slot;
+    const char *keys;
     int n;
     int i;
-    char title[128];
+    int selected;
+    char title[192];
     if (!g_commands || g_command_count == 0)
         return;
 
     typed = E.prompt_input ? (char *) utf8ToString(E.prompt_input) : NULL;
-    typed_len = typed ? strlen(typed) : 0;
-
-    matches = gcalloc((size_t) g_command_count, sizeof(char *));
-    if (!matches) {
+    ranked = rankCommands(typed ? typed : "", &n);
+    if (!ranked) {
         gfree(typed);
         return;
     }
-    n = 0;
-    for (i = 0; i < g_command_count; i++) {
-        if (typed_len == 0 || strncmp(g_commands[i], typed, typed_len) == 0)
-            matches[n++] = g_commands[i];
+    entries = gcalloc((size_t) n, sizeof(char *));
+    storage = gcalloc((size_t) n, WK_COMMAND_ENTRY_MAX);
+    if (!entries || !storage) {
+        gfree(entries);
+        gfree(storage);
+        gfree(ranked);
+        gfree(typed);
+        return;
+    }
+    for (i = 0; i < n; i++) {
+        slot = storage + (size_t) i * WK_COMMAND_ENTRY_MAX;
+        keys = g_command_keys ? g_command_keys[ranked[i].index] : NULL;
+        snprintf(slot, WK_COMMAND_ENTRY_MAX, "%s%s%s", g_commands[ranked[i].index], keys ? "\t" : "",
+                 keys ? keys : "");
+        entries[i] = slot;
     }
 
-    snprintf(title, sizeof(title), " M-x — %d command%s%s%s", n,
-             n == 1 ? "" : "s",
-             typed_len ? " matching " : "", typed_len ? typed : "");
+    // Nothing typed yet: ENTER does nothing, so nothing is highlighted.
+    selected = -1;
+    if (typed && typed[0]) {
+        selected = E.prompt_command_selected < n ? E.prompt_command_selected : n - 1;
+        snprintf(title, sizeof(title),
+                 " M-x — %d command%s matching %s  (ENTER runs the highlighted one, arrows choose)",
+                 n, n == 1 ? "" : "s", typed);
+    } else {
+        snprintf(title, sizeof(title), " M-x — %d command%s", n, n == 1 ? "" : "s");
+    }
+    drawPanel(ab, title, entries, n, selected);
 
-    if (n > 0)
-        drawPanel(ab, title, matches, n, -1);
-
-    gfree(matches);
+    gfree(entries);
+    gfree(storage);
+    gfree(ranked);
     gfree(typed);
 }
 
@@ -464,7 +720,7 @@ static void drawPrefixHelp(struct abuf *ab) {
         return;
 
     entries = gcalloc((size_t) E.number_of_keybinds, sizeof(char *));
-    storage = gcalloc((size_t) E.number_of_keybinds, WK_ENTRY_MAX);
+    storage = gcalloc((size_t) E.number_of_keybinds, WK_COMMAND_ENTRY_MAX);
     if (!entries || !storage) {
         gfree(entries);
         gfree(storage);
@@ -488,8 +744,8 @@ static void drawPrefixHelp(struct abuf *ab) {
                        keyBindScope(&E.key_binds[j], buf) == 2;
         if (shadowed)
             continue;
-        slot = storage + (size_t) n * WK_ENTRY_MAX;
-        snprintf(slot, WK_ENTRY_MAX, "%s → %s", E.key_binds[i].key_sequence,
+        slot = storage + (size_t) n * WK_COMMAND_ENTRY_MAX;
+        snprintf(slot, WK_COMMAND_ENTRY_MAX, "%s → %s", E.key_binds[i].key_sequence,
                  g_bind_names[i] ? g_bind_names[i] : "?");
         entries[n++] = slot;
     }

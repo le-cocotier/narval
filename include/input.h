@@ -42,6 +42,8 @@ int editorMoveCursor(int key);
 
 int executeKeyBind(char *key_sequence);
 int keyBindScope(const struct keyBind_t *kb, const struct buffer_t *buf);
+// The id of the "*" prefix: a binding under it applies in every prefix.
+int starPrefixId(void);
 
 // Scrolls the active pane's view by `lines` (negative: up); the cursor
 // only moves if it would otherwise leave the pane.

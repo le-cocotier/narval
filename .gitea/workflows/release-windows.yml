@@ -3,10 +3,12 @@
 #
 #
 # Pushing a tag that starts with "v" (git tag v3.3 && git push origin v3.3)
-# cross-compiles narval.exe on Linux and publishes
+# cross-compiles narval.exe and narval-gui.exe on Linux and publishes
 #   narval-<tag>-windows-x64.zip
-# on the repository's Releases page: narval.exe, install.ps1, the default
-# config, the bundled packages and a README. Windows users unzip it and run
+# on the repository's Releases page: narval.exe, narval-gui.exe with the
+# SDL3 DLLs it needs (SDL's MinGW release, downloaded from GitHub by
+# build-zip.sh), install.ps1, the default config, the bundled packages and
+# a README. Windows users unzip it and run
 # install.ps1 — no compiler, Meson or git needed.
 #
 # Publishing needs a token allowed to create releases. The automatic
@@ -39,7 +41,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y meson ninja-build mingw-w64 zip curl jq
+          sudo apt-get install -y meson ninja-build mingw-w64 pkg-config zip curl jq
 
       - name: Check the OS boundary
         run: tools/check_os_boundary.sh .
@@ -67,7 +69,7 @@ jobs:
             ID=$(jq -er '.id' <<<"$RELEASE")
           else
             ID=$(jq -n --arg tag "$TAG" '{tag_name: $tag, name: ("Narval " + $tag),
-                   body: "Windows: download the zip below, unzip it and run install.ps1 (see README.txt inside)."}' \
+                   body: "Windows: download the zip below, unzip it and run install.ps1 (see README.txt inside). It installs narval and narval-gui, the window app."}' \
                  | api -X POST -H "Content-Type: application/json" --data @- "$API/releases" \
                  | jq -er '.id')
           fi

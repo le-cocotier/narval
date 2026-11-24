@@ -34,7 +34,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y meson ninja-build gcc mingw-w64 zip rpm
+          sudo apt-get install -y meson ninja-build gcc mingw-w64 pkg-config curl zip rpm
 
       - name: Check the OS boundary
         run: tools/check_os_boundary.sh .
@@ -58,5 +58,5 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.tar.gz dist/*.deb dist/*.rpm \
               --title "Narval $GITHUB_REF_NAME" --verify-tag \
-              --notes "Windows: download the zip, unzip it and run install.ps1. Linux: the .deb or .rpm below. macOS: build from source (see the README)."
+              --notes "Windows: download the zip, unzip it and run install.ps1 (it installs narval and narval-gui, the window app). Linux: the .deb or .rpm below (the terminal narval; narval-gui builds from source). macOS: build from source (see the README)."
           fi

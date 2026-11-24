@@ -298,6 +298,43 @@ static void testCellGlyphs(void) {
   SDL_DestroySurface(s);
 }
 
+// Characters from other fonts: colour emoji told from grey glyphs, and
+// shrunk to a cell by averaging, transparent pixels adding no colour.
+static void testImages(void) {
+  SDL_Surface *big = SDL_CreateSurface(8, 8, SDL_PIXELFORMAT_RGBA32);
+  SDL_Surface *small;
+  Uint8 r = 0, g = 0, b = 0, a = 0;
+  int y;
+
+  CHECK(big != NULL);
+  if (!big)
+    return;
+  SDL_FillSurfaceRect(big, NULL, SDL_MapSurfaceRGBA(big, 255, 255, 255, 255));
+  CHECK_INT(guiHasColor(big), 0);  // a white glyph
+  // Left half transparent black, right half opaque red.
+  SDL_FillSurfaceRect(big, NULL, SDL_MapSurfaceRGBA(big, 0, 0, 0, 0));
+  for (y = 0; y < 8; y++) {
+    SDL_Rect right = {4, y, 4, 1};
+    SDL_FillSurfaceRect(big, &right, SDL_MapSurfaceRGBA(big, 255, 0, 0, 255));
+  }
+  CHECK_INT(guiHasColor(big), 1);
+  small = guiShrink(big, 1, 1);
+  CHECK(small && small->w == 1 && small->h == 1);
+  if (small)
+    SDL_ReadSurfacePixel(small, 0, 0, &r, &g, &b, &a);
+  CHECK_INT(r, 255);  // red, not darkened by the transparent black half
+  CHECK_INT(g, 0);
+  CHECK(a >= 127 && a <= 128);  // half covered
+  SDL_DestroySurface(small);
+  small = guiShrink(big, 2, 3);  // not a whole fraction: 4 x 2.67 pixels each
+  CHECK(small && small->w == 2 && small->h == 3);
+  CHECK_INT(small ? alphaAt(small, 0, 1) : -1, 0);
+  CHECK_INT(small ? alphaAt(small, 1, 2) : -1, 255);
+  SDL_DestroySurface(small);
+  CHECK(guiShrink(NULL, 1, 1) == NULL && guiShrink(big, 0, 1) == NULL);
+  SDL_DestroySurface(big);
+}
+
 static void writeStr(const char *s) {
   screenWrite(s, strlen(s));
 }
@@ -344,6 +381,7 @@ int main(const int argc, char **argv) {
   testEveryKey();
   testDrawing();
   testCellGlyphs();
+  testImages();
   testShapes();
   terminalRestore();  // closes the window
   CHECK_INT(guiCellPixel(0, 0), -1);

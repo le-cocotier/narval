@@ -183,8 +183,10 @@ Alt (Option) key is Alt/Meta (`ALT-x` is M-x) and the right one types characters
 on a Mac). Cmd+V (Super+V) pastes the clipboard as typed text, and
 Cmd+Q or the close button do what `CTRL-x CTRL-c` does, unsaved-changes warning included. The
 mouse wheel and clicks work as in a terminal with `MOUSE` on. `GUI-FONT-SIZE` and `GUI-FONT` in
-`init.lisp` set the font; the default is the bundled DejaVu Sans Mono (`assets/fonts/`). HiDPI
-screens get it at their full resolution.
+`init.lisp` set the font (a path to a .ttf, .otf or .ttc file; `~/` is your home folder); the
+default is the bundled DejaVu Sans Mono (`assets/fonts/`). Characters the font hasn't got (emoji,
+Chinese, Japanese, Korean, symbols) come from the system's fonts, as in a terminal, emoji in
+colour. HiDPI screens get it all at their full resolution.
 
 How it works: the window is one more screen driver (`include/terminal.h`), like a daemon
 client's. Frames go through the same ANSI parser terminal panes use into a grid of cells, which

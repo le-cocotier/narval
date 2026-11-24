@@ -1,9 +1,42 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- narval's icon: the site's favicon (site/favicon.svg) with the margin
-       app icons keep around them. -->
+  <!-- narval's app icon: a little narwhal. Drawn on a 64x64 grid, inset
+       for the margin app icons keep around them. -->
+  <defs>
+    <clipPath id="tusk">
+      <path d="M44.5 29.5 L47.5 31.5 L60 9 Z"/>
+    </clipPath>
+  </defs>
   <g transform="translate(5 5) scale(0.84375)">
     <rect width="64" height="64" rx="14" fill="#0e1a24"/>
-    <path d="M14 46 L14 20 L36 42 L36 20" fill="none" stroke="#66d9e8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M42 44 L54 12" stroke="#d8e4ee" stroke-width="3.5" stroke-linecap="round"/>
+    <g transform="translate(32 30) scale(1.06) translate(-32 -29)">
+      <!-- tusk, with its spiral grooves -->
+      <path d="M44.5 29.5 L47.5 31.5 L60 9 Z" fill="#eef3f6"/>
+      <g clip-path="url(#tusk)" stroke="#8fa6b6" stroke-width="0.8" stroke-linecap="round">
+        <path d="M45 27 L50 28.5"/>
+        <path d="M47.5 22.5 L52.5 24"/>
+        <path d="M50 18 L55 19.5"/>
+        <path d="M52.5 13.5 L57.5 15"/>
+      </g>
+      <!-- tail fluke -->
+      <path d="M15.5 30 C12 25 7 22.5 3.5 23.5 C6.5 25.5 8.5 27.5 9.5 30 C7.5 32 6.5 35 7 38 C10.5 36.5 13.5 34 16.5 31.5 Z" fill="#45aec4"/>
+      <!-- body -->
+      <path d="M51 38 C51 30 45 25.5 37 25.5 C29 25.5 23 29 15 29.5 L14.5 31.5 C21 33 25 46.5 37.5 46.5 C45.5 46.5 51 43.5 51 38 Z" fill="#66d9e8"/>
+      <!-- back highlight -->
+      <path d="M27 28.6 C31 26.8 35 26.3 38.5 26.6 C35 27.6 31 28.4 27 28.6 Z" fill="#9be8f2"/>
+      <!-- belly -->
+      <path d="M24 39 C28 44 32 46.5 37.5 46.5 C44 46.5 48.5 44.5 50.3 41.5 C45 43 33 43.5 24 39 Z" fill="#d2f5fa"/>
+      <!-- flipper -->
+      <path d="M34.5 42 C33.5 46 31 48.5 27.5 49.5 C28.5 46.5 30 44 31.5 42 Z" fill="#45aec4"/>
+      <!-- spots -->
+      <circle cx="30" cy="31.2" r="1.1" fill="#45aec4"/>
+      <circle cx="35.2" cy="29.4" r="0.9" fill="#45aec4"/>
+      <circle cx="25" cy="32.6" r="0.8" fill="#45aec4"/>
+      <circle cx="33" cy="34" r="0.7" fill="#45aec4"/>
+      <!-- eye, cheek and smile -->
+      <circle cx="43.5" cy="35" r="1.8" fill="#0e1a24"/>
+      <circle cx="44.2" cy="34.3" r="0.55" fill="#ffffff"/>
+      <ellipse cx="45" cy="38.6" rx="1.6" ry="0.9" fill="#f29bb2" opacity="0.7"/>
+      <path d="M46.8 40.2 C48 40.8 49.2 40.6 50.2 39.8" fill="none" stroke="#0e1a24" stroke-width="0.9" stroke-linecap="round"/>
+    </g>
   </g>
 </svg>

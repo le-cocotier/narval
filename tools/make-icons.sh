@@ -16,7 +16,8 @@ for s in 16 32 48 64 128 256 512 1024; do
 done
 cp "$tmp/256.png" "$icons/narval.png"
 convert "$tmp/16.png" "$tmp/32.png" "$tmp/48.png" "$tmp/64.png" "$tmp/128.png" "$tmp/256.png" "$icons/narval.ico"
-convert "$tmp/64.png" "BMP:$icons/narval.bmp"   # 32-bit, with alpha
+# 256 px, so a Dock tile on a Retina screen stays sharp. 32-bit, with alpha.
+convert "$tmp/256.png" "BMP:$icons/narval.bmp"
 # .icns: PNG images under Apple's type codes for each size.
 python3 - "$tmp" "$icons/narval.icns" <<'PY'
 import struct, sys

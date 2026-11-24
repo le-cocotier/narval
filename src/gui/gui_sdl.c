@@ -1033,9 +1033,26 @@ static void guiClose(void)
     G.keys_len = G.keys_cap = G.keys_pos = 0;
 }
 
-// The window's icon (the taskbar's on Linux; macOS and Windows take the
-// app's): assets/icons/narval.bmp in ~/.narval, else where narval is
-// installed.
+// Whether the app already shows an icon of its own, drawn at every size:
+// narval-gui.exe carries one (windows/narval-gui.rc), and so does
+// Narval.app (narval.icns). Setting the window's icon on macOS replaces
+// the Dock's, so a bitmap there would blur the app's sharp one.
+static int appHasIcon(void)
+{
+    const char *platform = SDL_GetPlatform();
+    const char *base;
+
+    if (strcmp(platform, "Windows") == 0)
+        return 1;
+    if (strcmp(platform, "macOS") != 0)
+        return 0;
+    base = SDL_GetBasePath();  // Narval.app/Contents/Resources/ in the app
+    return base && strstr(base, ".app/Contents/") != NULL;
+}
+
+// The window's icon where the app has none (appHasIcon): the taskbar's on
+// Linux, the Dock's for a narval-gui started outside Narval.app.
+// assets/icons/narval.bmp in ~/.narval, else where narval is installed.
 static void setWindowIcon(void)
 {
     const char *dirs[2];
@@ -1043,6 +1060,8 @@ static void setWindowIcon(void)
     SDL_Surface *icon = NULL;
     int i;
 
+    if (appHasIcon())
+        return;
     dirs[0] = utilNarvalDir();
     dirs[1] = utilDataDir();
     for (i = 0; i < 2 && !icon; i++)

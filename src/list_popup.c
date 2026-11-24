@@ -15,58 +15,12 @@
 #include "../include/list_popup.h"
 #include "../include/define.h"
 #include "../include/popup_ui.h"
-#include "../include/galloc.h"
 
 #include <ctype.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 extern EditorConfig E;
-
-static int isWordStart(const char *label, const char *p) {
-  return p == label || p[-1] == '-' || p[-1] == ' ' || p[-1] == '/' || p[-1] == '_' ||
-         p[-1] == '.';
-}
-
-/**
- * @brief How well `label` matches `query` with the letters of the query in
- * order (fuzzy): lower is better, -1 for no match.
- * @details Only the part before a tab counts (the rest is a second column,
- * e.g. the keys in the command palette). Each start of the first letter is
- * tried, matching the rest as early as possible; the tightest span wins, and
- * letters that start a word ("e-s" in editor-save) earn a bonus, so "sv"
- * puts editor-save before dashboard-activate.
- */
-static int fuzzyScore(const char *label, const char *query) {
-  const char *end = strchr(label, '\t');
-  const char *s;
-  const char *p;
-  const char *q;
-  int best = -1;
-  int bonus;
-  int score;
-  if (!end)
-    end = label + strlen(label);
-  for (s = label; s < end; s++) {
-    if (tolower((unsigned char)*s) != tolower((unsigned char)query[0]))
-      continue;
-    bonus = isWordStart(label, s);
-    for (p = s + 1, q = query + 1; p < end && *q; p++)
-      if (tolower((unsigned char)*p) == tolower((unsigned char)*q)) {
-        bonus += isWordStart(label, p);
-        q++;
-      }
-    if (*q)
-      break; // no match from here on either
-    score = 2 * (int)(p - s) - 3 * bonus + 4; // >= 0: span >= 1 + the bonus
-    if (score < 0)
-      score = 0;
-    if (best < 0 || score < best)
-      best = score;
-  }
-  return best;
-}
 
 /**
  * @brief Case-insensitive substring test: does `label` contain `query`
@@ -94,60 +48,27 @@ static int labelMatchesQuery(const char *label, const char *query) {
   return 0;
 }
 
-typedef struct {
-  Lisp pair;
-  int score;
-  int index;
-} RankedItem;
-
-static int compareRanked(const void *a, const void *b) {
-  const RankedItem *x = a;
-  const RankedItem *y = b;
-  if (x->score != y->score)
-    return x->score - y->score;
-  return x->index - y->index; // ties keep the order they were passed in
-}
-
 /**
  * @brief Rebuilds E.list_popup.items/count from all_items + query.
  * @details Only meaningful when filterable — non-filterable popups never
- * call this, items IS all_items for their whole lifetime. A substring
- * filter keeps the order of all_items; a fuzzy one sorts the matches best
- * first (fuzzyScore), ties in the order passed in.
+ * call this, items IS all_items for their whole lifetime. Builds the
+ * filtered list in the same order as all_items (a tail pointer, not the
+ * cons-then-reverse trick used elsewhere in this codebase for the same
+ * reason list_directory results get sorted in Lisp instead: here the
+ * order is meaningful and worth preserving directly).
  */
 static void listPopupRebuildFilter(void) {
   Lisp head = lisp_null();
   Lisp tail = lisp_null();
   int count = 0;
-  int total = 0;
-  int score;
-  int i;
   Lisp it;
   Lisp pair;
   Lisp cell;
-  RankedItem *ranked = NULL;
-  const int fuzzy = E.list_popup.filterable == LIST_FILTER_FUZZY && E.list_popup.query[0];
-
-  if (fuzzy) {
-    for (it = E.list_popup.all_items; lisp_is_pair(it); it = lisp_cdr(it))
-      total++;
-    ranked = gcalloc((size_t)(total > 0 ? total : 1), sizeof(RankedItem));
-  }
 
   for (it = E.list_popup.all_items; lisp_is_pair(it); it = lisp_cdr(it)) {
     pair = lisp_car(it);
     if (!lisp_is_pair(pair))
       continue;
-    if (ranked) {
-      score = fuzzyScore(lisp_string(lisp_car(pair)), E.list_popup.query);
-      if (score >= 0) {
-        ranked[count].pair = pair;
-        ranked[count].score = score;
-        ranked[count].index = count;
-        count++;
-      }
-      continue;
-    }
     if (!labelMatchesQuery(lisp_string(lisp_car(pair)), E.list_popup.query))
       continue;
 
@@ -158,13 +79,6 @@ static void listPopupRebuildFilter(void) {
       lisp_set_cdr(tail, cell);
     tail = cell;
     count++;
-  }
-
-  if (ranked) {
-    qsort(ranked, (size_t)count, sizeof(RankedItem), compareRanked);
-    for (i = count - 1; i >= 0; i--)
-      head = lisp_cons(ranked[i].pair, head, E.ctx);
-    gfree(ranked);
   }
 
   E.list_popup.items = head;
@@ -335,13 +249,6 @@ void listPopupDraw(struct abuf *ab) {
   int is_sel;
   int row;
   const char *label;
-  const char *tab;
-  char left[LIST_POPUP_MAX_WIDTH + 1];
-  int left_w;
-  int right_w;
-  int len;
-  const PopupMatch match = E.list_popup.filterable == LIST_FILTER_FUZZY ? POPUP_MATCH_FUZZY
-                                                                        : POPUP_MATCH_SUBSTRING;
   if (!E.list_popup.visible)
     return;
   // Non-filterable popups never open with count == 0 (see
@@ -370,25 +277,16 @@ void listPopupDraw(struct abuf *ab) {
     snprintf(title, sizeof(title), "%s", E.list_popup.title);
 
   // Size the box to the longest visible label (or the title, if wider).
-  // A label "left\tright" has two columns: each measured on its own.
   content_w = (int)strlen(title);
-  left_w = 0;
-  right_w = 0;
   it = lisp_list_advance(E.list_popup.items, scroll);
   for (i = 0; i < visible_count && lisp_is_pair(it); i++, it = lisp_cdr(it)) {
     pair = lisp_car(it);
     if (!lisp_is_pair(pair))
       continue;
-    label = lisp_string(lisp_car(pair));
-    tab = strchr(label, '\t');
-    label_len = tab ? (int)(tab - label) : (int)strlen(label);
-    if (label_len > left_w)
-      left_w = label_len;
-    if (tab && (int)strlen(tab + 1) > right_w)
-      right_w = (int)strlen(tab + 1);
+    label_len = (int)strlen(lisp_string(lisp_car(pair)));
+    if (label_len > content_w)
+      content_w = label_len;
   }
-  if (left_w + (right_w ? right_w + 3 : 0) > content_w)
-    content_w = left_w + (right_w ? right_w + 3 : 0);
   if (content_w > E.screencols - 6)
     content_w = E.screencols - 6;
   if (content_w > LIST_POPUP_MAX_WIDTH)
@@ -434,20 +332,9 @@ void listPopupDraw(struct abuf *ab) {
       if (lisp_is_pair(pair))
         label = lisp_string(lisp_car(pair));
     }
-    tab = strchr(label, '\t');
-    if (tab && right_w > 0 && content_w > right_w + 3) {
-      len = (int)(tab - label) < (int)sizeof(left) - 1 ? (int)(tab - label) : (int)sizeof(left) - 1;
-      memcpy(left, label, (size_t)len);
-      left[len] = '\0';
-      popupAppendLabel(ab, &style, is_sel, left, content_w - right_w - 3,
-                       E.list_popup.filterable ? E.list_popup.query : NULL, match, 0);
-      abAppend(ab, "   ", 3);
-      popupAppendLabel(ab, &style, is_sel, tab + 1, right_w, NULL, POPUP_MATCH_NONE,
-                       POPUP_LABEL_DIM);
-    } else {
-      popupAppendLabel(ab, &style, is_sel, label, content_w,
-                       E.list_popup.filterable ? E.list_popup.query : NULL, match, 0);
-    }
+    popupAppendLabel(ab, &style, is_sel, label, content_w,
+                     E.list_popup.filterable ? E.list_popup.query : NULL,
+                     POPUP_MATCH_SUBSTRING, 0);
 
     popupRowEndScroll(ab, &style, i, visible_count, count, scroll);
 

@@ -142,7 +142,6 @@ void initBuiltins(void) {
   registerBuiltin("editor-redraw", editorRedraw);
   registerBuiltin("describe-key", describeKey);
   registerBuiltin("key-bindings", keyBindings);
-  registerBuiltin("command-names", commandNames);
   registerBuiltin("describe-function", describeFunction);
   registerBuiltin("describe-variable", describeVariable);
   registerBuiltin("settings", settingsList);
@@ -420,7 +419,6 @@ static void initConfig(void) {
   if (!E.ctx.p->err_port)
     E.ctx.p->err_port = tmpfile();
   lisp_lib_load(E.ctx);
-  commandNamesMarkLibrary(); // before the editor's builtins: these aren't commands
   lispGcInit();
   // Init builtins lisp functions
   initBuiltins();

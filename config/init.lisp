@@ -135,7 +135,6 @@
 (add-package "dired")    ; CTRL-x d, CTRL-x CTRL-j — and CTRL-x c p below
 (add-package "git")      ; CTRL-x g: status, stage, commit, push/pull, log, branches
 (add-package "dashboard") ; CTRL-x D: the project at a glance, and at startup in a project
-(add-package "command-palette") ; ALT-p: every command, fuzzy-filtered, with its keys
 
 ;; Themes: exactly one should be loaded (the second one just overwrites
 ;; whatever colors the first one set). Fork one as a starting point for

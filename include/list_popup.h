@@ -4,11 +4,6 @@
 #include "data.h"
 #include "append_buffer.h"
 
-// ListPopup.filterable: off, the label contains the query, or the label
-// holds the query's letters in order.
-#define LIST_FILTER_SUBSTRING 1
-#define LIST_FILTER_FUZZY 2
-
 // Opens the popup with `title`, a proper Lisp list of (label . value)
 // pairs, and callbacks invoked on selection/cancellation. `on_select` is
 // called with the chosen pair's cdr as its single argument; `on_cancel`

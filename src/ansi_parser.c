@@ -644,9 +644,12 @@ static void applySgr(TermParserState* ts, int* i)
     if (p == 0)
         memset(&ts->current_attr, 0, sizeof(TermCellAttr));
     else if (p == 1) ts->current_attr.bold = 1;
+    else if (p == 2) ts->current_attr.dim = 1;
+    else if (p == 3) ts->current_attr.italic = 1;
     else if (p == 4) ts->current_attr.underline = 1;
     else if (p == 7) ts->current_attr.reverse = 1;
-    else if (p == 22) ts->current_attr.bold = 0;
+    else if (p == 22) ts->current_attr.bold = ts->current_attr.dim = 0;
+    else if (p == 23) ts->current_attr.italic = 0;
     else if (p == 24) ts->current_attr.underline = 0;
     else if (p == 27) ts->current_attr.reverse = 0;
     else if (p >= 30 && p <= 37) ts->current_attr.fg = (unsigned int) (p - 30) + 1;
@@ -658,8 +661,9 @@ static void applySgr(TermParserState* ts, int* i)
 }
 
 /**
- * @brief Private modes (CSI ? n h / l): the alternate screen. The others
- * (cursor visibility, bracketed paste, mouse, ...) don't change the text.
+ * @brief Private modes (CSI ? n h / l): the alternate screen, and whether
+ * the cursor is shown. The others (bracketed paste, mouse, ...) don't
+ * change what is on screen.
  */
 static void dispatchPrivateMode(struct buffer_t* buf, const int set)
 {
@@ -691,6 +695,9 @@ static void dispatchPrivateMode(struct buffer_t* buf, const int set)
         case 1048:
             if (set) saveCursor(ts);
             else restoreCursor(ts);
+            break;
+        case 25:
+            ts->cursor_hidden = !set;
             break;
         default:
             break;

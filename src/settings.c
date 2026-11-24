@@ -58,6 +58,8 @@ static Setting s_settings[] = {
      "Mouse wheel scrolls the pane under the pointer, a left click places the cursor."},
     {"EXTENDED-KEYS", SETTING_BOOL, 1, 0, &E.constantes.EXTENDED_KEYS,
      "Ask the terminal to report Ctrl+digit, Ctrl+punctuation and Ctrl+Shift+letter keys too."},
+    {"GUI-FONT-SIZE", SETTING_INT, 14, 6, &E.constantes.GUI_FONT_SIZE,
+     "narval-gui's font size, in points (GUI-FONT, a .ttf/.otf/.ttc path, picks the font)."},
 };
 
 #define SETTING_COUNT ((int)(sizeof(s_settings) / sizeof(s_settings[0])))

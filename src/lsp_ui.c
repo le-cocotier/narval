@@ -14,6 +14,7 @@
 #include "../include/append_buffer.h"
 #include "../include/popup_ui.h"
 #include "../include/utf8.h"
+#include "../include/utils.h"
 
 extern EditorConfig E;
 
@@ -818,15 +819,6 @@ const Diagnostic *lspUiWorstDiagnostic(const DiagnosticList *diags, const int bu
     return worst;
 }
 
-// (R, G, B) of a theme color escape ("\x1b[38;2;R;G;Bm" or 48;2).
-static void theme_rgb(const char *ansi, int *r, int *g, int *b) {
-    const char *p = ansi ? strchr(ansi, '[') : NULL;
-    int kind;
-    int mode;
-    *r = *g = *b = 0;
-    if (p) sscanf(p + 1, "%d;%d;%d;%d;%d", &kind, &mode, r, g, b);
-}
-
 int lspUiDrawInlineDiagnostic(struct abuf *ab, const Diagnostic *d, const int others,
                               const char *row_bg, const int max_cols)
 {
@@ -857,8 +849,8 @@ int lspUiDrawInlineDiagnostic(struct abuf *ab, const Diagnostic *d, const int ot
     color = diag_color(d->severity);
     // The tint: the severity's color an eighth of the way over the
     // theme's background.
-    theme_rgb(color, &fr, &fg, &fb);
-    theme_rgb(E.theme.BACKGROUND_COLOR, &br, &bg, &bb);
+    utilThemeRgb(color, &fr, &fg, &fb);
+    utilThemeRgb(E.theme.BACKGROUND_COLOR, &br, &bg, &bb);
     snprintf(tint, sizeof(tint), "48;2;%d;%d;%d", br + (fr - br) / 8, bg + (fg - bg) / 8,
              bb + (fb - bb) / 8);
     if (others > 0)

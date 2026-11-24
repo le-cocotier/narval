@@ -16,7 +16,7 @@ cd "$root" || exit 2
 raw='malloc|calloc|realloc|free|strdup|strndup|wcsdup|_strdup|_wcsdup|asprintf|vasprintf|getline|getdelim'
 
 violations=$(grep -nE "(^|[^A-Za-z0-9_.>])($raw)[[:space:]]*\(" \
-    main.c src/*.c src/os/*.c include/*.h test/*.c test/fuzz/*.c 2>/dev/null \
+    main.c src/*.c src/os/*.c src/gui/*.c include/*.h test/*.c test/fuzz/*.c 2>/dev/null \
     | grep -v -e '^src/gutils\.c:' -e 'galloc: raw' \
     | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|/\*|\*)')
 

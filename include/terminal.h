@@ -10,12 +10,14 @@
 #include <stdlib.h>
 #include "utf8.h"
 #include "debug_log.h"
+#include "os.h"
 
 /**
  * @brief Where the editor's screen is. Standalone, that is the terminal
  * narval runs in. In daemon mode (daemon.c) it is the client window being
  * served at the moment: drawing, key reads and the window size all go
  * through these three, never to os_term_*() directly.
+ * With narval-gui (src/gui/) it is a window of its own.
  */
 typedef struct
 {
@@ -23,12 +25,20 @@ typedef struct
     // os_stream_read() semantics: >0 bytes, 0 nothing in time, -1 never.
     long (*read_keys)(void *buf, size_t n, int timeout_ms);
     int (*size)(int *rows, int *cols);
+    // Optional (NULL: the terminal's way). The run loop's wait, os_wait()
+    // semantics, where streams[0] stands for the keys: a window's keys come
+    // from its event queue, not from a stream.
+    int (*wait)(OsStream *const *streams, int n, int timeout_ms, int *ready);
+    // Optional: what terminalRestore() does instead (closing a window).
+    void (*restore)(void);
 } ScreenDriver;
 
 // NULL: back to the real terminal.
 void screenSetDriver(const ScreenDriver *driver);
 void screenWrite(const void *buf, size_t n);
 long screenReadKeys(void *buf, size_t n, int timeout_ms);
+// The run loop's wait: keys (streams[0]) and every other stream.
+int screenWait(OsStream *const *streams, int n, int timeout_ms, int *ready);
 
 /**
  * \fn void die(const char *s)

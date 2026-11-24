@@ -173,6 +173,41 @@ test('os-boundary', find_program('tools/check_os_boundary.sh'),
 test('galloc', find_program('tools/check_galloc.sh'),
   args : [meson.current_source_dir()])
 
+# ─── narval-gui ───────────────────────────────────────────────────────────────
+# The same editor in a window of its own (src/gui/gui_sdl.c): main.c built
+# with NARVAL_GUI, the window as one more ScreenDriver. Needs SDL3 and
+# SDL3_ttf (brew install sdl3 sdl3_ttf; MSYS2 mingw-w64-*-sdl3 and
+# -sdl3-ttf; a distro's libsdl3-dev and libsdl3-ttf-dev). Built when they
+# are found; -Dgui=enabled makes them required, -Dgui=disabled skips it.
+sdl3_dep = dependency('sdl3', required : get_option('gui'))
+sdl3_ttf_dep = dependency('sdl3-ttf', required : get_option('gui'))
+gui_found = sdl3_dep.found() and sdl3_ttf_dep.found()
+if gui_found
+  gui_deps = [m, sdl3_dep, sdl3_ttf_dep]
+  gui_lib = static_library('narval-gui',
+    'src/gui/gui_sdl.c',
+    c_args : core_args,
+    dependencies : gui_deps)
+  executable('narval-gui',
+    files('main.c') + extra_sources,
+    c_args : core_args + ['-DNARVAL_GUI'],
+    link_with : [gui_lib, core_lib, os_lib],
+    dependencies : gui_deps,
+    # SDL3 comes as a DLL on Windows (SDL3.dll, SDL3_ttf.dll beside it).
+    link_args : is_windows ? [] : link_args,
+    win_subsystem : 'windows',
+    install : true)
+  # The window with SDL's offscreen video driver: keys in, cells drawn.
+  test('gui', executable('test_gui',
+    files('test/test_gui.c', 'test/test.c') + extra_sources,
+    c_args : core_args,
+    link_with : [gui_lib, core_lib, os_lib],
+    dependencies : gui_deps,
+    link_args : is_windows ? [] : link_args),
+    args : [meson.current_source_dir() / 'assets/fonts/DejaVuSansMono.ttf'],
+    env : ['SDL_VIDEO_DRIVER=offscreen'])
+endif
+
 # Unit tests (test/): each is a small program linked against the editor's
 # code; test/test.c stands in for main.c's globals. On Windows they get
 # narval.exe's manifest too, so file names are UTF-8 for them as well.

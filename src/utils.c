@@ -78,6 +78,15 @@ void *utilMemmem(const void *haystack, const size_t haystack_len, const void *ne
     return NULL;
 }
 
+void utilThemeRgb(const char *ansi, int *r, int *g, int *b)
+{
+    const char *p = ansi ? strchr(ansi, '[') : NULL;
+    int kind;
+    int mode;
+    *r = *g = *b = 0;
+    if (p) sscanf(p + 1, "%d;%d;%d;%d;%d", &kind, &mode, r, g, b);
+}
+
 char *utilFormat(const char *fmt, ...)
 {
     va_list ap;

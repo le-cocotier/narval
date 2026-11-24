@@ -19,7 +19,7 @@ forbidden="$forbidden|mach/[a-z_/]+|linux/[a-z_/]+"
 # its own export macros on Windows, lisp.h maps files with mmap() unless
 # LISP_NO_MMAP (which meson.build defines) is set.
 violations=$(grep -nE "^[[:space:]]*#[[:space:]]*include[[:space:]]*<($forbidden)\.h>" \
-    main.c src/*.c include/*.h 2>/dev/null \
+    main.c src/*.c src/gui/*.c include/*.h 2>/dev/null \
     | grep -v -e '^src/cJSON\.c:' -e '^include/cJSON\.h:' -e '^include/lisp\.h:')
 
 if [ -n "$violations" ]; then
@@ -30,7 +30,7 @@ fi
 
 # Platform #ifdefs belong in the OS layer too.
 ifdefs=$(grep -nE '^[[:space:]]*#[[:space:]]*(if|ifdef|ifndef|elif).*(_WIN32|__APPLE__|__linux__|__unix__|_MSC_VER|__MINGW)' \
-    main.c src/*.c include/*.h 2>/dev/null \
+    main.c src/*.c src/gui/*.c include/*.h 2>/dev/null \
     | grep -v -e '^src/cJSON\.c:' -e '^include/cJSON\.h:' -e '^include/lisp\.h:')
 if [ -n "$ifdefs" ]; then
     echo "Platform #ifdefs outside src/os/ (put the difference behind include/os.h):" >&2

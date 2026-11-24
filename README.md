@@ -140,6 +140,36 @@ is on PATH, narval asks to start it. To use your own install command, put it in 
 The os is `"linux"`, `"darwin"`, `"windows"`, `"unix"` (everything but Windows) or `"any"`.
 
 
+## narval-gui: narval in its own window
+
+`narval-gui [file]` is the same editor in a native window on macOS, Linux and Windows: same
+commands, key bindings, config, themes and packages, drawn with a real font instead of a
+terminal's. It is built next to `narval` when [SDL3](https://libsdl.org) and SDL3_ttf are found:
+
+```sh
+brew install sdl3 sdl3_ttf                 # macOS
+sudo apt install libsdl3-dev libsdl3-ttf-dev   # recent Debian/Ubuntu (else build SDL3 from source)
+pacman -S mingw-w64-ucrt-x86_64-sdl3 mingw-w64-ucrt-x86_64-sdl3-ttf   # MSYS2
+meson setup build && meson compile -C build   # build/narval and build/narval-gui
+```
+
+`-Dgui=enabled` makes a missing SDL3 an error, `-Dgui=disabled` skips the window. The terminal
+`narval` never depends on SDL.
+
+In the window, the left Alt (Option) key is Alt/Meta (`ALT-x` is M-x) and the right one types
+characters (AltGr, Option+e on a Mac). Cmd+V (Super+V) pastes the clipboard as typed text, and
+Cmd+Q or the close button do what `CTRL-x CTRL-c` does, unsaved-changes warning included. The
+mouse wheel and clicks work as in a terminal with `MOUSE` on. `GUI-FONT-SIZE` and `GUI-FONT` in
+`init.lisp` set the font; the default is the bundled DejaVu Sans Mono (`assets/fonts/`). HiDPI
+screens get it at their full resolution.
+
+How it works: the window is one more screen driver (`include/terminal.h`), like a daemon
+client's. Frames go through the same ANSI parser terminal panes use into a grid of cells, which
+`src/gui/gui_sdl.c` draws; keys go the other way as the bytes a terminal would send. There is
+no second editor to keep in step. Checking it for leaks:
+`LSAN_OPTIONS=suppressions=tools/lsan-gui.supp` with an ASan build, or valgrind with
+`--suppressions=tools/valgrind-gui.supp` (both only hide what SDL's X11 driver keeps in Xlib).
+
 ## Daemon mode: several windows on one editor
 
 ```

@@ -35,7 +35,7 @@ static long termReadKeys(void *buf, const size_t n, const int timeout_ms)
     return os_stream_read(os_term_input(), buf, n, timeout_ms);
 }
 
-static const ScreenDriver s_terminal_driver = {os_term_write, termReadKeys, os_term_size};
+static const ScreenDriver s_terminal_driver = {os_term_write, termReadKeys, os_term_size, NULL, NULL};
 static const ScreenDriver *s_screen = &s_terminal_driver;
 
 void screenSetDriver(const ScreenDriver *driver)
@@ -51,6 +51,13 @@ void screenWrite(const void *buf, const size_t n)
 long screenReadKeys(void *buf, const size_t n, const int timeout_ms)
 {
     return s_screen->read_keys(buf, n, timeout_ms);
+}
+
+int screenWait(OsStream *const *streams, const int n, const int timeout_ms, int *ready)
+{
+    if (s_screen->wait)
+        return s_screen->wait(streams, n, timeout_ms, ready);
+    return os_wait(streams, n, timeout_ms, ready);
 }
 
 void die(const char* s)
@@ -80,6 +87,11 @@ void disableRawMode()
  */
 void terminalRestore(void)
 {
+    if (s_screen->restore)
+    {
+        s_screen->restore();
+        return;
+    }
     os_term_write(MOUSE_OFF_SEQ, MOUSE_SEQ_LEN);
     os_term_write(EXTENDED_KEYS_OFF_SEQ, EXTENDED_KEYS_SEQ_LEN);
     os_term_write("\x1b[0m", 4);   // reset colors/attributes

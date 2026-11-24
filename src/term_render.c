@@ -27,6 +27,8 @@ static void appendSgrFor(char* out, int* pos, const int buf_size, const TermCell
     char codes[96] = "\x1b[0"; // always start from reset to avoid state leaking between cells
     int n = 3;
     if (a.bold)      n += snprintf(codes + n, sizeof(codes) - n, ";1");
+    if (a.dim)       n += snprintf(codes + n, sizeof(codes) - n, ";2");
+    if (a.italic)    n += snprintf(codes + n, sizeof(codes) - n, ";3");
     if (a.underline) n += snprintf(codes + n, sizeof(codes) - n, ";4");
     if (a.reverse)   n += snprintf(codes + n, sizeof(codes) - n, ";7");
     n += appendColor(codes + n, (int) sizeof(codes) - n, 30, a.fg);
@@ -75,7 +77,8 @@ char* termRenderRow(const Row* row, int* length, int x_offset, int width)
 
         if (attr.fg != last_attr.fg || attr.bg != last_attr.bg ||
             attr.bold != last_attr.bold || attr.underline != last_attr.underline ||
-            attr.reverse != last_attr.reverse)
+            attr.reverse != last_attr.reverse || attr.italic != last_attr.italic ||
+            attr.dim != last_attr.dim)
         {
             appendSgrFor(result, &pos, buf_size, attr);
             last_attr = attr;

@@ -57,6 +57,13 @@
 ;; #f) stops asking. Omitting this leaves it on.
 (define EXTENDED-KEYS #t)
 
+;; narval-gui, narval in a window of its own: the font's size in points,
+;; and (GUI-FONT) the font itself, a .ttf, .otf or .ttc file. Without
+;; GUI-FONT it uses the bundled DejaVu Sans Mono, else the system's
+;; monospace font (Menlo, Consolas, ...). The terminal narval ignores both.
+(define GUI-FONT-SIZE 14)
+;; (define GUI-FONT "/System/Library/Fonts/Menlo.ttc")
+
 ;; Every AUTOSAVE-INTERVAL seconds, files with unsaved changes are copied to
 ;; ~/.narval/autosave/. Saving (or killing the buffer) removes the copy; after
 ;; a crash or a closed terminal, opening the file again offers to recover it.

@@ -1,14 +1,34 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- narval's app icon: a narwhal, kept simple. Drawn on a 64x64 grid,
-       inset for the margin app icons keep around them. Regenerate the
-       other formats with tools/make-icons.sh. -->
-  <g transform="translate(5 5) scale(0.84375)">
-    <rect width="64" height="64" rx="14" fill="#0e1a24"/>
-    <g transform="translate(32 30) scale(1.06) translate(-32 -29)">
-      <path d="M44.5 29.5 L47.5 31.5 L60 9 Z" fill="#d8e4ee"/>
-      <path d="M15.5 30 C12 25 7 22.5 3.5 23.5 C6.5 25.5 8.5 27.5 9.5 30 C7.5 32 6.5 35 7 38 C10.5 36.5 13.5 34 16.5 31.5 Z" fill="#66d9e8"/>
-      <path d="M51 38 C51 30 45 25.5 37 25.5 C29 25.5 23 29 15 29.5 L14.5 31.5 C21 33 25 46.5 37.5 46.5 C45.5 46.5 51 43.5 51 38 Z" fill="#66d9e8"/>
-      <circle cx="43.5" cy="35" r="1.8" fill="#0e1a24"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- narval's app icon: a narwhal curled round in a blue square, after
+       Giorgio's design. Drawn in that design's 1024 px coordinates, the
+       square fitted to the 824 px macOS icon grid. Regenerate the other
+       formats with tools/make-icons.sh. -->
+  <defs>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a6699"/>
+      <stop offset="1" stop-color="#132f55"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="6" dy="14" stdDeviation="10" flood-color="#06142a" flood-opacity="0.45"/>
+    </filter>
+    <path id="body" d="M480 316 C572 314 648 375 648 455 C648 495 632 518 612 537 C592 555 565 570 550 582 C536 594 530 606 530 622 C530 642 540 656 556 663 C570 669 585 669 598 668 L612 673 L622 698 C590 716 540 726 480 726 C370 726 282 640 282 530 C282 410 370 318 480 316 Z"/>
+  </defs>
+  <g transform="translate(100 100) scale(1.1492) translate(-153 -152)">
+    <rect x="153" y="152" width="717" height="719" rx="128" fill="url(#sea)"/>
+    <g filter="url(#shadow)">
+      <!-- tail fluke -->
+      <path d="M604 676 C586 660 578 630 586 605 C592 588 602 576 615 567 C624 588 640 615 652 640 C680 640 712 652 732 672 C722 686 700 698 670 704 C648 708 628 705 612 698 Z" fill="#3079a6"/>
+      <!-- body, over a darker copy: its lower rim -->
+      <use href="#body" transform="translate(0 9)" fill="#3480b4"/>
+      <use href="#body" fill="#4192c5"/>
+      <!-- belly, inside the curl -->
+      <path d="M632 477 C600 494 560 496 525 500 C490 506 458 525 448 560 C436 600 440 650 470 685 C495 705 530 708 560 707 C585 705 600 695 608 680 C590 682 565 682 545 670 C526 658 518 640 518 620 C518 595 532 578 548 565 C580 540 615 512 632 477 Z" fill="#b7dcee"/>
+      <!-- flipper -->
+      <path d="M382 549 C364 575 362 610 376 630 C410 626 446 600 449 540" fill="none" stroke="#3983b0" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- tusk, its rounded base on the head -->
+      <path d="M573.4 372.8 L705 236.3 A9 9 0 0 1 719 247.7 L610.6 403.2 A24 24 0 0 1 573.4 372.8 Z" fill="#e4c47a"/>
+      <!-- eye -->
+      <circle cx="498" cy="440" r="16" fill="#17304a"/>
     </g>
   </g>
 </svg>

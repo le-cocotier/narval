@@ -1,0 +1,7 @@
+# LeakSanitizer suppressions for narval-gui: what SDL's X11 video driver
+# leaves behind in Xlib (the input method and the resource database it
+# opens once per process, never closed). Nothing of narval's own: galloc's
+# exit report covers that. Usage:
+#   LSAN_OPTIONS=suppressions=tools/lsan-gui.supp build-asan/narval-gui
+leak:X11_InitKeyboard
+leak:GetGlobalContentScale

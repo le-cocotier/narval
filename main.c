@@ -25,6 +25,13 @@
 #include "include/utf8.h"
 #include "include/utils.h"
 
+// narval-gui is this file built with NARVAL_GUI: the same editor, in a
+// window (include/gui.h). SDL_main.h gives Windows its WinMain.
+#ifdef NARVAL_GUI
+#include "include/gui.h"
+#include <SDL3/SDL_main.h>
+#endif
+
 EditorConfig E;
 int buffer_id = 0;
 
@@ -189,6 +196,11 @@ int main(const int argc, char *argv[]) {
       foreground = 1;
     } else if ((value = optionValue(argv[i], "--name")) != NULL && value[0]) {
       name = value;
+#ifdef NARVAL_GUI
+    } else if (!strncmp(argv[i], "-psn_", 5)) {
+      // macOS's process serial number, given to an app the Finder starts
+      // (older systems): not a file.
+#endif
     } else {
       files[n_files++] = argv[i];
     }
@@ -225,8 +237,16 @@ int main(const int argc, char *argv[]) {
   active = NULL;
   utf8Printf(splash_screen, PATH_MAX, "%s/assets/narval.txt", utilNarvalDir());
 
+#ifdef NARVAL_GUI
+  if (guiOpen(NULL) != 0)
+    return 1;
+#else
   enableRawMode();
+#endif
   initEditor();
+#ifdef NARVAL_GUI
+  guiConfigure();
+#endif
   // A message init.lisp left (a package that couldn't load, a failed
   // use-package, ...) is worth more than the help line below: keep it.
   config_msg = NULL;

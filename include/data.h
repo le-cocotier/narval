@@ -44,6 +44,8 @@ typedef struct term_cell_attr_t
     unsigned char bold : 1;
     unsigned char underline : 1;
     unsigned char reverse : 1;
+    unsigned char italic : 1;
+    unsigned char dim : 1;
 } TermCellAttr;
 
 #define TERM_COLOR_RGB 0x1000000u
@@ -163,6 +165,7 @@ struct const_t
     int DEBUG_INLINE_VALUES; // (define DEBUG-INLINE-VALUES #t) — variables' values after the lines, while paused
     int MOUSE;              // (define MOUSE #t) — wheel scrolling and click-to-place
     int EXTENDED_KEYS;      // (define EXTENDED-KEYS #t) — ask for modifyOtherKeys (Ctrl+1, Ctrl+.)
+    int GUI_FONT_SIZE;      // (define GUI-FONT-SIZE 14) — narval-gui's font size, points
 };
 
 /**
@@ -588,6 +591,8 @@ typedef struct term_parser_state_t
     int col_cache_y, col_cache_x, col_cache_idx;
 
     TermCellAttr current_attr;
+    // CSI ? 25 l: the program hid the cursor (the GUI window doesn't draw it).
+    int cursor_hidden;
 
     // Multi-byte UTF-8 reassembly across possibly-fragmented read() calls
     unsigned char utf8_pending[4];

@@ -26,6 +26,10 @@ char *utilFormat(const char *fmt, ...);
 // ("a/b/c.txt" -> "a/b", "c.txt" -> ".", "/c.txt" -> "/", "C:/x" -> "C:/").
 void utilDirname(const char *path, char *out, size_t out_size);
 
+// (R, G, B) of a theme colour escape ("\x1b[38;2;R;G;Bm" or 48;2), 0s if
+// it isn't one.
+void utilThemeRgb(const char *ansi, int *r, int *g, int *b);
+
 // getenv(name), else getenv(legacy_name) (the NARVAL_* variables were
 // BELUGA_* before the rename; old setups keep working). NULL when neither
 // is set or both are empty. legacy_name may be NULL.

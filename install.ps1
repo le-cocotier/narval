@@ -49,6 +49,13 @@
     packages) is kept unless you also pass -Purge.
 .PARAMETER Purge
     With -Uninstall: delete ~/.narval as well.
+.PARAMETER NoGui
+    Don't build or install narval-gui.exe, narval in its own window. Without
+    it, narval-gui.exe is built when SDL3 and SDL3_ttf are found (MSYS2:
+    pacman -S mingw-w64-ucrt-x86_64-sdl3 mingw-w64-ucrt-x86_64-sdl3-ttf, or
+    SDL's own -devel-mingw releases on PKG_CONFIG_PATH) and installed next to
+    narval.exe with the DLLs it needs and a Start menu shortcut, so Windows
+    search finds "Narval".
 #>
 [CmdletBinding()]
 param(
@@ -60,7 +67,8 @@ param(
     [string]$Binary,
     [switch]$Update,
     [switch]$Uninstall,
-    [switch]$Purge
+    [switch]$Purge,
+    [switch]$NoGui
 )
 
 # This file is deliberately plain ASCII: Windows PowerShell 5.1 reads a
@@ -134,8 +142,34 @@ function Test-SamePath($a, $b) {
 
 # --- uninstall --------------------------------------------------------------
 
+# narval-gui.exe's Start menu entry (what Windows search lists).
+$StartMenuLink = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Narval.lnk'
+# The DLLs installed for narval-gui.exe, one name per line, for -Uninstall.
+$GuiDllList = 'narval-gui.dlls'
+
 if ($Uninstall) {
     Write-Host '--- Narval uninstaller (Windows) ---'
+    $gui = Join-Path $Prefix 'narval-gui.exe'
+    if (Test-Path $gui) {
+        try {
+            Remove-Item -Force $gui
+            Remove-Item -Force -ErrorAction SilentlyContinue "$gui.old"
+            $list = Join-Path $Prefix $GuiDllList
+            if (Test-Path $list) {
+                foreach ($dll in Get-Content $list) {
+                    if ($dll) { Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $Prefix $dll) }
+                }
+                Remove-Item -Force $list
+            }
+            Ok "Removed $gui"
+        } catch {
+            Warn "Couldn't remove $gui - is Narval still open? Close it and re-run."
+        }
+    }
+    if (Test-Path $StartMenuLink) {
+        Remove-Item -Force $StartMenuLink
+        Ok 'Removed Narval from the Start menu'
+    }
     $installed = Join-Path $Prefix 'narval.exe'
     if (Test-Path $installed) {
         if (Confirm-Step "Remove ${installed}?") {
@@ -268,6 +302,7 @@ if (-not $Exe) {
     # MinGW gcc, even when Visual Studio's compiler is also around (it isn't
     # supported: the code uses gcc extensions).
     $env:CC = 'gcc'
+    if ($NoGui) { $mesonArgs += '-Dgui=disabled' } else { $mesonArgs += '-Dgui=auto' }
     # --reconfigure only on a directory meson has actually set up: on an
     # empty or half-created build\ it fails.
     if (Test-Path (Join-Path $ScriptDir 'build\meson-private')) {
@@ -280,6 +315,9 @@ if (-not $Exe) {
     if ($LASTEXITCODE -ne 0) { Die "Build failed - nothing was installed, $NarvalHome is untouched." }
     $Exe = Join-Path $ScriptDir 'build\narval.exe'
 }
+# narval-gui.exe: built beside narval.exe, or shipped beside a -Binary one.
+$GuiExe = Join-Path (Split-Path -Parent (Resolve-Path $Exe).Path) 'narval-gui.exe'
+if ($NoGui -or -not (Test-Path $GuiExe)) { $GuiExe = $null }
 
 # --- migrating from beluga ---------------------------------------------------
 
@@ -302,6 +340,11 @@ foreach ($dir in 'assets', 'packages', 'config') {
     New-Item -ItemType Directory -Force -Path (Join-Path $NarvalHome $dir) | Out-Null
 }
 Copy-Item -Force (Join-Path $ScriptDir 'assets\narval.txt') (Join-Path $NarvalHome 'assets\')
+# narval-gui's font and icons.
+foreach ($dir in 'fonts', 'icons') {
+    $src = Join-Path $ScriptDir "assets\$dir"
+    if (Test-Path $src) { Copy-Item -Force -Recurse $src (Join-Path $NarvalHome 'assets\') }
+}
 
 $ConfigFile = Join-Path $NarvalHome 'config\init.lisp'
 $DefaultConfig = Join-Path $ScriptDir 'config\init.lisp'
@@ -476,6 +519,81 @@ if (-not (Test-SamePath $LegacyPrefix $Prefix) -and (Test-Path (Join-Path $Legac
     } catch {
         Warn "Couldn't remove the old $LegacyPrefix\beluga.exe - is beluga still running? Delete it yourself."
     }
+}
+
+# --- narval-gui.exe -----------------------------------------------------------
+
+# The DLLs `exe` loads that are in one of `dirs` (not Windows' own), and
+# theirs in turn: SDL3.dll, SDL3_ttf.dll and, from MSYS2, FreeType and
+# friends. Read with objdump (part of every MinGW toolchain); without it,
+# just SDL's two.
+function Get-GuiDlls($exe, $dirs) {
+    $found = @{}
+    $queue = New-Object System.Collections.Queue
+    $queue.Enqueue($exe)
+    $objdump = Get-Command objdump -ErrorAction SilentlyContinue
+    while ($queue.Count -gt 0) {
+        $file = $queue.Dequeue()
+        if ($objdump) {
+            $names = & objdump -p $file 2>$null | Select-String 'DLL Name: (.+)$' |
+                ForEach-Object { $_.Matches[0].Groups[1].Value.Trim() }
+        } else {
+            $names = @('SDL3.dll', 'SDL3_ttf.dll')
+        }
+        foreach ($name in $names) {
+            if ($found.ContainsKey($name.ToLower())) { continue }
+            foreach ($dir in $dirs) {
+                $path = Join-Path $dir $name
+                if (Test-Path $path) {
+                    $found[$name.ToLower()] = $path
+                    if ($objdump) { $queue.Enqueue($path) }
+                    break
+                }
+            }
+        }
+    }
+    return $found.Values
+}
+
+if ($GuiExe) {
+    $guiTarget = Join-Path $Prefix 'narval-gui.exe'
+    Remove-Item -Force -ErrorAction SilentlyContinue "$guiTarget.old"
+    if (Test-Path $guiTarget) { try { Move-Item -Force $guiTarget "$guiTarget.old" } catch { } }
+    try {
+        Copy-Item -Force $GuiExe $guiTarget
+    } catch {
+        Die "Couldn't write $guiTarget - is Narval still open? Close it and re-run."
+    }
+    Remove-Item -Force -ErrorAction SilentlyContinue "$guiTarget.old"
+
+    # Where the DLLs are: beside the exe (a release zip), where pkg-config
+    # says SDL3 is installed, then PATH.
+    $dllDirs = @(Split-Path -Parent $GuiExe)
+    if (Get-Command pkg-config -ErrorAction SilentlyContinue) {
+        $sdlPrefix = & pkg-config --variable=prefix sdl3 2>$null
+        if ($sdlPrefix) { $dllDirs += (Join-Path $sdlPrefix 'bin') }
+    }
+    # Not Windows' own folders: KERNEL32.dll and the like stay where they are.
+    $dllDirs += @($env:Path -split ';' | Where-Object {
+        $_ -and -not $_.StartsWith($env:SystemRoot, [StringComparison]::OrdinalIgnoreCase) })
+    $dlls = @(Get-GuiDlls $GuiExe $dllDirs)
+    foreach ($dll in $dlls) { Copy-Item -Force $dll $Prefix }
+    Set-Content -Path (Join-Path $Prefix $GuiDllList) -Value ($dlls | ForEach-Object { Split-Path -Leaf $_ })
+    if (-not ($dlls | Where-Object { (Split-Path -Leaf $_) -ieq 'SDL3.dll' })) {
+        Warn "SDL3.dll wasn't found: put it next to $guiTarget, or narval-gui.exe won't start"
+    }
+
+    # The Start menu shortcut: Windows search lists it as "Narval".
+    $shell = New-Object -ComObject WScript.Shell
+    $link = $shell.CreateShortcut($StartMenuLink)
+    $link.TargetPath = $guiTarget
+    $link.WorkingDirectory = $env:USERPROFILE
+    $link.IconLocation = "$guiTarget,0"
+    $link.Description = 'Narval, the text editor, in its own window'
+    $link.Save()
+    Ok "Installed $guiTarget and added Narval to the Start menu (search for Narval)"
+} elseif (-not $NoGui) {
+    Write-Host 'narval-gui.exe (narval in its own window) was not built: it needs SDL3 and SDL3_ttf (see Get-Help .\install.ps1 -Parameter NoGui).'
 }
 
 Write-Host ''

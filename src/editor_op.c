@@ -319,7 +319,7 @@ void editorRunLoop(void) {
     streams[n_streams++] = os_term_input();
     editorWatchStreams(&watch, streams, &n_streams, RUN_LOOP_MAX_STREAMS);
 
-    if (os_wait(streams, n_streams, 50, ready) > 0) { // 50ms tick
+    if (screenWait(streams, n_streams, 50, ready) > 0) { // 50ms tick
       editorHandleStreams(&watch, ready);
       if (ready[0])
         editorProcessKeypress();

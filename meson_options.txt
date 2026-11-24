@@ -1,3 +1,6 @@
 # Build the fuzz targets in test/fuzz/ as libFuzzer programs (needs clang;
 # see test/fuzz/README.md). Off: they run over their corpus as tests.
 option('fuzzers', type : 'boolean', value : false)
+# narval-gui, the editor in its own window (SDL3 + SDL3_ttf): built when
+# both are found (auto), required (enabled) or skipped (disabled).
+option('gui', type : 'feature', value : 'auto')

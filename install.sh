@@ -31,6 +31,7 @@ DEBUG_BUILD=0
 UPDATE=0
 UNINSTALL=0
 PURGE=0
+NO_GUI=0
 BINDIR="/usr/local/bin"
 NARVAL_HOME="$HOME/.narval"
 # The arguments to re-run with after --update, minus --update itself.
@@ -59,6 +60,10 @@ Usage: ./install.sh [options]
                         language server's own stderr chatter) go to
                         ~/.narval/debug.log, not the terminal — `tail -f`
                         it in another pane while you work.
+      --no-gui          Don't build or install narval-gui, the window app
+                        (Narval.app on macOS, a launcher entry on Linux).
+                        Without it, it is installed when SDL3 and SDL3_ttf
+                        are found, and offered to install when they aren't.
       --uninstall       Remove the narval binary. ~/.narval (your config and
                         packages) is kept unless you also pass --purge.
       --purge           With --uninstall: delete ~/.narval as well.
@@ -93,6 +98,7 @@ parse_args() {
             --debug) DEBUG_BUILD=1 ;;
             --uninstall) UNINSTALL=1 ;;
             --purge) PURGE=1 ;;
+            --no-gui) NO_GUI=1 ;;
             -h|--help) usage; exit 0 ;;
             *) die "Unknown option: $1 (see --help)" ;;
         esac
@@ -231,6 +237,43 @@ check_deps() {
     ok "All dependencies present"
 }
 
+# narval-gui needs SDL3 and SDL3_ttf (and pkg-config, for meson to find
+# them). Missing, they're offered; declined, narval installs without it.
+gui_packages_for() {
+    case "$1" in
+        brew)   echo "pkgconf sdl3 sdl3_ttf" ;;
+        apt)    echo "pkg-config libsdl3-dev libsdl3-ttf-dev" ;;
+        dnf)    echo "pkgconf-pkg-config SDL3-devel SDL3_ttf-devel" ;;
+        pacman) echo "pkgconf sdl3 sdl3_ttf" ;;
+        zypper) echo "pkg-config SDL3-devel SDL3_ttf-devel" ;;
+        apk)    echo "pkgconf sdl3-dev sdl3_ttf-dev" ;;
+    esac
+}
+
+have_gui_deps() {
+    command -v pkg-config &>/dev/null && pkg-config --exists sdl3 sdl3-ttf
+}
+
+check_gui_deps() {
+    [ "$NO_GUI" -eq 1 ] && return 0
+    have_gui_deps && return 0
+    local mgr pkgs cmd shown
+    mgr="$(detect_pkg_manager)"
+    pkgs="$(gui_packages_for "$mgr")"
+    if [ -z "$pkgs" ]; then
+        warn "narval-gui (the window app) needs SDL3 and SDL3_ttf; installing without it"
+        return 0
+    fi
+    cmd="$(install_cmd_for "$mgr" "$pkgs")"
+    if [ "$mgr" = "brew" ]; then shown="$cmd"; else shown="sudo sh -c '$cmd'"; fi
+    if confirm "narval-gui, narval in its own window, needs SDL3. Run \`$shown\` now?"; then
+        if [ "$mgr" = "brew" ]; then sh -c "$cmd" || true; else as_root sh -c "$cmd" || true; fi
+        have_gui_deps || warn "SDL3 still not found (not packaged on this system yet?); installing without narval-gui"
+    else
+        warn "Installing without narval-gui (re-run once SDL3 is installed, or --no-gui to stop asking)"
+    fi
+}
+
 # --- update ----------------------------------------------------------------
 
 update_and_rerun() {
@@ -267,6 +310,7 @@ uninstall() {
     else
         warn "No narval binary found in $BINDIR or on your PATH"
     fi
+    uninstall_app
 
     if [ ! -d "$NARVAL_HOME" ]; then
         return 0
@@ -295,6 +339,7 @@ build() {
         meson_args=(-Dbuildtype=release -Dc_args=)
     fi
 
+    if [ "$NO_GUI" -eq 1 ]; then meson_args+=(-Dgui=disabled); else meson_args+=(-Dgui=auto); fi
     # --reconfigure only on a directory meson has actually set up: on an
     # empty or half-created build/ it fails.
     if [ -d build/meson-private ]; then
@@ -341,6 +386,8 @@ install_config() {
     info "Setting up $NARVAL_HOME ..."
     mkdir -p "$NARVAL_HOME/assets" "$NARVAL_HOME/packages" "$NARVAL_HOME/config"
     cp -f ./assets/narval.txt "$NARVAL_HOME/assets/"
+    # narval-gui's font and window icon.
+    cp -R ./assets/fonts ./assets/icons "$NARVAL_HOME/assets/"
 
     if [ -f "$config" ]; then
         if cmp -s ./config/init.lisp "$config"; then
@@ -493,6 +540,16 @@ install_binary() {
         as_root mv -f "$BINDIR/.narval.new" "$BINDIR/narval"
     fi
 
+    if [ "$NO_GUI" -eq 0 ] && [ -x ./build/narval-gui ]; then
+        if [ -w "$BINDIR" ]; then
+            cp -f ./build/narval-gui "$BINDIR/.narval-gui.new"
+            mv -f "$BINDIR/.narval-gui.new" "$BINDIR/narval-gui"
+        else
+            as_root cp -f ./build/narval-gui "$BINDIR/.narval-gui.new"
+            as_root mv -f "$BINDIR/.narval-gui.new" "$BINDIR/narval-gui"
+        fi
+    fi
+
     echo
     ok "Installed $("$BINDIR/narval" --version 2>/dev/null || echo narval) to $BINDIR/narval"
     local found
@@ -504,6 +561,60 @@ install_binary() {
     fi
     echo "Put your customizations in $PERSONAL_CONFIG — unlike"
     echo "$NARVAL_HOME/config/init.lisp, it's never replaced by an update."
+}
+
+# --- the window app -------------------------------------------------------
+# narval-gui where apps are found: Narval.app in /Applications on macOS
+# (Spotlight, Launchpad, the Dock, Open With), a launcher entry and icon
+# under ~/.local/share on Linux (GNOME, KDE, ... search and menus).
+
+APP_DIR_MAC="/Applications"
+DESKTOP_ID="dev.narval.editor"
+XDG_DATA="${XDG_DATA_HOME:-$HOME/.local/share}"
+
+install_app() {
+    [ "$NO_GUI" -eq 0 ] && [ -x ./build/narval-gui ] || return 0
+    if [ "$(uname -s)" = "Darwin" ]; then
+        local app="$APP_DIR_MAC/Narval.app"
+        if [ ! -w "$APP_DIR_MAC" ]; then
+            app="$HOME/Applications/Narval.app"
+            mkdir -p "$HOME/Applications"
+        fi
+        ./packaging/macos/make-app.sh ./build/narval-gui "$app" >/dev/null ||
+            { warn "Couldn't make $app"; return 0; }
+        ok "Installed $app: open Narval from Spotlight, Launchpad or the Dock"
+    else
+        local apps="$XDG_DATA/applications"
+        local icons="$XDG_DATA/icons/hicolor"
+        mkdir -p "$apps" "$icons/scalable/apps" "$icons/256x256/apps"
+        # Exec with the full path: a launcher's PATH may not hold $BINDIR.
+        sed "s|^Exec=narval-gui|Exec=$BINDIR/narval-gui|" \
+            ./packaging/desktop/$DESKTOP_ID.desktop > "$apps/$DESKTOP_ID.desktop"
+        cp -f ./assets/icons/narval.svg "$icons/scalable/apps/narval.svg"
+        cp -f ./assets/icons/narval.png "$icons/256x256/apps/narval.png"
+        command -v update-desktop-database &>/dev/null && update-desktop-database "$apps" 2>/dev/null || true
+        command -v gtk-update-icon-cache &>/dev/null && gtk-update-icon-cache -q -t "$icons" 2>/dev/null || true
+        ok "Added Narval to your applications ($apps/$DESKTOP_ID.desktop)"
+    fi
+}
+
+uninstall_app() {
+    local gui="$BINDIR/narval-gui" app
+    if [ -e "$gui" ]; then
+        if [ -w "$BINDIR" ]; then rm -f "$gui"; else as_root rm -f "$gui"; fi
+        ok "Removed $gui"
+    fi
+    for app in "$APP_DIR_MAC/Narval.app" "$HOME/Applications/Narval.app"; do
+        if [ -d "$app" ] && [ "$(uname -s)" = "Darwin" ]; then
+            rm -rf "$app" && ok "Removed $app"
+        fi
+    done
+    if [ -e "$XDG_DATA/applications/$DESKTOP_ID.desktop" ]; then
+        rm -f "$XDG_DATA/applications/$DESKTOP_ID.desktop" \
+              "$XDG_DATA/icons/hicolor/scalable/apps/narval.svg" \
+              "$XDG_DATA/icons/hicolor/256x256/apps/narval.png"
+        ok "Removed Narval from your applications"
+    fi
 }
 
 # --- main ----------------------------------------------------------------
@@ -530,6 +641,7 @@ main() {
     confirm "Install narval from $SCRIPT_DIR to $BINDIR?" || { echo "Aborted."; exit 1; }
 
     check_deps
+    check_gui_deps
     # Build first: if it fails, ~/.narval stays as it was, rather than
     # holding new packages the old binary can't run.
     build
@@ -537,6 +649,7 @@ main() {
     install_config
     install_packages
     install_binary
+    install_app
     remove_old_binary
 }
 

@@ -35,7 +35,7 @@ static long termReadKeys(void *buf, const size_t n, const int timeout_ms)
     return os_stream_read(os_term_input(), buf, n, timeout_ms);
 }
 
-static const ScreenDriver s_terminal_driver = {os_term_write, termReadKeys, os_term_size, NULL, NULL};
+static const ScreenDriver s_terminal_driver = {os_term_write, termReadKeys, os_term_size, NULL, NULL, 0};
 static const ScreenDriver *s_screen = &s_terminal_driver;
 
 void screenSetDriver(const ScreenDriver *driver)
@@ -58,6 +58,11 @@ int screenWait(OsStream *const *streams, const int n, const int timeout_ms, int 
     if (s_screen->wait)
         return s_screen->wait(streams, n, timeout_ms, ready);
     return os_wait(streams, n, timeout_ms, ready);
+}
+
+int screenDrawsShadows(void)
+{
+    return s_screen->draws_shadows;
 }
 
 void die(const char* s)

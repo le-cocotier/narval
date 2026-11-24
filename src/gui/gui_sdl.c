@@ -15,6 +15,7 @@
  */
 
 #include "../../include/gui.h"
+#include "gui_draw.h"
 
 #include "../../include/ansi_parser.h"
 #include "../../include/buffer.h"
@@ -34,6 +35,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,11 +45,14 @@ extern EditorConfig E;
 #define GUI_DEFAULT_FONT_SIZE 14
 #define GUI_START_COLS 110
 #define GUI_START_ROWS 34
-#define GUI_PADDING 4          // logical pixels around the grid
+#define GUI_PADDING 10         // logical pixels around the grid
+#define GUI_LINE_SPACING 1.15f // the cell's height: the font's line, and a little air
 #define GUI_MIN_FRAME_MS 12    // while keys are queued (a paste), at most ~80 frames a second
 #define GUI_STREAM_SLICE_MS 8  // how often other streams are polled while waiting on the window
 #define GUI_FONT_STYLES 4      // regular, bold, italic, bold italic
 #define GUI_MAX_DROPPED 64     // files opened at once (dropped, or from Finder's Open With)
+#define GUI_CURSOR_GLIDE_MS 70 // the cursor's glide to where it jumped
+#define GUI_FRAME_MS 8         // between a glide's frames, at most (vsync paces them)
 
 typedef struct
 {
@@ -56,6 +61,7 @@ typedef struct
     SDL_Texture *texture;  // NULL: the font has nothing to draw for it
     int w;
     int h;
+    int cell;  // drawn to fill the cell (gui_draw.c), not from the font
 } Glyph;
 
 typedef struct
@@ -67,7 +73,9 @@ typedef struct
     float font_size;     // points, as asked (GUI-FONT-SIZE)
     float scale;         // pixels per logical pixel
     int cell_w;          // pixels
-    int cell_h;
+    int cell_h;          // the font's line and the spacing above and below it
+    int text_y;          // where the font's line starts in the cell
+    int text_h;          // the font's line
     int ascent;
     int pad;             // pixels
     int rows;
@@ -93,6 +101,19 @@ typedef struct
     Glyph *glyphs;
     int glyph_cap;
     int glyph_count;
+    SDL_Texture *round_tex;   // a popup's rounded box (gui_draw.c), tinted
+    SDL_Texture *shadow_tex;  // and its shadow
+
+    // The cursor's x, y and width in pixels: where it is drawn, and the
+    // glide it is on (from, to, since when).
+    float cur_at[3];
+    float cur_from[3];
+    float cur_to[3];
+    Uint64 cur_start;
+    int gliding;
+    int cur_shown;  // drawn in the last frame: the next move may glide
+
+    long titlebar_rgb;  // the colour the title bar was given, -1 none yet
 
     // Files dropped on the window or opened with it from the Finder,
     // opened once the run loop is back at its wait (galloc'd paths).
@@ -106,11 +127,18 @@ typedef struct
 
 static Gui G;
 
+static void shapesClear(void);
+
 /***********************************************************************************************************************
  *
  *                                                 Keys
  *
  **********************************************************************************************************************/
+
+static int keysQueued(void)
+{
+    return G.keys_pos < G.keys_len;
+}
 
 static void queueBytes(const char *bytes, const size_t n)
 {
@@ -319,6 +347,7 @@ static void handleText(const char *text)
 static void glyphCacheClear(void)
 {
     int i;
+    shapesClear();
     for (i = 0; i < G.glyph_cap; i++)
         if (G.glyphs[i].texture)
             SDL_DestroyTexture(G.glyphs[i].texture);
@@ -379,9 +408,11 @@ static int fontsOpen(const char *path)
     fontsClose();
     memcpy(G.fonts, fonts, sizeof(fonts));
     G.cell_w = advance;
-    G.cell_h = TTF_GetFontLineSkip(fonts[0]);
-    if (G.cell_h < TTF_GetFontHeight(fonts[0]))
-        G.cell_h = TTF_GetFontHeight(fonts[0]);
+    G.text_h = TTF_GetFontLineSkip(fonts[0]);
+    if (G.text_h < TTF_GetFontHeight(fonts[0]))
+        G.text_h = TTF_GetFontHeight(fonts[0]);
+    G.cell_h = (int) ((float) G.text_h * GUI_LINE_SPACING + 0.5f);
+    G.text_y = (G.cell_h - G.text_h) / 2;
     G.ascent = TTF_GetFontAscent(fonts[0]);
     if (G.font_path != path)
     {
@@ -597,7 +628,9 @@ static const Glyph *glyphGet(const Uint32 codepoint, const int style)
     glyph->codepoint = codepoint;
     glyph->style = style;
     G.glyph_count++;
-    surface = TTF_RenderGlyph_Blended(G.fonts[style], codepoint, white);
+    glyph->cell = guiIsCellGlyph(codepoint);
+    surface = glyph->cell ? guiCellGlyph(codepoint, G.cell_w, G.cell_h)
+                          : TTF_RenderGlyph_Blended(G.fonts[style], codepoint, white);
     if (!surface)
         return glyph;
     glyph->texture = SDL_CreateTextureFromSurface(G.renderer, surface);
@@ -622,57 +655,71 @@ static void drawGlyph(const Utf8Char *c, const int row, const int col, const int
     if (!glyph || !glyph->texture)
         return;
     dst.x = (float) (G.pad + col * G.cell_w);
-    dst.y = (float) (G.pad + row * G.cell_h);
+    dst.y = (float) (G.pad + row * G.cell_h + (glyph->cell ? 0 : G.text_y));
     dst.w = (float) glyph->w;
     dst.h = (float) glyph->h;
     SDL_SetTextureColorMod(glyph->texture, (Uint8) (rgb >> 16), (Uint8) (rgb >> 8), (Uint8) rgb);
     SDL_RenderTexture(G.renderer, glyph->texture, NULL, &dst);
 }
 
+// A cell's colours, its attributes applied: reverse, dim.
+static void cellColors(const TermCellAttr *attr, const Uint32 fg0, const Uint32 bg0, Uint32 *fg, Uint32 *bg)
+{
+    *fg = cellColor(attr->fg, fg0);
+    *bg = cellColor(attr->bg, bg0);
+    if (attr->reverse)
+    {
+        *fg ^= *bg;
+        *bg ^= *fg;
+        *fg ^= *bg;
+    }
+    if (attr->dim)
+        *fg = blend(*fg, *bg);
+}
+
 /**
- * @brief Draws one row of the grid: backgrounds, then characters (a wide
- * one over two cells, a combining mark over the cell before it), then
- * underlines. Cells left at the default background are the clear's.
+ * @brief Draws the cells of one row from column `from` to `to`:
+ * backgrounds, then characters (a wide one over two cells, a combining
+ * mark over the cell before it), then underlines. Cells whose background
+ * is `base` are left as they are: the clear's, or a popup's own.
  */
-static void drawRow(const Row *line, const int row, const Uint32 fg0, const Uint32 bg0)
+static void drawRowPart(const Row *line, const int row, const int from, const int to, const Uint32 fg0,
+                        const Uint32 bg0, const Uint32 base)
 {
     TermCellAttr attr;
     Uint32 fg;
     Uint32 bg;
     SDL_FRect underline;
     int col = 0;
-    int last_col = 0;
+    int last_col = -1;
     int width;
     int style;
     int i;
 
-    for (i = 0; i < line->size && col < G.cols; i++)
+    for (i = 0; i < line->size && col < G.cols && col <= to; i++)
     {
         width = utf8CharWidth(&line->characters[i]);
-        attr = line->attrs ? line->attrs[i] : (TermCellAttr) {0};
-        fg = cellColor(attr.fg, fg0);
-        bg = cellColor(attr.bg, bg0);
-        if (attr.reverse)
+        if (col < from)
         {
-            fg ^= bg;
-            bg ^= fg;
-            fg ^= bg;
+            col += width;
+            continue;
         }
-        if (attr.dim)
-            fg = blend(fg, bg);
+        attr = line->attrs ? line->attrs[i] : (TermCellAttr) {0};
+        cellColors(&attr, fg0, bg0, &fg, &bg);
         style = (attr.bold ? 1 : 0) | (attr.italic ? 2 : 0);
         if (width == 0)
         {
-            drawGlyph(&line->characters[i], row, last_col, style, fg);
+            if (last_col >= 0)
+                drawGlyph(&line->characters[i], row, last_col, style, fg);
             continue;
         }
-        if (bg != bg0)
+        if (bg != base)
             fillCells(row, col, width, bg);
         drawGlyph(&line->characters[i], row, col, style, fg);
         if (attr.underline)
         {
             underline.x = (float) (G.pad + col * G.cell_w);
-            underline.y = (float) (G.pad + row * G.cell_h + G.ascent + 1);
+            underline.y = (float) (G.pad + row * G.cell_h + G.text_y + G.ascent + 1);
             underline.w = (float) (width * G.cell_w);
             underline.h = G.scale > 1.5f ? 2.0f : 1.0f;
             setColor(fg);
@@ -705,13 +752,340 @@ static int charAtColumn(const Row *line, const int col, int *start)
     return -1;
 }
 
+// The screen's row `row` (0: the top one shown), NULL below the last.
+static const Row *screenRow(const int row)
+{
+    const int at = G.screen.term_state.screen_top_row + row;
+    return row >= 0 && row < G.rows && at < G.screen.numrows ? &G.screen.row[at] : NULL;
+}
+
+// The character starting at (`row`, `col`), 0 if none does.
+static Uint32 codepointAt(const int row, const int col)
+{
+    const Row *line = screenRow(row);
+    int start;
+    const int index = line ? charAtColumn(line, col, &start) : -1;
+    return index >= 0 && start == col ? utf8CharCodepoint(&line->characters[index]) : 0;
+}
+
+// The background of the cell at (`row`, `col`) of the screen.
+static Uint32 cellBackground(const int row, const int col, const Uint32 fg0, const Uint32 bg0)
+{
+    const Row *line = screenRow(row);
+    Uint32 fg;
+    Uint32 bg;
+    int start;
+    const int index = line ? charAtColumn(line, col, &start) : -1;
+
+    if (index < 0 || !line->attrs)
+        return bg0;
+    cellColors(&line->attrs[index], fg0, bg0, &fg, &bg);
+    return bg;
+}
+
+static void fillPixels(const float x, const float y, const float w, const float h, const Uint32 rgb)
+{
+    SDL_FRect r;
+    if (w <= 0.0f || h <= 0.0f)
+        return;
+    r.x = x;
+    r.y = y;
+    r.w = w;
+    r.h = h;
+    setColor(rgb);
+    SDL_RenderFillRect(G.renderer, &r);
+}
+
+/**
+ * @brief If the cell at (`row`, `col`) holds a line (box drawing), draws
+ * one edge of it stretched over `dw` x `dh` pixels at `dx`, `dy`: its
+ * pixel row `edge` up or down into the margin above or below (`across`
+ * 0), its pixel column `edge` sideways into the one beside it (1).
+ */
+static void stretchEdge(const int row, const int col, const int across, const int edge, const int dx,
+                        const int dy, const int dw, const int dh, const Uint32 fg0, const Uint32 bg0)
+{
+    const Row *line = screenRow(row);
+    const Glyph *glyph;
+    TermCellAttr attr = {0};
+    Uint32 fg;
+    Uint32 bg;
+    SDL_FRect src;
+    SDL_FRect dst;
+    int start;
+    const int index = line ? charAtColumn(line, col, &start) : -1;
+    Uint32 codepoint;
+
+    if (index < 0 || start != col || dw <= 0 || dh <= 0)
+        return;
+    codepoint = utf8CharCodepoint(&line->characters[index]);
+    if (codepoint < 0x2500 || codepoint > 0x257F)
+        return;
+    glyph = glyphGet(codepoint, 0);
+    if (!glyph || !glyph->texture)
+        return;
+    if (line->attrs)
+        attr = line->attrs[index];
+    cellColors(&attr, fg0, bg0, &fg, &bg);
+    src.x = across ? (float) edge : 0.0f;
+    src.y = across ? 0.0f : (float) edge;
+    src.w = across ? 1.0f : (float) G.cell_w;
+    src.h = across ? (float) G.cell_h : 1.0f;
+    dst.x = (float) dx;
+    dst.y = (float) dy;
+    dst.w = (float) dw;
+    dst.h = (float) dh;
+    SDL_SetTextureColorMod(glyph->texture, (Uint8) (fg >> 16), (Uint8) (fg >> 8), (Uint8) fg);
+    SDL_RenderTexture(G.renderer, glyph->texture, &src, &dst);
+}
+
+/**
+ * @brief The margin around the grid takes the colour of the cells beside
+ * it: a highlighted line, the status bar, a terminal pane run to the
+ * window's left, right and bottom edges instead of stopping short of them.
+ * The top margin stays the background, under the first row whatever it is.
+ */
+static void fillMargins(const Uint32 fg0, const Uint32 bg0)
+{
+    const int grid_r = G.pad + G.cols * G.cell_w;  // where the grid ends
+    const int grid_b = G.pad + G.rows * G.cell_h;
+    int w = 0;
+    int h = 0;
+    int row;
+    int col;
+    int y;
+    int x;
+    int cw;
+    int c;
+
+    SDL_GetWindowSizeInPixels(G.window, &w, &h);
+    for (row = 0; row < G.rows; row++)
+    {
+        y = G.pad + row * G.cell_h;
+        fillPixels(0.0f, (float) y, (float) G.pad, (float) G.cell_h, cellBackground(row, 0, fg0, bg0));
+        fillPixels((float) grid_r, (float) y, (float) (w - grid_r), (float) G.cell_h,
+                   cellBackground(row, G.cols - 1, fg0, bg0));
+    }
+    for (col = -1; col <= G.cols; col++)
+    {
+        x = col < 0 ? 0 : G.pad + col * G.cell_w;
+        cw = col < 0 ? G.pad : col == G.cols ? w - grid_r : G.cell_w;
+        c = col < 0 ? 0 : col == G.cols ? G.cols - 1 : col;
+        fillPixels((float) x, (float) grid_b, (float) cw, (float) (h - grid_b),
+                   cellBackground(G.rows - 1, c, fg0, bg0));
+    }
+    // Lines that reach the grid's edge go on to the window's: a pane
+    // divider runs from the top of the window, a rule across it from side
+    // to side. The edge row of pixels of the line's cell, stretched.
+    for (col = 0; col < G.cols; col++)
+    {
+        x = G.pad + col * G.cell_w;
+        stretchEdge(0, col, 0, 0, x, 0, G.cell_w, G.pad, fg0, bg0);
+        stretchEdge(G.rows - 1, col, 0, G.cell_h - 1, x, grid_b, G.cell_w, h - grid_b, fg0, bg0);
+    }
+    for (row = 0; row < G.rows; row++)
+    {
+        y = G.pad + row * G.cell_h;
+        stretchEdge(row, 0, 1, 0, 0, y, G.pad, G.cell_h, fg0, bg0);
+        stretchEdge(row, G.cols - 1, 1, G.cell_w - 1, grid_r, y, w - grid_r, G.cell_h, fg0, bg0);
+    }
+}
+
+/***********************************************************************************************************************
+ *
+ *                                                 Popups
+ *
+ **********************************************************************************************************************/
+
+static SDL_Texture *textureFrom(SDL_Surface *surface)
+{
+    SDL_Texture *texture = surface ? SDL_CreateTextureFromSurface(G.renderer, surface) : NULL;
+    if (surface)
+        SDL_DestroySurface(surface);
+    if (texture)
+        SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+    return texture;
+}
+
+static void shapesClear(void)
+{
+    if (G.round_tex)
+        SDL_DestroyTexture(G.round_tex);
+    if (G.shadow_tex)
+        SDL_DestroyTexture(G.shadow_tex);
+    G.round_tex = NULL;
+    G.shadow_tex = NULL;
+}
+
+// Whether `c` can be on a box's left (or, `right`, right) side.
+static int boxSide(const Uint32 c, const int right)
+{
+    return c == 0x2502 || c == (right ? 0x2524u : 0x251Cu);
+}
+
+/**
+ * @brief A popup's box (popup_ui.c's ╭─╮ │ │ ╰─╯) whose top left corner is
+ * at (`row`, `col`): its far corner in `row2`, `col2`. @return 0 if there
+ * is no whole box there.
+ */
+static int findBox(const int row, const int col, int *row2, int *col2)
+{
+    int r;
+    int c = col + 1;
+
+    while (codepointAt(row, c) == 0x2500)
+        c++;
+    if (c == col + 1 || codepointAt(row, c) != 0x256E)
+        return 0;
+    for (r = row + 1; r < G.rows; r++)
+    {
+        if (codepointAt(r, col) == 0x2570)
+            break;
+        if (!boxSide(codepointAt(r, col), 0) || !boxSide(codepointAt(r, c), 1))
+            return 0;
+    }
+    if (r >= G.rows || r == row + 1 || codepointAt(r, c) != 0x256F)
+        return 0;
+    *row2 = r;
+    *col2 = c;
+    return 1;
+}
+
+/**
+ * @brief Lifts a popup off the screen: a soft shadow around its box, the
+ * box's background with rounded corners on it, and its cells drawn again
+ * over both.
+ */
+static void floatBox(const int row, const int col, const int row2, const int col2, const Uint32 fg0,
+                     const Uint32 bg0)
+{
+    const Uint32 box_bg = cellBackground(row, col, fg0, bg0);
+    const int dark = ((box_bg >> 16 & 0xFF) * 299 + (box_bg >> 8 & 0xFF) * 587 + (box_bg & 0xFF) * 114) / 1000 < 128;
+    const int blur = (int) (18.0f * G.scale + 0.5f);
+    float lx;
+    float ly;
+    float t;
+    float radius;
+    int edge;
+    SDL_FRect box;
+    SDL_FRect dst;
+    int r;
+
+    guiCellLines(G.cell_w, G.cell_h, &lx, &ly, &t, &radius);
+    edge = (int) (radius + t / 2.0f + 0.5f);
+    box.x = (float) (G.pad + col * G.cell_w) + lx - t / 2.0f;
+    box.y = (float) (G.pad + row * G.cell_h) + ly - t / 2.0f;
+    box.w = (float) ((col2 - col) * G.cell_w) + t;
+    box.h = (float) ((row2 - row) * G.cell_h) + t;
+    if (!G.round_tex)
+        G.round_tex = textureFrom(guiRoundedRect(edge));
+    if (!G.shadow_tex)
+        G.shadow_tex = textureFrom(guiShadow(edge, blur));
+    if (G.shadow_tex)
+    {
+        dst.x = box.x - (float) blur;
+        dst.y = box.y - (float) blur + (float) blur / 3.0f;
+        dst.w = box.w + 2.0f * (float) blur;
+        dst.h = box.h + 2.0f * (float) blur;
+        SDL_SetTextureColorMod(G.shadow_tex, 0, 0, 0);
+        SDL_SetTextureAlphaMod(G.shadow_tex, dark ? 150 : 70);
+        SDL_RenderTexture9Grid(G.renderer, G.shadow_tex, NULL, (float) (edge + blur), (float) (edge + blur),
+                               (float) (edge + blur), (float) (edge + blur), 1.0f, &dst);
+    }
+    if (G.round_tex)
+    {
+        SDL_SetTextureColorMod(G.round_tex, (Uint8) (box_bg >> 16), (Uint8) (box_bg >> 8), (Uint8) box_bg);
+        SDL_RenderTexture9Grid(G.renderer, G.round_tex, NULL, (float) edge, (float) edge, (float) edge,
+                               (float) edge, 1.0f, &box);
+    }
+    else
+        fillPixels(box.x, box.y, box.w, box.h, box_bg);
+    for (r = row; r <= row2; r++)
+        drawRowPart(screenRow(r), r, col, col2, fg0, bg0, box_bg);
+}
+
+// Every popup box on the screen, floated (floatBox()).
+static void floatBoxes(const Uint32 fg0, const Uint32 bg0)
+{
+    const Row *line;
+    int boxes = 0;
+    int row;
+    int col;
+    int row2;
+    int col2;
+    int i;
+
+    for (row = 0; row < G.rows - 2 && boxes < 8; row++)
+    {
+        line = screenRow(row);
+        for (i = 0, col = 0; line && i < line->size && boxes < 8; i++)
+        {
+            if (utf8CharCodepoint(&line->characters[i]) == 0x256D && findBox(row, col, &row2, &col2))
+            {
+                floatBox(row, col, row2, col2, fg0, bg0);
+                boxes++;
+            }
+            col += utf8CharWidth(&line->characters[i]);
+        }
+    }
+}
+
+/***********************************************************************************************************************
+ *
+ *                                                 The cursor
+ *
+ **********************************************************************************************************************/
+
+/**
+ * @brief Where the cursor is drawn: on its cell, or on the way there. A
+ * jump (another line, a word away, another pane) glides over
+ * GUI_CURSOR_GLIDE_MS; typing, which moves it one column, doesn't.
+ */
+static void cursorPlace(const float x, const float y, const float w)
+{
+    const Uint64 now = SDL_GetTicks();
+    const int typed = y == G.cur_to[1] && fabsf(x - G.cur_to[0]) <= (float) G.cell_w + 0.5f;
+    float p;
+    float e;
+
+    if (x != G.cur_to[0] || y != G.cur_to[1] || w != G.cur_to[2])
+    {
+        G.cur_from[0] = G.cur_at[0];
+        G.cur_from[1] = G.cur_at[1];
+        G.cur_from[2] = G.cur_at[2];
+        G.cur_to[0] = x;
+        G.cur_to[1] = y;
+        G.cur_to[2] = w;
+        G.cur_start = now;
+        G.gliding = G.cur_shown && !typed && !keysQueued();
+    }
+    G.cur_shown = 1;
+    if (!G.gliding)
+    {
+        G.cur_at[0] = x;
+        G.cur_at[1] = y;
+        G.cur_at[2] = w;
+        return;
+    }
+    p = (float) (now - G.cur_start) / (float) GUI_CURSOR_GLIDE_MS;
+    if (p >= 1.0f)
+    {
+        p = 1.0f;
+        G.gliding = 0;
+    }
+    e = 1.0f - (1.0f - p) * (1.0f - p) * (1.0f - p);  // ease out
+    G.cur_at[0] = G.cur_from[0] + (x - G.cur_from[0]) * e;
+    G.cur_at[1] = G.cur_from[1] + (y - G.cur_from[1]) * e;
+    G.cur_at[2] = G.cur_from[2] + (w - G.cur_from[2]) * e;
+}
+
 // The cursor: a block in the text's colour, the character in the cell's
 // colour over it; an outline while the window isn't focused.
 static void drawCursor(const Uint32 fg0, const Uint32 bg0)
 {
     const TermParserState *ts = &G.screen.term_state;
     const int row = ts->cursor_y - ts->screen_top_row;
-    const Row *line;
+    const Row *line = screenRow(row);
     TermCellAttr attr = {0};
     Uint32 fg;
     Uint32 bg;
@@ -721,8 +1095,11 @@ static void drawCursor(const Uint32 fg0, const Uint32 bg0)
     int width = 1;
 
     if (ts->cursor_hidden || row < 0 || row >= G.rows || ts->cursor_x >= G.cols)
+    {
+        G.cur_shown = 0;
+        G.gliding = 0;
         return;
-    line = ts->cursor_y < G.screen.numrows ? &G.screen.row[ts->cursor_y] : NULL;
+    }
     if (line)
         index = charAtColumn(line, ts->cursor_x, &start);
     if (index >= 0)
@@ -731,28 +1108,40 @@ static void drawCursor(const Uint32 fg0, const Uint32 bg0)
         if (line->attrs)
             attr = line->attrs[index];
     }
-    fg = cellColor(attr.fg, fg0);
-    bg = cellColor(attr.bg, bg0);
-    if (attr.reverse)
-    {
-        fg ^= bg;
-        bg ^= fg;
-        fg ^= bg;
-    }
+    cellColors(&attr, fg0, bg0, &fg, &bg);
+    cursorPlace((float) (G.pad + start * G.cell_w), (float) (G.pad + row * G.cell_h),
+                (float) (width * G.cell_w));
+    box.x = G.cur_at[0];
+    box.y = G.cur_at[1] + (float) G.text_y;
+    box.w = G.cur_at[2];
+    box.h = (float) G.text_h;
+    setColor(fg);
     if (!G.focused)
     {
-        box.x = (float) (G.pad + start * G.cell_w);
-        box.y = (float) (G.pad + row * G.cell_h);
-        box.w = (float) (width * G.cell_w);
-        box.h = (float) G.cell_h;
-        setColor(fg);
         SDL_RenderRect(G.renderer, &box);
         return;
     }
-    fillCells(row, start, width, fg);
-    if (index >= 0)
-        drawGlyph(&line->characters[index], row, start,
-                  (attr.bold ? 1 : 0) | (attr.italic ? 2 : 0), bg);
+    SDL_RenderFillRect(G.renderer, &box);
+    if (index >= 0 && !G.gliding)
+        drawGlyph(&line->characters[index], row, start, (attr.bold ? 1 : 0) | (attr.italic ? 2 : 0), bg);
+}
+
+// The title bar in the theme's background (macOS, Windows; os_window.c),
+// once more each time the theme changes it.
+static void titlebarFollowTheme(const Uint32 bg0)
+{
+    SDL_PropertiesID props;
+    void *native;
+
+    if (G.titlebar_rgb == (long) bg0)
+        return;
+    G.titlebar_rgb = (long) bg0;
+    props = SDL_GetWindowProperties(G.window);
+    native = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, NULL);
+    if (!native)
+        native = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+    if (native)
+        os_window_titlebar(native, bg0);
 }
 
 // Draws the grid into the renderer's back buffer (present() shows it).
@@ -760,7 +1149,7 @@ static void render(void)
 {
     const Uint32 fg0 = themeColor(E.theme.COLOR_DEFAULT, 0xabb2bf);
     const Uint32 bg0 = themeColor(E.theme.BACKGROUND_COLOR, 0x282c34);
-    const TermParserState *ts = &G.screen.term_state;
+    const Row *line;
     int row;
 
     if (!G.open)
@@ -768,9 +1157,12 @@ static void render(void)
     setColor(bg0);
     SDL_RenderClear(G.renderer);
     for (row = 0; row < G.rows; row++)
-        if (ts->screen_top_row + row < G.screen.numrows)
-            drawRow(&G.screen.row[ts->screen_top_row + row], row, fg0, bg0);
+        if ((line = screenRow(row)) != NULL)
+            drawRowPart(line, row, 0, G.cols - 1, fg0, bg0, bg0);
+    fillMargins(fg0, bg0);
+    floatBoxes(fg0, bg0);
     drawCursor(fg0, bg0);
+    titlebarFollowTheme(bg0);
 }
 
 static void present(void)
@@ -779,7 +1171,7 @@ static void present(void)
         return;
     render();
     SDL_RenderPresent(G.renderer);
-    G.dirty = 0;
+    G.dirty = G.gliding;  // the next frame of the glide
     G.last_present = SDL_GetTicks();
 }
 
@@ -851,11 +1243,6 @@ static void pumpEvents(void)
         handleEvent(&ev);
 }
 
-static int keysQueued(void)
-{
-    return G.keys_pos < G.keys_len;
-}
-
 // Draws what changed, but not every frame of a paste being typed in.
 static void presentIfDirty(void)
 {
@@ -909,6 +1296,8 @@ static long guiReadKeys(void *buf, const size_t n, const int timeout_ms)
         left = timeout_ms < 0 ? -1 : (Sint64) (deadline - SDL_GetTicks());
         if (timeout_ms >= 0 && (left <= 0 || SDL_GetTicks() >= deadline))
             return 0;
+        if (G.gliding && (left < 0 || left > GUI_FRAME_MS))
+            left = GUI_FRAME_MS;
         SDL_WaitEventTimeout(NULL, (Sint32) left);
     }
 }
@@ -981,6 +1370,8 @@ static int guiWait(OsStream *const *streams, const int n, const int timeout_ms, 
             return 0;
         if (n > 1 && left > GUI_STREAM_SLICE_MS)
             left = GUI_STREAM_SLICE_MS;
+        if (G.gliding && left > GUI_FRAME_MS)
+            left = GUI_FRAME_MS;
         SDL_WaitEventTimeout(NULL, (Sint32) left);
     }
 }
@@ -1126,7 +1517,7 @@ static void startInHome(void)
     gfree(cwd);
 }
 
-static const ScreenDriver s_gui_driver = {guiWrite, guiReadKeys, guiSize, guiWait, guiClose};
+static const ScreenDriver s_gui_driver = {guiWrite, guiReadKeys, guiSize, guiWait, guiClose, 1};
 
 int guiOpen(const char *font_path)
 {
@@ -1156,6 +1547,7 @@ int guiOpen(const char *font_path)
         return -1;
     }
     G.open = 1;
+    G.titlebar_rgb = -1;
     SDL_SetRenderVSync(G.renderer, 1);
     G.scale = SDL_GetWindowDisplayScale(G.window);
     if (G.scale <= 0.0f)

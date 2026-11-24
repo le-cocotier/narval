@@ -6,6 +6,7 @@
 #include "../include/popup_ui.h"
 #include "../include/append_buffer.h"
 #include "../include/galloc.h"
+#include "../include/terminal.h"
 #include "../include/utf8.h"
 
 #include <ctype.h>
@@ -220,6 +221,8 @@ void popupDrawShadow(struct abuf *ab, const PopupStyle *style,
     int cols;
     int c;
 
+    if (screenDrawsShadows())
+        return;  // narval-gui draws a soft one under the box's corners
     ab_sgr(ab, style->shadow);
     if (right_col <= E.screencols) {
         for (r = 1; r < box_h; r++) {

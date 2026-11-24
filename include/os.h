@@ -505,4 +505,16 @@ char *os_clipboard_get(void);
 // 0 or -1.
 int os_clipboard_set(const char *text, size_t len);
 
+/***********************************************************************************************************************
+ *
+ *                                                 narval-gui's window
+ *
+ **********************************************************************************************************************/
+
+// In libnarval-os-window (src/os/os_window.c), linked into narval-gui only.
+// The title bar the system draws for `native` (an NSWindow, an HWND) in
+// `rgb` (0xRRGGBB), its text light or dark to suit; where the system has
+// no say in it (Linux, Windows 10), nothing.
+void os_window_titlebar(void *native, unsigned int rgb);
+
 #endif // NARVAL_OS_H_

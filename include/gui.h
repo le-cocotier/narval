@@ -9,7 +9,10 @@
 // parser (ansi_parser.c) into a grid of cells, drawn with a monospace
 // font, and the window's key and mouse events become the bytes a terminal
 // would send, read by the same key reader. Every command, key binding,
-// theme and popup is the terminal narval's.
+// theme and popup is the terminal narval's. What it draws better than a
+// terminal can: box drawing and block characters fitted to the cell
+// (gui_draw.c), popups lifted off the screen with a soft shadow, the
+// cursor's glide, the title bar in the theme's colour (os_window.c).
 //
 // Settings (init.lisp): GUI-FONT-SIZE (points, settings.c), and GUI-FONT,
 // a path to a .ttf/.ttc/.otf file. Without GUI-FONT the bundled DejaVu

@@ -170,6 +170,12 @@ meson setup build && meson compile -C build   # build/narval and build/narval-gu
 
 Files dropped on the window open in the active pane.
 
+The window draws what a terminal only approximates: pane dividers, popup borders and the git
+gutter as unbroken lines (box drawing and block characters are drawn, not taken from the font),
+popups with rounded corners and a soft shadow, a little space between lines, margins in the
+colours of the cells beside them, and a cursor that glides to where it jumps. On macOS and
+Windows 11 the title bar takes the theme's background.
+
 Every key narval can name reaches it in the window, with any mix of Ctrl, Alt and Shift, even
 the ones most terminals can't send: `CTRL-1`, `CTRL-.`, `CTRL-SHIFT-a`, `CTRL-ALT-i` (not
 `ALT-TAB`), `ALT-[`, `ALT-ENTER`, `SHIFT-SPACE` (`test/test_gui.c` presses all of them). The left

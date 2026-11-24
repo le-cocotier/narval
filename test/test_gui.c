@@ -13,6 +13,7 @@
 #include "../include/gui.h"
 #include "../include/terminal.h"
 #include "../include/utf8.h"
+#include "../src/gui/gui_draw.h"
 
 #include <SDL3/SDL.h>
 
@@ -253,6 +254,85 @@ static void testDrawing(void) {
   CHECK_INT(guiCellPixel(5, 5), 0xabb2bf);
 }
 
+// The coverage (alpha) of pixel (x, y) of a drawn glyph.
+static int alphaAt(SDL_Surface *s, const int x, const int y) {
+  Uint8 r, g, b, a;
+  if (!SDL_ReadSurfacePixel(s, x, y, &r, &g, &b, &a))
+    return -1;
+  return a;
+}
+
+// Box drawing fills its cell: lines meet the next cell's, whatever the
+// line spacing; corners are arcs; block elements are exact fractions.
+static void testCellGlyphs(void) {
+  const int w = 9;
+  const int h = 21;
+  SDL_Surface *s;
+  int y;
+  int x;
+  int full;
+
+  CHECK(guiIsCellGlyph(0x2502) && guiIsCellGlyph(0x259F) && !guiIsCellGlyph('|'));
+  s = guiCellGlyph(0x2502, w, h);  // │
+  CHECK(s && s->w == w && s->h == h);
+  for (y = 0, full = 0; s && y < h; y++)
+    full += alphaAt(s, w / 2, y) == 255;
+  CHECK_INT(full, h);
+  CHECK_INT(s ? alphaAt(s, 0, 0) : -1, 0);
+  SDL_DestroySurface(s);
+  s = guiCellGlyph(0x2500, w, h);  // ─
+  for (x = 0, full = 0; s && x < w; x++)
+    full += alphaAt(s, x, h / 2) == 255;
+  CHECK_INT(full, w);
+  SDL_DestroySurface(s);
+  s = guiCellGlyph(0x256D, w, h);  // ╭: down to the bottom edge, right to the right edge
+  CHECK(s && alphaAt(s, w / 2, h - 1) == 255 && alphaAt(s, w - 1, h / 2) > 128);
+  CHECK_INT(s ? alphaAt(s, 0, 0) : -1, 0);
+  CHECK_INT(s ? alphaAt(s, w / 2, 0) : -1, 0);
+  SDL_DestroySurface(s);
+  s = guiCellGlyph(0x258E, w, h);  // ▎: the left quarter, top to bottom
+  CHECK(s && alphaAt(s, 0, 0) == 255 && alphaAt(s, 1, h - 1) == 255 && alphaAt(s, w - 1, 0) == 0);
+  SDL_DestroySurface(s);
+  s = guiShadow(4, 10);
+  CHECK(s && s->w == 29 && alphaAt(s, 14, 14) == 255 && alphaAt(s, 0, 0) == 0);
+  SDL_DestroySurface(s);
+}
+
+static void writeStr(const char *s) {
+  screenWrite(s, strlen(s));
+}
+
+// In the window: lines and popups as drawn, the cursor's glide.
+static void testShapes(void) {
+  const char lines[] = "\x1b[?25l\x1b[2J\x1b[H"
+                       "\x1b[38;2;255;0;0m\xe2\x94\x82\r\n\xe2\x94\x82\x1b[0m";  // │ over │
+  const char box[] = "\x1b[2J\x1b[9;11H\xe2\x95\xad\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x95\xae"
+                     "\x1b[10;11H\xe2\x94\x82   \xe2\x94\x82"
+                     "\x1b[11;11H\xe2\x95\xb0\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x95\xaf";
+  long shadow;
+
+  CHECK_INT(screenDrawsShadows(), 1);
+  screenWrite(lines, sizeof(lines) - 1);
+  CHECK_INT(guiCellPixel(0, 0), 0xff0000);
+  CHECK_INT(guiCellPixel(1, 0), 0xff0000);
+  // A popup's box floats: a shadow just outside it, none far away.
+  screenWrite(box, sizeof(box) - 1);
+  shadow = guiCellPixel(9, 15);
+  CHECK(shadow >= 0 && (shadow >> 16 & 0xFF) < 0x28 && (shadow & 0xFF) < 0x34);
+  CHECK_INT(guiCellPixel(9, 30), 0x282c34);
+  CHECK_INT(guiCellPixel(9, 12), 0x282c34);  // inside: the popup's own background
+  // The cursor glides to where it jumps, and lands there.
+  writeStr("\x1b[2J\x1b[6;6H\x1b[?25h");
+  CHECK_INT(guiCellPixel(5, 5), 0xabb2bf);
+  writeStr("\x1b[16;31H");
+  CHECK_INT(guiCellPixel(15, 30), 0x282c34);  // on its way
+  SDL_Delay(150);
+  CHECK_INT(guiCellPixel(15, 30), 0xabb2bf);
+  // One column, as typing moves it: no glide.
+  writeStr("\x1b[16;32H");
+  CHECK_INT(guiCellPixel(15, 31), 0xabb2bf);
+}
+
 int main(const int argc, char **argv) {
   testInit();
   testKeyBytes();
@@ -263,6 +343,8 @@ int main(const int argc, char **argv) {
   testEvents();
   testEveryKey();
   testDrawing();
+  testCellGlyphs();
+  testShapes();
   terminalRestore();  // closes the window
   CHECK_INT(guiCellPixel(0, 0), -1);
   gfree(E.status_msg);

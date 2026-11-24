@@ -191,9 +191,23 @@ if gui_found
       include_directories : include_directories('windows', 'assets/icons'),
       depend_files : files('windows/narval.manifest', 'assets/icons/narval.ico'))
   endif
+  # The title bar in the theme's colour (src/os/os_window.c): the
+  # Objective-C runtime on macOS, DWM on Windows.
+  gui_os_deps = []
+  if is_windows
+    gui_os_deps += cc.find_library('dwmapi')
+  elif host_machine.system() == 'darwin'
+    gui_os_deps += cc.find_library('objc')
+  endif
+  gui_os_lib = static_library('narval-os-window',
+    'src/os/os_window.c',
+    c_args : is_windows ? ['-D_WIN32_WINNT=0x0A00'] : [],
+    dependencies : gui_os_deps)
+  gui_deps += gui_os_deps
   gui_lib = static_library('narval-gui',
-    'src/gui/gui_sdl.c',
+    'src/gui/gui_sdl.c', 'src/gui/gui_draw.c',
     c_args : core_args,
+    link_with : gui_os_lib,
     dependencies : gui_deps)
   executable('narval-gui',
     files('main.c') + gui_sources,

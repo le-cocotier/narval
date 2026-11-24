@@ -31,6 +31,9 @@ typedef struct
     int (*wait)(OsStream *const *streams, int n, int timeout_ms, int *ready);
     // Optional: what terminalRestore() does instead (closing a window).
     void (*restore)(void);
+    // 1: a window (narval-gui), which draws popups' shadows itself, soft
+    // ones, where a terminal gets a band of dark cells (popup_ui.c).
+    int draws_shadows;
 } ScreenDriver;
 
 // NULL: back to the real terminal.
@@ -39,6 +42,8 @@ void screenWrite(const void *buf, size_t n);
 long screenReadKeys(void *buf, size_t n, int timeout_ms);
 // The run loop's wait: keys (streams[0]) and every other stream.
 int screenWait(OsStream *const *streams, int n, int timeout_ms, int *ready);
+// The screen's draws_shadows.
+int screenDrawsShadows(void);
 
 /**
  * \fn void die(const char *s)

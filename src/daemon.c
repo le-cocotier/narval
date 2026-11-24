@@ -707,7 +707,7 @@ static int daemonScreenSize(int *rows, int *cols) {
   return 0;
 }
 
-static const ScreenDriver s_daemon_driver = {daemonWrite, daemonReadKeys, daemonScreenSize, NULL, NULL};
+static const ScreenDriver s_daemon_driver = {daemonWrite, daemonReadKeys, daemonScreenSize, NULL, NULL, 0};
 
 /***********************************************************************************************************************
  *

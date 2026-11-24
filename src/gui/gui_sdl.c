@@ -1531,10 +1531,39 @@ static void startInHome(void)
 
 static const ScreenDriver s_gui_driver = {guiWrite, guiReadKeys, guiSize, guiWait, guiClose, 1};
 
+// SDL's allocator, routed through galloc so the memory inspector and the
+// exit report see what SDL and SDL_ttf hold (window, renderer, fonts, glyph
+// surfaces), grouped under one "SDL" site. galloc is a macro that records
+// the caller, hence the _impl calls with a fixed site. gutils' lock covers
+// SDL's own threads. Anything SDL allocated before the switch (SDL_main's
+// argument handling on some platforms) is not tracked, and gfree/grealloc
+// hand such pointers to the C library's free/realloc, which allocated them.
+static void *SDLCALL sdlMalloc(size_t size)
+{
+    return galloc_impl(size, "SDL", 0, "SDL_malloc");
+}
+
+static void *SDLCALL sdlCalloc(size_t num, size_t size)
+{
+    return gcalloc_impl(num, size, "SDL", 0, "SDL_calloc");
+}
+
+static void *SDLCALL sdlRealloc(void *mem, size_t size)
+{
+    return grealloc_impl(mem, size, "SDL", 0, "SDL_realloc");
+}
+
+static void SDLCALL sdlFree(void *mem)
+{
+    gfree(mem);
+}
+
 int guiOpen(const char *font_path)
 {
     memset(&G, 0, sizeof(G));
     G.font_size = GUI_DEFAULT_FONT_SIZE;
+    // Before anything else allocates through SDL. Fails only on NULL hooks.
+    SDL_SetMemoryFunctions(sdlMalloc, sdlCalloc, sdlRealloc, sdlFree);
     SDL_SetAppMetadata("narval", NARVAL_VERSION, "dev.narval.editor");
     if (!SDL_Init(SDL_INIT_VIDEO))
     {

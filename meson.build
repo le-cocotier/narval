@@ -48,7 +48,9 @@ else
     c_args : ['-D_GNU_SOURCE'],
     # forkpty() lives in libutil on Linux; on macOS/BSD it is in libc and
     # this lookup simply finds nothing, which is why it is not `required`.
-    dependencies : [cc.find_library('util', required : false)])
+    # pthreads: galloc's lock (os_alloc_lock).
+    dependencies : [cc.find_library('util', required : false),
+                    dependency('threads')])
 endif
 
 # ─── The editor ───────────────────────────────────────────────────────────────

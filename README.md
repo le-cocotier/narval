@@ -401,7 +401,10 @@ AddressSanitizer on Windows), and run `build-asan\narval.exe` with `C:\msys64\cl
 Leaks: every `galloc` is tracked. `CTRL-x m` (memory inspector) lists the live blocks with
 the file and line that allocated them, and a debug build (`install.sh --debug`,
 `install.ps1 -DebugBuild`) writes what is still allocated at exit to
-`~/.narval/memory-at-exit.log`, grouped by allocation site.
+`~/.narval/memory-at-exit.log`, grouped by allocation site. In narval-gui, SDL and SDL_ttf
+allocate through galloc too and show up as `SDL:0`. Both views also give galloc's own
+bookkeeping and the whole process heap, so what galloc can't see (libc's buffers, FreeType)
+is the difference between the two.
 
 
 ## License

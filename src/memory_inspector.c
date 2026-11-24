@@ -15,6 +15,7 @@
 #include "../include/editor_op.h"
 #include "../include/galloc.h"
 #include "../include/input.h"
+#include "../include/os.h"
 #include "../include/split_screen.h"
 #include "../include/utf8.h"
 #include "../include/utils.h"
@@ -51,16 +52,16 @@ static const char *sortModeLabel(const SortMode mode) {
 }
 
 static int compareSizeDesc(const void *a, const void *b) {
-  const struct dataBlock_t *ba = *(const struct dataBlock_t *const *)a;
-  const struct dataBlock_t *bb = *(const struct dataBlock_t *const *)b;
+  const struct dataBlock_t *ba = a;
+  const struct dataBlock_t *bb = b;
   if (ba->size != bb->size)
     return ba->size > bb->size ? -1 : 1;
   return 0;
 }
 
 static int compareLocation(const void *a, const void *b) {
-  const struct dataBlock_t *ba = *(const struct dataBlock_t *const *)a;
-  const struct dataBlock_t *bb = *(const struct dataBlock_t *const *)b;
+  const struct dataBlock_t *ba = a;
+  const struct dataBlock_t *bb = b;
   const int c = strcmp(ba->file ? ba->file : "", bb->file ? bb->file : "");
   if (c != 0)
     return c;
@@ -108,29 +109,25 @@ static Buffer *openMemoryBuffer(void) {
   return buf;
 }
 
-// Snapshots gBlocks() into a plain array so it can be sorted for display
-// without touching the real list — galloc/gfree's own bookkeeping (see
-// gfree's "is this the last allocated block" check) depends on that list's
-// actual insertion order, so it must never be reordered in place.
-static struct dataBlock_t **collectSortedBlocks(int *out_count) {
-  const int count = gBlockCount();
-  struct dataBlock_t **arr;
+// Copies the tracked blocks into a plain array (gSnapshot) so they can be
+// sorted for display without touching the real list, whose insertion order
+// galloc/gfree depend on. Copies rather than pointers: in narval-gui SDL
+// allocates through galloc too, possibly from its own threads, so a block
+// may be freed while the snapshot is on screen.
+static struct dataBlock_t *collectSortedBlocks(int *out_count) {
+  // Room for blocks allocated between the count and the copy (this array
+  // is one of them).
+  const int cap = gBlockCount() + 64;
+  struct dataBlock_t *arr;
   int i;
-  struct dataBlock_t *p;
-  if (count <= 0) {
-    *out_count = 0;
-    return NULL;
-  }
 
-  arr = galloc(sizeof(struct dataBlock_t *) * (size_t)count);
+  arr = galloc(sizeof(struct dataBlock_t) * (size_t)cap);
   if (!arr) {
     *out_count = 0;
     return NULL;
   }
 
-  i = 0;
-  for (p = gBlocks(); p && i < count; p = p->lastBlock)
-    arr[i++] = p;
+  i = gSnapshot(arr, cap);
 
   switch (s_sort_mode) {
   case SORT_SIZE_DESC:
@@ -147,6 +144,28 @@ static struct dataBlock_t **collectSortedBlocks(int *out_count) {
   return arr;
 }
 
+// The lines under the block count: what galloc spends on itself, and the
+// whole process heap as the allocator sees it, so the gap between that and
+// the tracked total (libc's own buffers, libraries that don't allocate
+// through SDL) is in plain view. `n` gets the number of lines written.
+static void formatFooter(char lines[2][160], int *n) {
+  long long heap_blocks;
+  long long heap_bytes;
+  snprintf(lines[0], 160, "+ %zu bytes of galloc bookkeeping, not in the total",
+           gTrackerOverhead());
+  *n = 1;
+  if (os_heap_in_use(&heap_blocks, &heap_bytes) != 0)
+    return;
+  if (heap_blocks >= 0)
+    snprintf(lines[1], 160,
+             "process heap: %lld blocks, %lld bytes in use, tracked or not",
+             heap_blocks, heap_bytes);
+  else
+    snprintf(lines[1], 160, "process heap: %lld bytes in use, tracked or not",
+             heap_bytes);
+  *n = 2;
+}
+
 static void formatRow(char *out, size_t out_size, const struct dataBlock_t *p) {
   snprintf(out, out_size, "%-14p %8zu bytes  %s:%d (%s)", p->address, p->size,
            p->file ? p->file : "?", p->line, p->func ? p->func : "?");
@@ -154,28 +173,33 @@ static void formatRow(char *out, size_t out_size, const struct dataBlock_t *p) {
 
 static void renderSnapshot(Buffer *buf) {
   int count;
-  struct dataBlock_t **sorted;
+  struct dataBlock_t *sorted;
   size_t total;
   int i;
   char header[160];
   char row[160];
+  char footer[2][160];
+  int nfooter;
   clearBufferRows(buf);
 
   sorted = collectSortedBlocks(&count);
 
   total = 0;
   for (i = 0; i < count; i++)
-    total += sorted[i]->size;
+    total += sorted[i].size;
 
   snprintf(header, sizeof(header),
            "%d tracked block%s, %zu bytes total — sorted by %s", count,
            count == 1 ? "" : "s", total, sortModeLabel(s_sort_mode));
   addRow(buf, header);
+  formatFooter(footer, &nfooter);
+  for (i = 0; i < nfooter; i++)
+    addRow(buf, footer[i]);
   addRow(buf, "r refresh, s cycle sort, w export, CTRL-x leave");
   addRow(buf, "");
 
   for (i = 0; i < count; i++) {
-    formatRow(row, sizeof(row), sorted[i]);
+    formatRow(row, sizeof(row), &sorted[i]);
     addRow(buf, row);
   }
 
@@ -240,10 +264,12 @@ void memoryInspectorExport(void) {
   char *path;
   FILE *f;
   int count;
-  struct dataBlock_t **sorted;
+  struct dataBlock_t *sorted;
   size_t total;
   int i;
   char row[160];
+  char footer[2][160];
+  int nfooter;
   if (!input)
     return;
 
@@ -266,12 +292,16 @@ void memoryInspectorExport(void) {
   sorted = collectSortedBlocks(&count);
   total = 0;
   for (i = 0; i < count; i++)
-    total += sorted[i]->size;
+    total += sorted[i].size;
 
-  fprintf(f, "%d tracked block%s, %zu bytes total, sorted by %s\n\n", count,
+  fprintf(f, "%d tracked block%s, %zu bytes total, sorted by %s\n", count,
           count == 1 ? "" : "s", total, sortModeLabel(s_sort_mode));
+  formatFooter(footer, &nfooter);
+  for (i = 0; i < nfooter; i++)
+    fprintf(f, "%s\n", footer[i]);
+  fprintf(f, "\n");
   for (i = 0; i < count; i++) {
-    formatRow(row, sizeof(row), sorted[i]);
+    formatRow(row, sizeof(row), &sorted[i]);
     fprintf(f, "%s\n", row);
   }
   gfree(sorted);

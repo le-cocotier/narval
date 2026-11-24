@@ -4,26 +4,29 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Narval: a terminal text editor in C, configured in Lisp</title>
-<meta name="description" content="Narval is a free, open-source terminal text editor written in C and configured in Lisp, with LSP, a DAP debugger, git and a package manager. Linux, macOS, Windows.">
-<meta name="keywords" content="narval, narval editor, terminal text editor, console editor, cli editor, lisp configured editor, emacs alternative, C text editor, LSP, debugger, cross-platform">
+<meta name="description" content="Narval is a free, open-source text editor written in C and configured in Lisp, with LSP, a DAP debugger, git and packages, in your terminal or its own window. Linux, macOS, Windows.">
+<meta name="keywords" content="narval, narval editor, terminal text editor, console editor, cli editor, lisp configured editor, emacs alternative, C text editor, GUI text editor, narval-gui, LSP, debugger, cross-platform">
 <meta name="author" content="Arthur Barraux">
 <link rel="canonical" href="__SITE_URL__/">
 <meta name="robots" content="index, follow">
 <meta name="google-site-verification" content="OdPqZ2RiwcJsk72Ey3LfcDhU-ga8V86dLu0WPlEAUSY">
 <meta name="theme-color" content="#0e1a24">
+<link rel="icon" href="favicon.ico" sizes="32x32">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Narval">
 <meta property="og:title" content="Narval: a terminal text editor in C, configured in Lisp">
-<meta property="og:description" content="LSP, a debugger, git, a package manager and terminal panes in one small C binary. Configure everything in Lisp. Linux, macOS and Windows.">
+<meta property="og:description" content="LSP, a debugger, git, a package manager and terminal panes in one small C binary, in your terminal or in a window of its own. Configure everything in Lisp. Linux, macOS and Windows.">
 <meta property="og:url" content="__SITE_URL__/">
 <meta property="og:image" content="__SITE_URL__/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The Narval narwhal icon beside narval-gui, its window, showing C code, a Lisp config and the file finder">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Narval: a terminal text editor in C, configured in Lisp">
-<meta name="twitter:description" content="LSP, a debugger, git, a package manager and terminal panes in one small C binary, configured in Lisp.">
+<meta name="twitter:description" content="LSP, a debugger, git, a package manager and terminal panes in one small C binary, configured in Lisp. In your terminal or its own window.">
 <meta name="twitter:image" content="__SITE_URL__/og-image.png">
 
 <script type="application/ld+json">
@@ -32,7 +35,7 @@
   "@type": "SoftwareApplication",
   "name": "Narval",
   "alternateName": ["narval editor", "Beluga editor"],
-  "description": "A terminal text editor written in C and configured in Lisp, with language servers (LSP), a Debug Adapter Protocol debugger, git integration, a package manager, terminal panes and a daemon mode.",
+  "description": "A terminal text editor written in C and configured in Lisp, with language servers (LSP), a Debug Adapter Protocol debugger, git integration, a package manager, terminal panes and a daemon mode. It runs in a terminal or, as narval-gui, in a native window of its own.",
   "applicationCategory": "DeveloperApplication",
   "applicationSubCategory": "Text editor",
   "operatingSystem": "Linux, macOS, Windows",
@@ -42,6 +45,7 @@
   "downloadUrl": "https://git.giorgio-nas.fr/arthur/narval/releases",
   "codeRepository": "https://git.giorgio-nas.fr/arthur/narval",
   "programmingLanguage": ["C", "Lisp"],
+  "screenshot": "__SITE_URL__/narval-gui.webp",
   "author": { "@type": "Person", "name": "Arthur Barraux" },
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "sameAs": ["https://git.giorgio-nas.fr/arthur/narval", "__GITHUB_URL__"]
@@ -92,6 +96,10 @@ pre .c { color: var(--code-muted); }
 pre .k { color: var(--code-key); }
 pre .s { color: var(--code-str); }
 p code, li code, td code { background: var(--surface); border: 1px solid var(--border); padding: 1px 5px; border-radius: 4px; font-size: 0.88em; }
+.nw { white-space: nowrap; }
+.shot { margin: 34px 0 0; }
+.shot img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 18px 48px rgba(9, 20, 30, 0.28); }
+.shot figcaption { color: var(--muted); font-size: 14px; text-align: center; margin-top: 12px; }
 section { padding: 36px 0; border-top: 1px solid var(--border); }
 section h2 { font-size: 26px; margin: 0 0 18px; letter-spacing: -0.01em; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
@@ -128,13 +136,19 @@ footer a { color: var(--muted); }
   <div class="hero">
     <h1>Narval, a terminal text editor<br>written in C, <span>configured in Lisp</span></h1>
     <p class="lead">Language servers, a debugger, git, a package manager and terminal panes, in one
-      small binary with no dependencies. It runs the same on Linux, macOS and Windows, and every
+      small binary with no dependencies. Use it in your terminal, or in a window of its own with
+      <span class="nw">narval-gui</span>. It runs the same on Linux, macOS and Windows, and every
       setting, key binding and hook is a line of Lisp.</p>
     <div class="cta">
       <a class="btn primary" href="#install">Install Narval 4.0</a>
       <a class="btn ghost" href="https://git.giorgio-nas.fr/arthur/narval">Source code</a>
       <a class="btn ghost" href="__GITHUB_URL__">GitHub mirror</a>
     </div>
+    <figure class="shot">
+      <img src="narval-gui.webp" width="1100" height="666"
+        alt="narval-gui with a C file and a Lisp config side by side, the file finder open over them">
+      <figcaption>narval-gui: the same editor in its own window, with a C file, a Lisp config and the file finder.</figcaption>
+    </figure>
   </div>
 
   <section id="features">
@@ -147,7 +161,8 @@ footer a { color: var(--muted); }
       <div class="card"><h3>Package manager</h3><p><code>use-package</code> with versions, dependencies and a lockfile, so the same setup installs on every machine.</p></div>
       <div class="card"><h3>Daemon mode</h3><p>Several terminal windows on one editor: shared buffers and language servers, a project per window.</p></div>
       <div class="card"><h3>Terminal panes</h3><p>Run full-screen programs inside the editor. Plus keyboard macros, mouse support, autosave and crash recovery.</p></div>
-      <div class="card"><h3>Native everywhere</h3><p>Plain C99, no dependencies beyond the C library. Windows 10 and 11 run it in Windows Terminal, no WSL needed.</p></div>
+      <div class="card"><h3>A window of its own</h3><p><code>narval-gui</code> is the same editor in a native window: same keys, config and packages, with unbroken lines, floating popups and every Ctrl and Alt combination. It installs as an app you can find in Spotlight, the Start menu or your Linux launcher.</p></div>
+      <div class="card"><h3>Native everywhere</h3><p>Plain C99, no dependencies beyond the C library (the window adds SDL3). Windows 10 and 11 run it in Windows Terminal or its own window, no WSL needed.</p></div>
     </div>
   </section>
 
@@ -197,13 +212,20 @@ sudo dnf install ./narval-&lt;version&gt;-1.x86_64.rpm</pre>
 cd narval &amp;&amp; ./install.sh</pre>
         <p><code>install.sh</code> builds narval and offers to install meson, ninja and a C
           compiler if they are missing.</p>
+        <h3>narval-gui, the window</h3>
+        <p><code>install.sh</code> also builds narval-gui when SDL3 and SDL3_ttf are installed, and
+          offers to install them. It then adds Narval to your apps: <code>Narval.app</code> for
+          Spotlight, Launchpad and the Dock on macOS, a launcher entry on Linux. On Windows,
+          <code>install.ps1</code> run from a source checkout builds it with MSYS2's SDL3 and adds
+          Narval to the Start menu.</p>
       </div>
     </div>
   </section>
 
   <section id="keys">
     <h2>First steps</h2>
-    <p>Run <code>narval path/to/file</code>. After a prefix such as Ctrl-x, pause and the keys
+    <p>Run <code>narval path/to/file</code> in a terminal, or <code>narval-gui path/to/file</code>
+      (or Narval from your apps) for the window. After a prefix such as Ctrl-x, pause and the keys
       available under it appear at the bottom of the screen.</p>
     <table>
       <tr><td>Ctrl-x Ctrl-s</td><td>save</td></tr>
@@ -229,6 +251,12 @@ cd narval &amp;&amp; ./install.sh</pre>
       <p>Bundled packages cover C and C++ (clangd), Python, Rust, TypeScript and Node.js,
         Angular, PHP, LaTeX, Markdown, YAML and Lisp. Any other language with a language server
         is one <code>lsp-server</code> line away, and narval offers to install a missing server.</p></details>
+    <details><summary>Is there a version with its own window?</summary>
+      <p>Yes, narval-gui. It is the same editor drawn in a native window with SDL3: the same
+        commands, key bindings, config, themes and packages, with a real font, unbroken lines,
+        rounded popups and keys terminals can't send, such as Ctrl-1 or Ctrl-Shift-a. Files dropped
+        on the window open in it, and <code>GUI-FONT</code> and <code>GUI-FONT-SIZE</code> in
+        <code>init.lisp</code> set the font.</p></details>
     <details><summary>Is it free?</summary>
       <p>Yes, Narval is open source under the MIT license.</p></details>
   </section>

@@ -299,6 +299,10 @@ Lisp l_memoryInspectorRefresh(Lisp args, LispError *e, LispContext ctx);
 Lisp l_memoryInspectorCycleSort(Lisp args, LispError *e, LispContext ctx);
 // (memory-inspector-export) — prompts for a path, writes the snapshot to it.
 Lisp l_memoryInspectorExport(Lisp args, LispError *e, LispContext ctx);
+Lisp l_memoryInspectorToggleView(Lisp args, LispError *e, LispContext ctx);
+Lisp l_memoryInspectorMarkBaseline(Lisp args, LispError *e, LispContext ctx);
+Lisp l_memoryInspectorClearBaseline(Lisp args, LispError *e, LispContext ctx);
+Lisp l_memoryInspectorGoto(Lisp args, LispError *e, LispContext ctx);
 #endif
 
 // Buffer text from Lisp (builtins_edit.c)

@@ -1402,6 +1402,37 @@ def dashboard_extended(binary, repo):
         ed.quit()
 
 
+
+def memory_inspector(binary, repo):
+    """CTRL-x m lists the allocation sites; b marks a baseline, after which
+    nothing has changed; v shows blocks; ENTER on a site opens its source
+    line. Debug builds only (APP_DEBUG): skipped otherwise."""
+    with Narval(binary, repo, rows=40, cols=140) as ed:
+        with open(ed.path('t.c'), 'w') as f:
+            f.write('int main(void) { return 0; }\n')
+        ed.start('t.c')
+        ed.wait_for('main')
+        ed.keys(CTRL_X, 'm', delay=0.6)
+        ed.pump(0.3)
+        if 'tracked block' not in ''.join(ed.text()):
+            raise Skip('not a debug build (APP_DEBUG)')
+        ed.wait_for('per site')
+        ed.wait_for('allocated at')
+        ed.keys('b', delay=0.5)
+        ed.wait_for('nothing changed since the baseline')
+        ed.keys('v', delay=0.5)
+        ed.wait_for('per block')
+        ed.keys('B', 'v', delay=0.5)
+        ed.wait_for('per site')
+        rows = ed.text()
+        first = next(i for i, row in enumerate(rows) if 'allocated at' in row) + 1
+        site = re.search(r'(\S+):(\d+) \(', rows[first])
+        assert site, rows[first]
+        ed.keys(*([DOWN] * first), '\r', delay=0.6)
+        ed.wait_for('%s:%s' % (site.group(1), site.group(2)))
+        assert 'Ln %s/' % site.group(2) in ''.join(ed.text()), ed.text()[-2:]
+        ed.quit()
+
 TESTS = [
     ('breakpoint-gutter', breakpoint_gutter),
     ('pane-cursors', pane_cursors),
@@ -1446,6 +1477,7 @@ TESTS = [
     ('dashboard-on-start', dashboard_on_start),
     ('dashboard-on-switch', dashboard_on_switch),
     ('dashboard-extended', dashboard_extended),
+    ('memory-inspector', memory_inspector),
 ]
 
 

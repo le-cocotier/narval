@@ -398,10 +398,12 @@ Everything outside `src/os/` is the same code on every platform, so Linux or mac
 most problems. For the Windows layer, do the same from an MSYS2 **CLANG64** shell (gcc has no
 AddressSanitizer on Windows), and run `build-asan\narval.exe` with `C:\msys64\clang64\bin` on
 `PATH` (the sanitizer runtime is a DLL). Dr. Memory doesn't start on Windows 11 24H2.
-Leaks: every `galloc` is tracked. `CTRL-x m` (memory inspector) lists the live blocks with
-the file and line that allocated them, and a debug build (`install.sh --debug`,
-`install.ps1 -DebugBuild`) writes what is still allocated at exit to
-`~/.narval/memory-at-exit.log`, grouped by allocation site. In narval-gui, SDL and SDL_ttf
+Leaks: every `galloc` is tracked. `CTRL-x m` (memory inspector) lists the live blocks grouped
+by the file and line that allocated them (`v` for one row per block, `s` to sort, `ENTER` opens
+that line). To find a leak, press `b` to mark a baseline, do the thing that leaks (open and close
+a file, say), then `r`: only the sites that changed since are listed, with by how much (`B` drops the
+baseline). A debug build (`install.sh --debug`, `install.ps1 -DebugBuild`) also writes what is
+still allocated at exit to `~/.narval/memory-at-exit.log`, grouped by allocation site. In narval-gui, SDL and SDL_ttf
 allocate through galloc too and show up as `SDL:0`. Both views also give galloc's own
 bookkeeping and the whole process heap, so what galloc can't see (libc's buffers, FreeType)
 is the difference between the two.

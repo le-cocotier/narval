@@ -3699,6 +3699,62 @@ Lisp l_memoryInspectorExport(Lisp args, LispError *e, LispContext ctx) {
   memoryInspectorExport();
   return lisp_null();
 }
+
+/**
+ * @brief Lisp function: (memory-inspector-view)
+ * @details Bound to "v" under the "memory" prefix. Switches between one row per allocation site (file:line, the default) and one row per block. See memory_inspector.c.
+ * @param args Lisp arguments (unused)
+ * @return lisp_null()
+ */
+Lisp l_memoryInspectorToggleView(Lisp args, LispError *e, LispContext ctx) {
+  (void)args;
+  (void)e;
+  (void)ctx;
+  memoryInspectorToggleView();
+  return lisp_null();
+}
+
+/**
+ * @brief Lisp function: (memory-inspector-baseline)
+ * @details Bound to "b" under the "memory" prefix. Marks a baseline: from then on the sites view shows only what changed since, and the blocks view only the blocks allocated since and still alive. See memory_inspector.c.
+ * @param args Lisp arguments (unused)
+ * @return lisp_null()
+ */
+Lisp l_memoryInspectorMarkBaseline(Lisp args, LispError *e, LispContext ctx) {
+  (void)args;
+  (void)e;
+  (void)ctx;
+  memoryInspectorMarkBaseline();
+  return lisp_null();
+}
+
+/**
+ * @brief Lisp function: (memory-inspector-clear-baseline)
+ * @details Bound to "B" under the "memory" prefix. Drops the baseline: back to everything tracked. See memory_inspector.c.
+ * @param args Lisp arguments (unused)
+ * @return lisp_null()
+ */
+Lisp l_memoryInspectorClearBaseline(Lisp args, LispError *e, LispContext ctx) {
+  (void)args;
+  (void)e;
+  (void)ctx;
+  memoryInspectorClearBaseline();
+  return lisp_null();
+}
+
+/**
+ * @brief Lisp function: (memory-inspector-goto)
+ * @details Bound to ENTER under the "memory" prefix. Opens the line that allocated the block or site under the cursor, in the other pane when split. See memory_inspector.c.
+ * @param args Lisp arguments (unused)
+ * @return lisp_null()
+ */
+Lisp l_memoryInspectorGoto(Lisp args, LispError *e, LispContext ctx) {
+  (void)args;
+  (void)e;
+  (void)ctx;
+  memoryInspectorGoto();
+  return lisp_null();
+}
 #endif
 
 /**

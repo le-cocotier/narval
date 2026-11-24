@@ -8,6 +8,7 @@
 
 static struct dataBlock_t * blocks = NULL;
 static int blockAmount = 0;
+static unsigned long long g_seq = 0; // the last block's dataBlock_t.seq
 
 // ─── Lock ───────────────────────────────────────────────────────────────────
 // narval itself allocates from one thread, but narval-gui hands SDL's
@@ -116,6 +117,7 @@ static void * track(void * data, const size_t size, const char * file, const int
   new_block->file = file;
   new_block->line = line;
   new_block->func = func;
+  new_block->seq = ++g_seq;
 
   if (!blocks) // First allocation
     blocks = new_block;
@@ -334,6 +336,14 @@ int gSnapshot(struct dataBlock_t * out, const int max) {
     out[n++] = *p;
   gUnlock();
   return n;
+}
+
+unsigned long long gSequence(void) {
+  unsigned long long seq;
+  gLock();
+  seq = g_seq;
+  gUnlock();
+  return seq;
 }
 
 size_t gTrackerOverhead(void) {

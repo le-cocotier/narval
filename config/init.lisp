@@ -617,7 +617,8 @@
 (map-key "PAGE-DOWN" move-cursor-page-down "search")
 (map-key "CTRL-x" '(editor-set-prefix "user") "search")
 
-;; memory (debug builds only — CTRL-x m to open, r refresh, s sort, w export, CTRL-x to leave)
+;; memory (debug builds only — CTRL-x m to open; ENTER source, v sites/blocks,
+;; s sort, b baseline, B clear it, r refresh, w export, CTRL-x to leave)
 (if (app-debug?)
   (begin
     (map-key "ARROW-UP" '(move-cursor "up") "memory")
@@ -627,6 +628,10 @@
     (map-key "r" memory-inspector-refresh "memory")
     (map-key "s" memory-inspector-sort "memory")
     (map-key "w" memory-inspector-export "memory")
+    (map-key "v" memory-inspector-view "memory")
+    (map-key "b" memory-inspector-baseline "memory")
+    (map-key "B" memory-inspector-clear-baseline "memory")
+    (map-key "ENTER" memory-inspector-goto "memory")
     (map-key "CTRL-x" '(editor-set-prefix "user") "memory")))
 
 ;; Your own modifications, kept out of this file so an update can replace it

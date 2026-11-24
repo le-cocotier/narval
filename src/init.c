@@ -263,6 +263,10 @@ void initBuiltins(void) {
   registerBuiltin("memory-inspector-refresh", l_memoryInspectorRefresh);
   registerBuiltin("memory-inspector-sort", l_memoryInspectorCycleSort);
   registerBuiltin("memory-inspector-export", l_memoryInspectorExport);
+  registerBuiltin("memory-inspector-view", l_memoryInspectorToggleView);
+  registerBuiltin("memory-inspector-baseline", l_memoryInspectorMarkBaseline);
+  registerBuiltin("memory-inspector-clear-baseline", l_memoryInspectorClearBaseline);
+  registerBuiltin("memory-inspector-goto", l_memoryInspectorGoto);
 #endif
 }
 

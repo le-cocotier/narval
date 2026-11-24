@@ -63,6 +63,9 @@ core_args = [
   '-Werror=implicit-function-declaration',
   # lisp.h maps files with mmap() unless told not to; stdio is portable.
   '-DLISP_NO_MMAP',
+  # Where __FILE__ paths (relative to the build directory) start from, so
+  # the memory inspector can open the line that allocated a block.
+  '-DNARVAL_BUILD_DIR="' + meson.current_build_dir().replace('\\', '/') + '"',
 ]
 link_args = []
 extra_sources = []

@@ -165,14 +165,18 @@ int guiKeyBytes(const unsigned int keycode, const unsigned int shifted, int mods
     if (!base)
     {
         // A character key types its character (SDL's text input) unless
-        // Ctrl or Alt is held: then it is a key, Ctrl+x, Alt+x.
+        // Ctrl or Alt is held: then it is a key, Ctrl+x, Alt+x. And
+        // Shift+Space, SHIFT-SPACE (typing a space when it isn't bound).
+        if (keycode == ' ' && mods == KEY_MOD_SHIFT)
+            return snprintf(out, size, "\x1b[27;2;32~");
         if (!(mods & (KEY_MOD_CTRL | KEY_MOD_ALT)) || keycode < ' ' || keycode >= 0x7F)
             return 0;
         base = (unsigned char) keycode;
         if (base >= 'A' && base <= 'Z')
             base = (unsigned char) (base | 0x20);
-        // Not a letter: Shift is in the character (Ctrl+Shift+1 is Ctrl+!).
-        if (!(base >= 'a' && base <= 'z') && (mods & KEY_MOD_SHIFT))
+        // Not a letter: Shift is in the character (Ctrl+Shift+1 is Ctrl+!),
+        // except on Space (CTRL-SHIFT-SPACE).
+        if (!(base >= 'a' && base <= 'z') && base != ' ' && (mods & KEY_MOD_SHIFT))
         {
             if (shifted >= ' ' && shifted < 0x7F)
                 base = (unsigned char) shifted;
@@ -180,6 +184,13 @@ int guiKeyBytes(const unsigned int keycode, const unsigned int shifted, int mods
         }
     }
     keyMake(&key, mods, base);
+    // A key with modifiers no control byte carries (Alt+[, Ctrl+Alt+i,
+    // Shift+Space, Alt+Enter): as xterm's modifyOtherKeys reports it,
+    // which says exactly which key it was. ESC + the key, a terminal's
+    // way for Alt, reads as something else when the key is "[" or "O"
+    // (the start of an escape sequence), ESC, TAB or ENTER.
+    if (IS_MOD_KEY(&key) && key.character[2] < 0x80)
+        return snprintf(out, size, "\x1b[27;%d;%d~", 1 + key.character[1], key.character[2]);
     return keyEscapeSequence(&key, out, size);
 }
 
@@ -240,7 +251,9 @@ static void requestQuit(void)
 static void handleKeyDown(const SDL_KeyboardEvent *k)
 {
     const unsigned int plain = SDL_GetKeyFromScancode(k->scancode, SDL_KMOD_NONE, true);
-    const unsigned int shifted = SDL_GetKeyFromScancode(k->scancode, SDL_KMOD_SHIFT, true);
+    // Shift applied as typing applies it (Shift+1 is "!"): key events
+    // otherwise get the unshifted key.
+    const unsigned int shifted = SDL_GetKeyFromScancode(k->scancode, SDL_KMOD_SHIFT, false);
     unsigned int keycode = plain;
     char bytes[32];
     int mods = 0;

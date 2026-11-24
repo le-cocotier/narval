@@ -156,8 +156,11 @@ meson setup build && meson compile -C build   # build/narval and build/narval-gu
 `-Dgui=enabled` makes a missing SDL3 an error, `-Dgui=disabled` skips the window. The terminal
 `narval` never depends on SDL.
 
-In the window, the left Alt (Option) key is Alt/Meta (`ALT-x` is M-x) and the right one types
-characters (AltGr, Option+e on a Mac). Cmd+V (Super+V) pastes the clipboard as typed text, and
+Every key narval can name reaches it in the window, with any mix of Ctrl, Alt and Shift, even
+the ones most terminals can't send: `CTRL-1`, `CTRL-.`, `CTRL-SHIFT-a`, `CTRL-ALT-i` (not
+`ALT-TAB`), `ALT-[`, `ALT-ENTER`, `SHIFT-SPACE` (`test/test_gui.c` presses all of them). The left
+Alt (Option) key is Alt/Meta (`ALT-x` is M-x) and the right one types characters (AltGr, Option+e
+on a Mac). Cmd+V (Super+V) pastes the clipboard as typed text, and
 Cmd+Q or the close button do what `CTRL-x CTRL-c` does, unsaved-changes warning included. The
 mouse wheel and clicks work as in a terminal with `MOUSE` on. `GUI-FONT-SIZE` and `GUI-FONT` in
 `init.lisp` set the font; the default is the bundled DejaVu Sans Mono (`assets/fonts/`). HiDPI

@@ -156,6 +156,20 @@ meson setup build && meson compile -C build   # build/narval and build/narval-gu
 `-Dgui=enabled` makes a missing SDL3 an error, `-Dgui=disabled` skips the window. The terminal
 `narval` never depends on SDL.
 
+`./install.sh` installs it as an app, offering to install SDL3 first (`--no-gui` skips it):
+
+- **macOS:** `Narval.app` in `/Applications` (`~/Applications` if that isn't writable), so
+  Spotlight, Launchpad and the Dock find it, and Finder's *Open With* lists it. Started from
+  there, it takes the `PATH` your login shell sets up (Homebrew's language servers, git, ...)
+  and starts in your home folder. `packaging/macos/make-app.sh` builds the app on its own.
+- **Linux:** a launcher entry (`~/.local/share/applications/dev.narval.editor.desktop`) and
+  its icon, for GNOME's, KDE's and other desktops' app search and menus. `meson install`
+  installs the same entry system-wide.
+- **Windows:** `install.ps1` copies `narval-gui.exe` and the DLLs it needs next to `narval.exe`
+  and adds *Narval* to the Start menu, where Windows search finds it.
+
+Files dropped on the window open in the active pane.
+
 Every key narval can name reaches it in the window, with any mix of Ctrl, Alt and Shift, even
 the ones most terminals can't send: `CTRL-1`, `CTRL-.`, `CTRL-SHIFT-a`, `CTRL-ALT-i` (not
 `ALT-TAB`), `ALT-[`, `ALT-ENTER`, `SHIFT-SPACE` (`test/test_gui.c` presses all of them). The left

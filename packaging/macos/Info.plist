@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Narval.app's Info.plist (packaging/macos/make-app.sh fills in the
+     version). The identifier is the window's app id (SDL_SetAppMetadata()
+     in src/gui/gui_sdl.c). -->
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>Narval</string>
+    <key>CFBundleDisplayName</key>
+    <string>Narval</string>
+    <key>CFBundleIdentifier</key>
+    <string>dev.narval.editor</string>
+    <key>CFBundleExecutable</key>
+    <string>narval-gui</string>
+    <key>CFBundleIconFile</key>
+    <string>narval</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleVersion</key>
+    <string>@VERSION@</string>
+    <key>CFBundleShortVersionString</key>
+    <string>@VERSION@</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.developer-tools</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>11.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSSupportsAutomaticGraphicsSwitching</key>
+    <true/>
+    <!-- Open With > Narval for text and source files: they arrive as
+         dropped files (SDL_EVENT_DROP_FILE). -->
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Text</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.text</string>
+                <string>public.plain-text</string>
+                <string>public.source-code</string>
+                <string>public.script</string>
+                <string>public.shell-script</string>
+                <string>public.json</string>
+                <string>public.yaml</string>
+                <string>net.daringfireball.markdown</string>
+            </array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Any file</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.data</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

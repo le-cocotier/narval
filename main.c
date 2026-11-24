@@ -196,6 +196,11 @@ int main(const int argc, char *argv[]) {
       foreground = 1;
     } else if ((value = optionValue(argv[i], "--name")) != NULL && value[0]) {
       name = value;
+#ifdef NARVAL_GUI
+    } else if (!strncmp(argv[i], "-psn_", 5)) {
+      // macOS's process serial number, given to an app the Finder starts
+      // (older systems): not a file.
+#endif
     } else {
       files[n_files++] = argv[i];
     }

@@ -1,0 +1,16 @@
+[Desktop Entry]
+# narval-gui in Linux app launchers (GNOME, KDE, ...). The file name and
+# StartupWMClass are the window's app id (SDL_SetAppMetadata() in
+# src/gui/gui_sdl.c), so the window is grouped under this entry.
+Type=Application
+Name=Narval
+GenericName=Text Editor
+Comment=Edit text and code, configured in Lisp
+Exec=narval-gui %F
+Icon=narval
+Terminal=false
+Categories=Development;TextEditor;
+Keywords=editor;text;code;lisp;narval;
+MimeType=text/plain;text/x-csrc;text/x-chdr;text/x-c++src;text/x-c++hdr;text/x-python;text/x-script.python;text/markdown;text/x-makefile;text/x-shellscript;application/x-shellscript;text/x-lisp;text/x-scheme;application/json;application/x-yaml;text/x-rust;text/javascript;text/x-java;text/x-go;
+StartupNotify=true
+StartupWMClass=dev.narval.editor

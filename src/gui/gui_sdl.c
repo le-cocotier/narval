@@ -17,6 +17,7 @@
 #include "../../include/gui.h"
 
 #include "../../include/ansi_parser.h"
+#include "../../include/buffer.h"
 #include "../../include/builtins.h"
 #include "../../include/data.h"
 #include "../../include/define.h"
@@ -24,6 +25,8 @@
 #include "../../include/galloc.h"
 #include "../../include/lisp.h"
 #include "../../include/os.h"
+#include "../../include/split_screen.h"
+#include "../../include/subprocess.h"
 #include "../../include/terminal.h"
 #include "../../include/utf8.h"
 #include "../../include/utils.h"
@@ -44,6 +47,7 @@ extern EditorConfig E;
 #define GUI_MIN_FRAME_MS 12    // while keys are queued (a paste), at most ~80 frames a second
 #define GUI_STREAM_SLICE_MS 8  // how often other streams are polled while waiting on the window
 #define GUI_FONT_STYLES 4      // regular, bold, italic, bold italic
+#define GUI_MAX_DROPPED 64     // files opened at once (dropped, or from Finder's Open With)
 
 typedef struct
 {
@@ -89,6 +93,12 @@ typedef struct
     Glyph *glyphs;
     int glyph_cap;
     int glyph_count;
+
+    // Files dropped on the window or opened with it from the Finder,
+    // opened once the run loop is back at its wait (galloc'd paths).
+    char *dropped[GUI_MAX_DROPPED];
+    int n_dropped;
+    char *cwd;  // E.cwd when started from a launcher in "/": the home folder
 
     int focused;
     int open;
@@ -825,6 +835,10 @@ static void handleEvent(const SDL_Event *ev)
     case SDL_EVENT_WINDOW_EXPOSED:
         G.dirty = 1;
         break;
+    case SDL_EVENT_DROP_FILE:
+        if (ev->drop.data && G.n_dropped < GUI_MAX_DROPPED)
+            G.dropped[G.n_dropped++] = gstrdup(ev->drop.data);
+        break;
     default:
         break;
     }
@@ -911,6 +925,25 @@ static int guiSize(int *rows, int *cols)
  * streams (terminal panes, language servers) are polled between them,
  * every few milliseconds while there are any.
  */
+// Opens the files dropped since the last call, each in the active pane as
+// editor-open-file does; the last one is left showing.
+static void openDropped(void)
+{
+    Utf8Char *path;
+    int i;
+
+    for (i = 0; i < G.n_dropped; i++)
+    {
+        path = stringToUtf8((unsigned char *) G.dropped[i]);
+        if (path)
+            splitScreenGetActivePane()->buffer_id = bufferCreate(path, READ_AND_WRITE, FILE_BUFF);
+        gfree(path);
+        gfree(G.dropped[i]);
+        G.dropped[i] = NULL;
+    }
+    G.n_dropped = 0;
+}
+
 static int guiWait(OsStream *const *streams, const int n, const int timeout_ms, int *ready)
 {
     const Uint64 deadline = SDL_GetTicks() + (Uint64) (timeout_ms > 0 ? timeout_ms : 0);
@@ -925,6 +958,12 @@ static int guiWait(OsStream *const *streams, const int n, const int timeout_ms, 
         pumpEvents();
         if (!G.open)
             return 0;
+        // Here no prompt or Lisp code is running: a buffer can be opened.
+        if (G.n_dropped)
+        {
+            openDropped();
+            return 0;  // the run loop redraws
+        }
         G.key_boundary = 0;
         count = n > 1 ? os_wait(streams + 1, n - 1, 0, ready + 1) : 0;
         if (count < 0)
@@ -963,9 +1002,18 @@ static void freeScreenRows(void)
 // terminalRestore(): the window closes, and everything it held is freed.
 static void guiClose(void)
 {
+    int i;
+
     if (!G.open && !G.window)
         return;
     G.open = 0;
+    for (i = 0; i < G.n_dropped; i++)
+        gfree(G.dropped[i]);
+    G.n_dropped = 0;
+    if (E.cwd == G.cwd)
+        E.cwd = NULL;
+    gfree(G.cwd);
+    G.cwd = NULL;
     fontsClose();
     gfree(G.font_path);
     G.font_path = NULL;
@@ -983,6 +1031,80 @@ static void guiClose(void)
     gfree(G.keys);
     G.keys = NULL;
     G.keys_len = G.keys_cap = G.keys_pos = 0;
+}
+
+// The window's icon (the taskbar's on Linux; macOS and Windows take the
+// app's): assets/icons/narval.bmp in ~/.narval, else where narval is
+// installed.
+static void setWindowIcon(void)
+{
+    const char *dirs[2];
+    char path[OS_PATH_MAX];
+    SDL_Surface *icon = NULL;
+    int i;
+
+    dirs[0] = utilNarvalDir();
+    dirs[1] = utilDataDir();
+    for (i = 0; i < 2 && !icon; i++)
+    {
+        if (!dirs[i])
+            continue;
+        snprintf(path, sizeof(path), "%s/assets/icons/narval.bmp", dirs[i]);
+        icon = SDL_LoadBMP(path);
+    }
+    if (!icon)
+        return;
+    SDL_SetWindowIcon(G.window, icon);
+    SDL_DestroySurface(icon);
+}
+
+/**
+ * @brief Started from the Dock, Spotlight or the Finder, a macOS app gets
+ * launchd's PATH (/usr/bin:/bin:/usr/sbin:/sbin): no Homebrew, so no
+ * language servers, git or compilers from it. This takes the PATH your
+ * login shell sets up instead, as a terminal would have given it. Not
+ * when started from a terminal (TERM is set): that PATH is already right.
+ */
+static void importLoginShellPath(void)
+{
+    static const char begin[] = "__NARVAL_PATH__";
+    static const char end[] = "__NARVAL_END__";
+    const char *shell = getenv("SHELL");
+    char *argv[5];
+    char *out;
+    char *from;
+    char *to;
+    int status = 0;
+
+    if (strcmp(SDL_GetPlatform(), "macOS") != 0 || getenv("TERM"))
+        return;
+    argv[0] = (char *) (shell && shell[0] ? shell : "/bin/zsh");
+    argv[1] = "-ilc";  // login and interactive: .zprofile and .zshrc
+    argv[2] = "printf '__NARVAL_PATH__%s__NARVAL_END__' \"$PATH\"";
+    argv[3] = NULL;
+    out = runArgvCaptureQuiet(argv, 5000, 64 * 1024, &status);
+    from = out ? strstr(out, begin) : NULL;
+    to = from ? strstr(from, end) : NULL;
+    if (to && to > from + sizeof(begin) - 1)
+    {
+        *to = '\0';
+        SDL_setenv_unsafe("PATH", from + sizeof(begin) - 1, 1);
+    }
+    gfree(out);
+}
+
+// Started from a launcher, the working directory is "/": the open-file
+// prompt and new terminal panes start in the home folder instead.
+static void startInHome(void)
+{
+    char *cwd = os_getcwd();
+
+    if (cwd && strcmp(cwd, "/") == 0 && !E.cwd)
+    {
+        G.cwd = os_home_dir();
+        E.cwd = G.cwd;
+    }
+    gfree(cwd);
 }
 
 static const ScreenDriver s_gui_driver = {guiWrite, guiReadKeys, guiSize, guiWait, guiClose};
@@ -1030,6 +1152,9 @@ int guiOpen(const char *font_path)
                       (int) ((float) (GUI_START_COLS * G.cell_w + 2 * G.pad) / G.scale + 0.5f),
                       (int) ((float) (GUI_START_ROWS * G.cell_h + 2 * G.pad) / G.scale + 0.5f));
     SDL_SetWindowMinimumSize(G.window, 240, 120);
+    setWindowIcon();
+    importLoginShellPath();
+    startInHome();
     gridMeasure();
     SDL_ShowWindow(G.window);
     SDL_StartTextInput(G.window);

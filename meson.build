@@ -184,12 +184,19 @@ sdl3_ttf_dep = dependency('sdl3-ttf', required : get_option('gui'))
 gui_found = sdl3_dep.found() and sdl3_ttf_dep.found()
 if gui_found
   gui_deps = [m, sdl3_dep, sdl3_ttf_dep]
+  gui_sources = []
+  if is_windows
+    # narval.exe's manifest, plus the app's icon.
+    gui_sources += import('windows').compile_resources('windows/narval-gui.rc',
+      include_directories : include_directories('windows', 'assets/icons'),
+      depend_files : files('windows/narval.manifest', 'assets/icons/narval.ico'))
+  endif
   gui_lib = static_library('narval-gui',
     'src/gui/gui_sdl.c',
     c_args : core_args,
     dependencies : gui_deps)
   executable('narval-gui',
-    files('main.c') + extra_sources,
+    files('main.c') + gui_sources,
     c_args : core_args + ['-DNARVAL_GUI'],
     link_with : [gui_lib, core_lib, os_lib],
     dependencies : gui_deps,
@@ -206,6 +213,17 @@ if gui_found
     link_args : is_windows ? [] : link_args),
     args : [meson.current_source_dir() / 'assets/fonts/DejaVuSansMono.ttf'],
     env : ['SDL_VIDEO_DRIVER=offscreen'])
+  # Linux and the BSDs: in the desktop's app launcher and search, with its
+  # icon. macOS gets Narval.app instead (packaging/macos/make-app.sh, run
+  # by install.sh), Windows a Start menu shortcut (install.ps1).
+  if not is_windows and host_machine.system() != 'darwin'
+    install_data('packaging/desktop/dev.narval.editor.desktop',
+      install_dir : get_option('datadir') / 'applications')
+    install_data('assets/icons/narval.svg',
+      install_dir : get_option('datadir') / 'icons/hicolor/scalable/apps')
+    install_data('assets/icons/narval.png',
+      install_dir : get_option('datadir') / 'icons/hicolor/256x256/apps')
+  endif
 endif
 
 # Unit tests (test/): each is a small program linked against the editor's

@@ -32,6 +32,7 @@ static void testDefaults(void) {
   CHECK_INT(out.LSP, 1);
   CHECK_INT(out.LINE_NUMBERS, 1);
   CHECK_INT(out.MOUSE, 1);
+  CHECK_INT(out.MOUSE_REVERSE_SCROLL, 0);
   CHECK_INT(out.EXTENDED_KEYS, 1);
   CHECK_STR(invalid, "");
 }

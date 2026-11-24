@@ -31,6 +31,10 @@
 ;; Terminal.app). Omitting this leaves it on.
 (define MOUSE #t)
 
+;; The wheel and the trackpad scroll the way the system is set to (macOS's
+;; natural scrolling included). #t turns that around, in narval only.
+(define MOUSE-REVERSE-SCROLL #f)
+
 ;; Keys with modifiers. Every Alt/Option and Ctrl combination has a name
 ;; for map-key, modifiers in the order CTRL-ALT-SHIFT-:
 ;;   "ALT-x" "ALT-X" (Alt+Shift+x) "ALT-1" "ALT-." "ALT-ENTER" "ALT-SPACE"

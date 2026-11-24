@@ -64,7 +64,8 @@ static int shiftedFunctionKeyFromTilde(const int number)
  * @brief Turns a mouse report's button code into a key, and remembers
  * where the pointer was.
  * @param button xterm's button byte: 0-2 left/middle/right, +4 Shift,
- * +8 Alt, +16 Ctrl, +32 motion, +64 wheel (64 up, 65 down)
+ * +8 Alt, +16 Ctrl, +32 motion, +64 wheel (64 up, 65 down; the other way
+ * round with MOUSE-REVERSE-SCROLL)
  * @param col, row 1-based screen cell
  * @param press 0 for a release (SGR's final 'm')
  */
@@ -74,10 +75,8 @@ static unsigned char mouseKey(const int button, const int col, const int row, co
 
     E.mouse_col = col - 1;
     E.mouse_row = row - 1;
-    if (b == 64)
-        return WHEEL_UP;
-    if (b == 65)
-        return WHEEL_DOWN;
+    if (b == 64 || b == 65)
+        return (b == 64) != (E.constantes.MOUSE_REVERSE_SCROLL != 0) ? WHEEL_UP : WHEEL_DOWN;
     if (b == 0 && press)
         return MOUSE_LEFT;
     return MOUSE_OTHER;

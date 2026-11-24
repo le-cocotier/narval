@@ -56,6 +56,8 @@ static Setting s_settings[] = {
      "While the debugger is paused, show the variables' values after the lines that use them."},
     {"MOUSE", SETTING_BOOL, 1, 0, &E.constantes.MOUSE,
      "Mouse wheel scrolls the pane under the pointer, a left click places the cursor."},
+    {"MOUSE-REVERSE-SCROLL", SETTING_BOOL, 0, 0, &E.constantes.MOUSE_REVERSE_SCROLL,
+     "Scroll the other way from the wheel or trackpad (else the way the system is set to)."},
     {"EXTENDED-KEYS", SETTING_BOOL, 1, 0, &E.constantes.EXTENDED_KEYS,
      "Ask the terminal to report Ctrl+digit, Ctrl+punctuation and Ctrl+Shift+letter keys too."},
     {"GUI-FONT-SIZE", SETTING_INT, 14, 6, &E.constantes.GUI_FONT_SIZE,

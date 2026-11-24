@@ -182,7 +182,8 @@ the ones most terminals can't send: `CTRL-1`, `CTRL-.`, `CTRL-SHIFT-a`, `CTRL-AL
 Alt (Option) key is Alt/Meta (`ALT-x` is M-x) and the right one types characters (AltGr, Option+e
 on a Mac). Cmd+V (Super+V) pastes the clipboard as typed text, and
 Cmd+Q or the close button do what `CTRL-x CTRL-c` does, unsaved-changes warning included. The
-mouse wheel and clicks work as in a terminal with `MOUSE` on. `GUI-FONT-SIZE` and `GUI-FONT` in
+mouse wheel and clicks work as in a terminal with `MOUSE` on, and the wheel scrolls the way the
+system is set to (macOS's natural scrolling included; `MOUSE-REVERSE-SCROLL` turns it around). `GUI-FONT-SIZE` and `GUI-FONT` in
 `init.lisp` set the font (a path to a .ttf, .otf or .ttc file; `~/` is your home folder); the
 default is the bundled DejaVu Sans Mono (`assets/fonts/`). Characters the font hasn't got (emoji,
 Chinese, Japanese, Korean, symbols) come from the system's fonts, as in a terminal, emoji in

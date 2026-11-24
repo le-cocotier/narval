@@ -164,6 +164,7 @@ struct const_t
     int INLAY_HINTS;        // (define INLAY-HINTS #t) — parameter names / types inside the line
     int DEBUG_INLINE_VALUES; // (define DEBUG-INLINE-VALUES #t) — variables' values after the lines, while paused
     int MOUSE;              // (define MOUSE #t) — wheel scrolling and click-to-place
+    int MOUSE_REVERSE_SCROLL; // (define MOUSE-REVERSE-SCROLL #f) — the wheel scrolls the other way
     int EXTENDED_KEYS;      // (define EXTENDED-KEYS #t) — ask for modifyOtherKeys (Ctrl+1, Ctrl+.)
     int GUI_FONT_SIZE;      // (define GUI-FONT-SIZE 14) — narval-gui's font size, points
 };

@@ -1366,7 +1366,10 @@ static void handleEvent(const SDL_Event *ev)
                        ev->type == SDL_EVENT_MOUSE_BUTTON_DOWN);
         break;
     case SDL_EVENT_MOUSE_WHEEL:
-        G.wheel += ev->wheel.direction == SDL_MOUSEWHEEL_FLIPPED ? -ev->wheel.y : ev->wheel.y;
+        // As the system is set to scroll: SDL's y already has macOS's
+        // natural scrolling applied (FLIPPED only says so), as a
+        // terminal's wheel reports do.
+        G.wheel += ev->wheel.y;
         while (G.wheel >= 1.0f || G.wheel <= -1.0f)
         {
             queueMouse(G.wheel > 0 ? 64 : 65, ev->wheel.mouse_x, ev->wheel.mouse_y, 1);

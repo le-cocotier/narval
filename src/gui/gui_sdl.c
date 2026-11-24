@@ -232,6 +232,18 @@ int guiKeyBytes(const unsigned int keycode, const unsigned int shifted, int mods
     return keyEscapeSequence(&key, out, size);
 }
 
+/**
+ * @brief Pixels per unit of the window's coordinates (mouse positions,
+ * window sizes): 2 on a Retina Mac. Not the display's scale, which sizes
+ * the font: on a HiDPI Linux or Windows screen the window counts in
+ * pixels already (1) while the display's scale is 1.5 or 2.
+ */
+static float density(void)
+{
+    const float d = G.window ? SDL_GetWindowPixelDensity(G.window) : 0.0f;
+    return d > 0.0f ? d : 1.0f;
+}
+
 // xterm's SGR mouse report for a press or release at a pixel position.
 static void queueMouse(const int button, const float x, const float y, const int press)
 {
@@ -242,8 +254,8 @@ static void queueMouse(const int button, const float x, const float y, const int
 
     if (!E.constantes.MOUSE || G.cell_w <= 0 || G.cell_h <= 0)
         return;
-    col = (int) ((x * G.scale - (float) G.pad) / (float) G.cell_w);
-    row = (int) ((y * G.scale - (float) G.pad) / (float) G.cell_h);
+    col = (int) ((x * density() - (float) G.pad) / (float) G.cell_w);
+    row = (int) ((y * density() - (float) G.pad) / (float) G.cell_h);
     if (col < 0) col = 0;
     if (row < 0) row = 0;
     if (col >= G.cols) col = G.cols - 1;
@@ -1560,8 +1572,8 @@ int guiOpen(const char *font_path)
         return -1;
     }
     SDL_SetWindowSize(G.window,
-                      (int) ((float) (GUI_START_COLS * G.cell_w + 2 * G.pad) / G.scale + 0.5f),
-                      (int) ((float) (GUI_START_ROWS * G.cell_h + 2 * G.pad) / G.scale + 0.5f));
+                      (int) ((float) (GUI_START_COLS * G.cell_w + 2 * G.pad) / density() + 0.5f),
+                      (int) ((float) (GUI_START_ROWS * G.cell_h + 2 * G.pad) / density() + 0.5f));
     SDL_SetWindowMinimumSize(G.window, 240, 120);
     setWindowIcon();
     importLoginShellPath();

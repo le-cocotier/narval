@@ -297,7 +297,11 @@ void editorRunLoop(void) {
   int ready[RUN_LOOP_MAX_STREAMS];
   RunLoopWatch watch;
   int n_streams;
-  getWindowSize(&last_rows, &last_cols);
+  // The size the editor was laid out for, not the screen's size now: a
+  // resize while a prompt held the screen before this loop first ran
+  // (clangd's install question, at startup) is still a resize.
+  last_rows = E.screenrows + 2;
+  last_cols = E.screencols;
 
   while (!E.exit_requested) {
     // Between two ticks no Lisp value is held in a C local.

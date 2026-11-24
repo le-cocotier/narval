@@ -129,7 +129,7 @@
 
 #define ABUF_INIT {NULL, 0, 0}
 
-#define NARVAL_VERSION "4.0.0"
+#define NARVAL_VERSION "4.2.0"
 
 
 

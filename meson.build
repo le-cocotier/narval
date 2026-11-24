@@ -1,5 +1,5 @@
 project('narval', 'c',
-  version : '4.0.0',
+  version : '4.2.0',
   default_options : [
     'c_std=c99'
   ]

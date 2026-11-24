@@ -54,7 +54,10 @@ endian = 'little'
 INI
     CROSS=(--cross-file "$WORK/cross.ini")
 fi
-meson setup "$WORK/build" "$ROOT" "${CROSS[@]}" --prefix=/usr --buildtype=release >/dev/null
+# narval-gui stays out of the packages for now: the %files list and the
+# .deb's Depends cover the terminal narval only, and SDL3 on the runner
+# would otherwise add the window app (and break rpmbuild on its files).
+meson setup "$WORK/build" "$ROOT" "${CROSS[@]}" --prefix=/usr --buildtype=release -Dgui=disabled >/dev/null
 meson compile -C "$WORK/build"
 DESTDIR="$WORK/root" meson install -C "$WORK/build" --no-rebuild >/dev/null
 "$STRIP" "$WORK/root/usr/bin/narval"

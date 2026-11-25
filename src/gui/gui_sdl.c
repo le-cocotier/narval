@@ -1790,6 +1790,11 @@ int guiOpen(const char *font_path)
     G.open = 1;
     G.titlebar_rgb = -1;
     SDL_SetRenderVSync(G.renderer, 1);
+    // Metal's layer keeps three drawables by default, each a whole window
+    // of pixels (~10 MB for a 110x34 window on a Retina screen). narval
+    // draws one frame at a time and waits for vsync, so two are enough: one
+    // shown, one being drawn.
+    os_window_metal_drawables(SDL_GetRenderMetalLayer(G.renderer), 2);
     G.scale = SDL_GetWindowDisplayScale(G.window);
     if (G.scale <= 0.0f)
         G.scale = 1.0f;

@@ -64,6 +64,15 @@ void os_window_titlebar(void *native, const unsigned int rgb)
     msgId(pool, "drain");
 }
 
+void os_window_metal_drawables(void *layer, const int count)
+{
+    const SEL set = sel_registerName("setMaximumDrawableCount:");
+
+    if (!layer || !((BOOL (*)(id, SEL, SEL)) objc_msgSend)((id) layer, sel_registerName("respondsToSelector:"), set))
+        return;
+    ((void (*)(id, SEL, unsigned long)) objc_msgSend)((id) layer, set, (unsigned long) count);
+}
+
 #elif defined(_WIN32)
 
 #include <windows.h>
@@ -86,6 +95,12 @@ void os_window_titlebar(void *native, const unsigned int rgb)
     DwmSetWindowAttribute(hwnd, NARVAL_DWMWA_CAPTION_COLOR, &color, sizeof(color));
 }
 
+void os_window_metal_drawables(void *layer, const int count)
+{
+    (void) layer;
+    (void) count;
+}
+
 #else
 
 // Linux and the BSDs: the window manager draws the title bar its own way.
@@ -93,6 +108,12 @@ void os_window_titlebar(void *native, const unsigned int rgb)
 {
     (void) native;
     (void) isDark(rgb);
+}
+
+void os_window_metal_drawables(void *layer, const int count)
+{
+    (void) layer;
+    (void) count;
 }
 
 #endif

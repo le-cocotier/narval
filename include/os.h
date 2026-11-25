@@ -541,5 +541,9 @@ int os_clipboard_set(const char *text, size_t len);
 // `rgb` (0xRRGGBB), its text light or dark to suit; where the system has
 // no say in it (Linux, Windows 10), nothing.
 void os_window_titlebar(void *native, unsigned int rgb);
+// How many drawables a CAMetalLayer (`layer`, from SDL's Metal renderer)
+// keeps for the frames in flight: each is a whole window of pixels. macOS
+// only; elsewhere, or with no layer, nothing.
+void os_window_metal_drawables(void *layer, int count);
 
 #endif // NARVAL_OS_H_

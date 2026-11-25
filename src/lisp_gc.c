@@ -7,8 +7,11 @@
 extern EditorConfig E;
 
 // Collect once the heap has twice the size it had after the last
-// collection, and never below this.
-#define LISP_GC_MIN_HEAP (8 * 1024 * 1024)
+// collection, and never below this. The editor's own Lisp (config,
+// packages, key bindings) is under 1 MB live, and a collection copies only
+// that, so 2 MB keeps the heap small (it was 8 MB: up to 7 MB of garbage
+// waiting) for a collection every few hundred KB of garbage, ~1 ms each.
+#define LISP_GC_MIN_HEAP (2 * 1024 * 1024)
 
 static size_t s_collect_at = LISP_GC_MIN_HEAP;
 
@@ -70,4 +73,7 @@ void lispGcMaybeCollect(void) {
   lisp_collect(lisp_null(), E.ctx);
   live = lisp_heap_size(E.ctx);
   s_collect_at = live * 2 > LISP_GC_MIN_HEAP ? live * 2 : LISP_GC_MIN_HEAP;
+  // The old heap's pages were just freed: give them back rather than
+  // letting malloc keep them.
+  os_heap_release();
 }

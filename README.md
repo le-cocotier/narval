@@ -95,6 +95,13 @@ Windows; `NARVAL_HOME` moves it). Put your own settings in
 With a package manager, the bundled packages stay in the install and upgrade with narval; a copy
 of one in `~/.narval/packages/` takes precedence.
 
+After an edit, `CTRL-x c r` (`config-reload`) loads the config again without restarting. What
+the old config set up is forgotten first (definitions, key bindings, hooks, the theme, language
+server and syntax registrations, the status bar layout, the loaded packages), so a line you took
+out stops having an effect too; open files, panes, terminals and running language servers stay.
+Mistakes are reported in `*config-errors*` as at startup. A hook on `"config-reloaded"` runs
+after each reload.
+
 ## Getting started
 
 ```sh
@@ -315,7 +322,7 @@ lines are written. The commit each one is at goes to `personal-config/packages.l
 folder on another machine, `narval --sync-packages` installs exactly the same commits without
 opening the editor. `CTRL-x c l` lists every package (version, commit, loaded or not) and
 installs (`i`), updates after showing the new commits (`u`, `U` for all), rolls back (`r`) and
-removes (`d`) them. Updates apply at the next start.
+removes (`d`) them. Updates apply at the next start, or at `CTRL-x c r`.
 
 A package can describe itself in a `package.lisp` next to its `init.lisp` (read, never run):
 

@@ -170,6 +170,13 @@ Lisp lspRegisterServer(Lisp args, LispError *e, LispContext ctx);
 
 void bFree_structs(void);
 
+// For a config reload (init.c): forget what the config registered. Key
+// bindings and hooks; (lsp-server ...) entries; (syntax-define-language
+// ...) languages.
+void keyBindsClear(void);
+void lspServersClear(void);
+void languagesClear(void);
+
 // Hooks
 //
 // (add-hook "event-name" fn) registers fn (a lambda or function symbol —
@@ -189,6 +196,8 @@ void bFree_structs(void);
 //                                            project-switch; a hook that
 //                                            shows a buffer replaces the
 //                                            find-file that follows
+//   "config-reloaded" ()                  — (config-reload) loaded the
+//                                            config again (init.c)
 //   "terminal-exited" (name, exit-code)   — a terminal pane's program ended
 //                                            (-1: code unknown); see
 //                                            terminal-run

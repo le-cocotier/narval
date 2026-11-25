@@ -74,6 +74,7 @@ typedef struct
     SDL_Renderer *renderer;
     TTF_Font *fonts[GUI_FONT_STYLES];
     char *font_path;     // galloc'd: what fonts[] were opened from
+    int font_configured; // fonts[] are GUI-FONT's (not the default search's)
     // The system's fonts for what fonts[] haven't got (emoji, Chinese,
     // Japanese, Korean, symbols), as a terminal borrows them: opened at
     // fonts[]'s size when a character is first missing.
@@ -1806,7 +1807,13 @@ void guiConfigure(void)
     if (!G.open)
         return;
     wanted = configuredFont();
-    if (size == G.font_size && (!wanted || (G.font_path && !strcmp(wanted, G.font_path))))
+    // Nothing to do when the size is the same and the font is GUI-FONT's
+    // already, or there's no GUI-FONT and none was set before either. A
+    // GUI-FONT taken out of the config (and reloaded) goes back to the
+    // default font.
+    if (size == G.font_size &&
+        (wanted ? G.font_configured && G.font_path && !strcmp(wanted, G.font_path)
+                : !G.font_configured))
     {
         gfree(wanted);
         return;
@@ -1814,6 +1821,7 @@ void guiConfigure(void)
     G.font_size = size;
     if (wanted && fontsOpen(wanted) == 0)
     {
+        G.font_configured = 1;
         gfree(wanted);
         gridMeasure();
         return;
@@ -1821,7 +1829,10 @@ void guiConfigure(void)
     if (wanted)
         editorSetStatusMessage("GUI-FONT: can't open %s", wanted);
     gfree(wanted);
-    path = G.font_path ? gstrdup(G.font_path) : NULL;
+    // The font in use, at the new size; or, when it was GUI-FONT's and
+    // GUI-FONT is gone, the default search's.
+    path = G.font_path && !G.font_configured ? gstrdup(G.font_path) : NULL;
+    G.font_configured = 0;
     fontsFind(path);
     gfree(path);
     gridMeasure();

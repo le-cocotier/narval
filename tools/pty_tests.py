@@ -1268,6 +1268,42 @@ def debug_log_buffer(binary, repo):
         ed.quit()
 
 
+def config_reload(binary, repo):
+    """CTRL-x c r reloads the config: a setting personal-config now sets
+    applies, one it no longer sets is back to its default, and a mistake
+    is reported without losing the keys."""
+    with Narval(binary, repo, rows=30, cols=100) as ed:
+        personal = ed.path('.narval/packages/personal-config/init.lisp')
+        with open(personal) as f:
+            original = f.read()
+        with open(ed.path('d.txt'), 'w') as f:
+            f.write('reload me\n')
+        ed.start('d.txt')
+        ed.wait_for('reload me')
+        assert any(re.match(r'\s*1\s+reload me', line) for line in ed.text()), ed.text()
+
+        with open(personal, 'w') as f:
+            f.write(original + '\n(define LINE-NUMBERS #f)\n')
+        ed.keys(CTRL_X, 'c', 'r', delay=0.5)
+        ed.wait_for('Config reloaded')
+        # No gutter: the text starts at the left margin.
+        assert any(re.match(r'\s{0,2}reload me', line) for line in ed.text()), ed.text()
+        assert 'Config reloaded (' in ed.text()[-1] and 'ms)' in ed.text()[-1], ed.text()
+
+        with open(personal, 'w') as f:
+            f.write(original + '\n(this-is-not-defined)\n')
+        ed.keys(CTRL_X, 'c', 'r', delay=0.5)
+        ed.wait_for('Config error')
+        ed.wait_for('this-is-not-defined')
+        assert any(re.match(r'\s*1\s+reload me', line) for line in ed.text()), ed.text()
+
+        with open(personal, 'w') as f:
+            f.write(original)
+        ed.keys(CTRL_X, 'c', 'r', delay=0.5)   # the keys still work
+        ed.wait_for('Config reloaded')
+        ed.quit()
+
+
 DASHBOARD_MAIN = """int main(void) {
   /* TODO: read the arguments */
   return 0;
@@ -1474,6 +1510,7 @@ TESTS = [
     ('stm32-project-settings', stm32_project_settings),
     ('stm32-debug', stm32_debug),
     ('debug-log-buffer', debug_log_buffer),
+    ('config-reload', config_reload),
     ('dashboard-on-start', dashboard_on_start),
     ('dashboard-on-switch', dashboard_on_switch),
     ('dashboard-extended', dashboard_extended),

@@ -765,6 +765,7 @@ static void daemonRunLoop(void) {
   int i;
 
   while (!s_stop) {
+    editorRunPendingConfigReload();
     lispGcMaybeCollect();
     // Index 0: the listener; then one per client; then what the
     // standalone loop waits on too.

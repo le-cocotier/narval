@@ -236,6 +236,43 @@ Lisp moveCursor(const Lisp args, LispError *e, LispContext ctx) {
  * Called during shutdown to prevent memory leaks.
  * @note Updates global editor state E
  */
+void keyBindsClear(void) {
+  int i;
+  for (i = 0; i < E.number_of_keybinds; ++i) {
+    gfree(E.key_binds[i].key_sequence);
+    gfree(E.key_binds[i].extensions);
+  }
+  gfree(E.key_binds);
+  E.key_binds = NULL;
+  E.number_of_keybinds = 0;
+  gfree(E.hooks);
+  E.hooks = NULL;
+  E.number_of_hooks = 0;
+  // which-key's caches are keyed off the tables freed just above.
+  whichKeyInvalidate();
+  whichKeyFreeCommandList();
+}
+
+void lspServersClear(void) {
+  int i;
+  int j;
+  for (i = 0; i < E.number_of_lsp_servers; ++i)
+    for (j = 0; j < LSP_SERVER_MAX_ARGS && E.lsp_servers[i].argv[j]; ++j)
+      gfree(E.lsp_servers[i].argv[j]);
+  gfree(E.lsp_servers);
+  E.lsp_servers = NULL;
+  E.number_of_lsp_servers = 0;
+}
+
+void languagesClear(void) {
+  int i;
+  for (i = 0; i < E.number_of_languages; i++)
+    gfree(E.languages[i].words);
+  gfree(E.languages);
+  E.languages = NULL;
+  E.number_of_languages = 0;
+}
+
 void bFree_structs(void) {
   int i, j;
   struct buffer_t *b;

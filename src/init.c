@@ -7,6 +7,10 @@
 #include "../include/cJSON.h"
 #include "../include/completion.h"
 #include "../include/lsp_install.h"
+#include "../include/buffer.h"
+#include "../include/editor_op.h"
+#include "../include/which_key.h"
+#include "../include/output.h"
 #include "../include/config_load.h"
 #include "../include/data.h"
 #include "../include/describe.h"
@@ -41,6 +45,7 @@
 // clashes with the one lisp.h's implementation (LISP_IMPLEMENTATION, above)
 // defines.
 void syntaxFreeCommentWords(void);
+void syntaxHighlighterInvalidateAfter(struct buffer_t *buf, int row);
 
 /***********************************************************************************************************************
  *
@@ -49,6 +54,9 @@ void syntaxFreeCommentWords(void);
  **********************************************************************************************************************/
 
 extern EditorConfig E;
+
+static void themeSetDefaults(void);
+static Lisp l_configReload(Lisp args, LispError *e, LispContext ctx);
 
 /***********************************************************************************************************************
  *
@@ -78,6 +86,7 @@ void initBuiltins(void) {
   registerBuiltin("editor-set-theme-color", editorSetThemeColor);
   registerBuiltin("editor-theme-colors", editorThemeColors);
   registerBuiltin("editor-load-file", editorLoadFile);
+  registerBuiltin("config-reload", l_configReload);
   registerBuiltin("editor-insert-char", editorPrintC);
   registerBuiltin("add-package", addPackage);
   registerBuiltin("package-loaded?", packageLoaded);
@@ -426,6 +435,8 @@ static void initConfig(void) {
   lispGcInit();
   // Init builtins lisp functions
   initBuiltins();
+  // What a config reload puts the environment back to.
+  configSnapshotEnv();
 
   // Form by form: a mistake is reported (see configShowErrors(), called
   // once the first buffer is up) instead of stopping the editor, and the
@@ -466,6 +477,134 @@ static void initStartupConstants(void) {
   E.global_constantes = E.constantes;
 }
 
+// ─── Reloading the config ────────────────────────────────────────────────────
+
+static void (*s_reload_listener)(void) = NULL;
+static int s_reload_pending = 0;
+
+void editorSetConfigReloadListener(void (*listener)(void)) { s_reload_listener = listener; }
+
+void editorRequestConfigReload(void) { s_reload_pending = 1; }
+
+void editorRunPendingConfigReload(void) {
+  if (!s_reload_pending)
+    return;
+  s_reload_pending = 0;
+  editorReloadConfig();
+}
+
+/**
+ * @brief The prefixes initEditor() makes itself (ids 0 to 3), as it makes
+ * them: what the table goes back to before init.lisp adds its own.
+ */
+static void resetPrefixes(void) {
+  E.number_of_prefix = 3;
+  E.prefix[0].sticky = 0;
+  E.prefix[1].sticky = 1;
+  E.prefix[2].sticky = 0;
+  E.prefix[3].sticky = 1;
+}
+
+/**
+ * @brief Forgets everything the config set up, back to what initEditor()
+ * has before init.lisp runs: the Lisp globals, key bindings and prefixes,
+ * hooks, language servers and their install recipes, debug adapters,
+ * syntax rules, the status bar layout, project markers, the loaded
+ * packages and the theme.
+ */
+static void forgetConfig(void) {
+  keyBindsClear();
+  resetPrefixes();
+  E.prefix_state = 0;
+  lspServersClear();
+  lspInstallClearRecipes();
+  dapClearAdapters();
+  languagesClear();
+  syntaxFreeCommentWords();
+  statusBarReset();
+  projectClearMarkers();
+  packagesFree();
+  themeSetDefaults();
+}
+
+int editorReloadConfig(void) {
+  char prefix_name[64];
+  long long started = os_monotonic_ms();
+  int read_to_end;
+  int errors;
+  int i;
+  Buffer *buf;
+
+  // The prefix the editor is in (a sidebar's sticky one, say): looked up
+  // again by name afterwards, as the config may number them differently.
+  snprintf(prefix_name, sizeof(prefix_name), "%s",
+           E.prefix_state >= 0 && E.prefix_state <= E.number_of_prefix
+               ? E.prefix[E.prefix_state].prefix_name
+               : "no-prefix");
+
+  logInfo("reloading %s", E.init_file_path);
+  configErrorsFree();
+  if (configRestoreEnv() != 0) {
+    editorSetStatusMessage("Config reload: not available before the config has loaded once");
+    return -1;
+  }
+  forgetConfig();
+
+  // Errors are gathered and shown once, at the end.
+  configSetQuiet(1);
+  configLoadFile(E.init_file_path, "init.lisp", &read_to_end);
+  if (!read_to_end)
+    loadDefaultConfig();
+  if (configErrorCount() > 0)
+    ensureEmergencyBindings();
+  configSetQuiet(0);
+  errors = configErrorCount();
+
+  initStartupConstants();
+  projectReloadConfigs();
+  E.quit_times_buffer = E.constantes.QUIT_TIMES;
+
+  E.prefix_state = find_prefix(prefix_name).prefix_id;
+  whichKeyInvalidate();
+  // Syntax rules may have changed under every open buffer.
+  buf = E.buffers;
+  for (i = 0; buf && i < E.number_of_buffer; i++, buf = buf->next)
+    syntaxHighlighterInvalidateAfter(buf, 0);
+  // narval-gui's font (GUI-FONT, GUI-FONT-SIZE).
+  if (s_reload_listener)
+    s_reload_listener();
+  editorFreeScreenCache(); // the theme may be another: redraw everything
+
+  runHooks("config-reloaded", lisp_null());
+
+  if (errors > 0) {
+    logWarn("config reloaded in %lld ms with %d error(s)", os_monotonic_ms() - started, errors);
+    configShowErrors();
+  } else {
+    logInfo("config reloaded in %lld ms", os_monotonic_ms() - started);
+    // (editorSetStatusMessage() has no %lld.)
+    editorSetStatusMessage("Config reloaded (%d ms)", (int)(os_monotonic_ms() - started));
+    settingsReportProblems();
+  }
+  return errors;
+}
+
+/**
+ * @brief Lisp function: (config-reload) — reloads init.lisp and every
+ * package once the current command has finished.
+ * @details Deferred to the run loop (editorRunPendingConfigReload()): the
+ * reload frees the key bindings, and the one being run is among them.
+ * @return #t
+ */
+static Lisp l_configReload(Lisp args, LispError *e, LispContext ctx) {
+  (void)args;
+  (void)e;
+  (void)ctx;
+  editorRequestConfigReload();
+  editorSetStatusMessage("Reloading the config...");
+  return lisp_true();
+}
+
 /**
  * @brief cJSON's allocation hooks: route its nodes and printed strings
  * through galloc, so they show up in the memory inspector and the exit
@@ -491,6 +630,35 @@ static char *themeColor(const char *ansi) {
   if (copy)
     strcpy(copy, ansi);
   return copy;
+}
+
+/**
+ * @brief Sets every theme color to the fallback palette (the old hardcoded
+ * "dark" one), freeing whatever was there. initEditor() and a config
+ * reload start from it; a theme package then overwrites it.
+ */
+static void themeSetDefaults(void) {
+  char **slot = &E.theme.BACKGROUND_COLOR;
+  int i;
+  for (i = 0; i < THEME_COLOR_COUNT; ++i) {
+    gfree(slot[i]); // NULL before the first call (E is zeroed)
+    slot[i] = NULL;
+  }
+  E.theme.BACKGROUND_COLOR = themeColor(ANSI_BG_RGB(40, 44, 52));
+  E.theme.LINE_CURSOR_BACKGROUND = themeColor(ANSI_BG_RGB(60, 64, 72));
+  E.theme.COLOR_KEYWORD = themeColor(ANSI_FG_RGB(198, 120, 221));
+  E.theme.COLOR_TYPE = themeColor(ANSI_FG_RGB(97, 175, 239));
+  E.theme.COLOR_STRING = themeColor(ANSI_FG_RGB(152, 195, 121));
+  E.theme.COLOR_COMMENT = themeColor(ANSI_FG_RGB(92, 99, 112));
+  E.theme.COLOR_NUMBER = themeColor(ANSI_FG_RGB(209, 154, 102));
+  E.theme.COLOR_DEFAULT = themeColor(ANSI_FG_RGB(171, 178, 191));
+  E.theme.COLOR_ADDED = themeColor(ANSI_FG_RGB(152, 195, 121));
+  E.theme.COLOR_REMOVED = themeColor(ANSI_FG_RGB(224, 108, 117));
+  E.theme.DEBUG_LINE_BACKGROUND = themeColor(ANSI_BG_RGB(77, 68, 38));
+  E.theme.STATUS_BAR_FG = themeColor(ANSI_FG_RGB(171, 178, 191));
+  E.theme.STATUS_BAR_BG = themeColor(ANSI_BG_RGB(33, 37, 43));
+  E.theme.STATUS_ACCENT_FG = themeColor(ANSI_FG_RGB(40, 44, 52));
+  E.theme.STATUS_ACCENT_BG = themeColor(ANSI_BG_RGB(97, 175, 239));
 }
 
 /**
@@ -673,21 +841,7 @@ void initEditor() {
   // initConfig() runs — a theme package's editor-set-theme-color calls
   // overwrite these during config load, but there's always something
   // valid in E.theme even if no theme package is installed/loaded.
-  E.theme.BACKGROUND_COLOR = themeColor(ANSI_BG_RGB(40, 44, 52));
-  E.theme.LINE_CURSOR_BACKGROUND = themeColor(ANSI_BG_RGB(60, 64, 72));
-  E.theme.COLOR_KEYWORD = themeColor(ANSI_FG_RGB(198, 120, 221));
-  E.theme.COLOR_TYPE = themeColor(ANSI_FG_RGB(97, 175, 239));
-  E.theme.COLOR_STRING = themeColor(ANSI_FG_RGB(152, 195, 121));
-  E.theme.COLOR_COMMENT = themeColor(ANSI_FG_RGB(92, 99, 112));
-  E.theme.COLOR_NUMBER = themeColor(ANSI_FG_RGB(209, 154, 102));
-  E.theme.COLOR_DEFAULT = themeColor(ANSI_FG_RGB(171, 178, 191));
-  E.theme.COLOR_ADDED = themeColor(ANSI_FG_RGB(152, 195, 121));
-  E.theme.COLOR_REMOVED = themeColor(ANSI_FG_RGB(224, 108, 117));
-  E.theme.DEBUG_LINE_BACKGROUND = themeColor(ANSI_BG_RGB(77, 68, 38));
-  E.theme.STATUS_BAR_FG = themeColor(ANSI_FG_RGB(171, 178, 191));
-  E.theme.STATUS_BAR_BG = themeColor(ANSI_BG_RGB(33, 37, 43));
-  E.theme.STATUS_ACCENT_FG = themeColor(ANSI_FG_RGB(40, 44, 52));
-  E.theme.STATUS_ACCENT_BG = themeColor(ANSI_BG_RGB(97, 175, 239));
+  themeSetDefaults();
 
   E.projects = NULL;
   E.number_of_projects = 0;

@@ -390,6 +390,18 @@ void lspInstallTick(void) {
     finishJob();
 }
 
+void lspInstallClearRecipes(void) {
+  int i;
+  for (i = 0; i < s_recipe_count; i++) {
+    gfree(s_recipes[i].command);
+    gfree(s_recipes[i].os);
+    gfree(s_recipes[i].shell);
+  }
+  gfree(s_recipes);
+  s_recipes = NULL;
+  s_recipe_count = 0;
+}
+
 void lspInstallFree(void) {
   int i;
   for (i = 0; i < s_recipe_count; i++) {

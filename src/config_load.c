@@ -32,6 +32,13 @@ extern EditorConfig E;
 
 static char **s_errors = NULL;
 static int s_error_count = 0;
+static int s_quiet = 0;
+
+// The global environment's table and the macro table before any config
+// ran (configSnapshotEnv()); lisp_null() until then.
+static Lisp s_env_snapshot;
+static Lisp s_macro_snapshot;
+static int s_have_snapshot = 0;
 
 void configReportError(const char *fmt, ...) {
   char line[512];
@@ -52,8 +59,47 @@ void configReportError(const char *fmt, ...) {
   // During startup configShowErrors() shows them, once the first buffer
   // is up; after that nothing else would. In batch mode (--sync-packages)
   // status messages are printed, so each one is printed as it happens.
-  if (E.initialized || E.batch)
+  if ((E.initialized || E.batch) && !s_quiet)
     editorSetStatusMessage("Config error: %s", line);
+}
+
+void configSetQuiet(const int quiet) { s_quiet = quiet; }
+
+/**
+ * @brief A new table holding the same (key . value) pairs as `table`.
+ */
+static Lisp copyTable(const Lisp table) {
+  Lisp copy = lisp_make_table(E.ctx);
+  Lisp pairs = lisp_table_to_alist(table, E.ctx);
+  while (lisp_is_pair(pairs)) {
+    lisp_table_set(copy, lisp_car(lisp_car(pairs)), lisp_cdr(lisp_car(pairs)), E.ctx);
+    pairs = lisp_cdr(pairs);
+  }
+  return copy;
+}
+
+void configSnapshotEnv(void) {
+  s_env_snapshot = copyTable(lisp_car(lisp_env(E.ctx)));
+  s_macro_snapshot = copyTable(lisp_macro_table(E.ctx));
+  s_have_snapshot = 1;
+}
+
+int configRestoreEnv(void) {
+  if (!s_have_snapshot)
+    return -1;
+  // The env is a list of tables, the global one first: replacing that car
+  // keeps every closure's (and every project's) env pointing at the live
+  // one. Copies, so the snapshot stays untouched for the next reload.
+  lisp_set_car(lisp_env(E.ctx), copyTable(s_env_snapshot));
+  lisp_set_macro_table(copyTable(s_macro_snapshot), E.ctx);
+  return 0;
+}
+
+void configVisitLispRoots(LispRootVisitor visit, LispContext ctx) {
+  if (!s_have_snapshot)
+    return;
+  visit(&s_env_snapshot, ctx);
+  visit(&s_macro_snapshot, ctx);
 }
 
 int configErrorCount(void) { return s_error_count; }
@@ -317,7 +363,19 @@ void configShowErrors(void) {
   id = bufferCreate(name, READ_ONLY, EXPLORER_BUFF);
   gfree(name);
   buf = bufferFindById(id);
-  if (buf && buf->numrows == 0) {
+  if (buf && buf->numrows > 0) {
+    // Left from an earlier load (a reload): the list is this load's.
+    for (i = 0; i < buf->numrows; i++) {
+      gfree(buf->row[i].characters);
+      gfree(buf->row[i].attrs);
+    }
+    gfree(buf->row);
+    buf->row = NULL;
+    buf->numrows = 0;
+    buf->x = 0;
+    buf->y = 0;
+  }
+  if (buf) {
     for (i = 0; i < s_error_count; i++) {
       uline = stringToUtf8((unsigned char *)s_errors[i]);
       if (!uline)

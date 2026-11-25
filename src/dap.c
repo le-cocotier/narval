@@ -1723,6 +1723,17 @@ void dapEvaluate(const char *expression, const int repl) {
  *
  **********************************************************************************************************************/
 
+void dapClearAdapters(void) {
+  int i;
+  int j;
+  for (i = 0; i < s_adapter_count; i++) {
+    for (j = 0; j < DAP_MAX_ARGS && s_adapters[i].argv[j]; j++)
+      gfree(s_adapters[i].argv[j]);
+    gfree(s_adapters[i].launch_defaults);
+  }
+  s_adapter_count = 0;
+}
+
 int dapRegisterAdapter(const char *ext, const char *const *argv, const char *launch_defaults) {
   DapAdapter *a;
   int i;
@@ -1991,7 +2002,6 @@ static int startSession(const char *ext, const char *launch_json, const int atta
 
 void dapFree(void) {
   int i;
-  int j;
   for (i = 0; i < DAP_MAX_SESSIONS; i++) {
     s = &s_sessions[i];
     // On the way out: no hook, the Lisp side is being torn down.
@@ -2006,12 +2016,7 @@ void dapFree(void) {
   s_window_enter = NULL;
   s_window_leave = NULL;
   breakpointsSetListener(NULL);
-  for (i = 0; i < s_adapter_count; i++) {
-    for (j = 0; j < DAP_MAX_ARGS && s_adapters[i].argv[j]; j++)
-      gfree(s_adapters[i].argv[j]);
-    gfree(s_adapters[i].launch_defaults);
-  }
-  s_adapter_count = 0;
+  dapClearAdapters();
   gfree(s_exception_choice);
   s_exception_choice = NULL;
   for (i = 0; i < s_watch_count; i++)

@@ -59,6 +59,9 @@ typedef struct dap_var_t
 // a session doesn't give itself.
 // @return 0, or -1 when the table is full.
 int dapRegisterAdapter(const char *ext, const char *const *argv, const char *launch_defaults);
+// Forgets every registered adapter (a config reload registers them again).
+// A session already running keeps going: it copied what it needed.
+void dapClearAdapters(void);
 
 // ── Session ─────────────────────────────────────────────────────────────────
 // Starts the adapter registered for `ext` (NULL or "": the active buffer's

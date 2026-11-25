@@ -165,7 +165,7 @@ Lisp describeVariable(Lisp args, LispError *e, LispContext ctx) {
     snprintf(text, sizeof(text), "Set it in personal-config: (define %s %s)", s->name,
              s->type == SETTING_BOOL ? (*s->target ? "#f" : "#t") : current);
     lines = lisp_cons(lisp_make_string2(text, ctx), lines, ctx);
-    lines = lisp_cons(lisp_make_string2("Settings are read at startup.", ctx), lines, ctx);
+    lines = lisp_cons(lisp_make_string2("Settings are read at startup and by config-reload (CTRL-x c r).", ctx), lines, ctx);
     return lisp_list_reverse(lines);
   }
   val = lisp_env_lookup(lisp_env(ctx), lisp_make_symbol(name, ctx), &present);
@@ -210,8 +210,8 @@ Lisp settingsList(Lisp args, LispError *e, LispContext ctx) {
     lines = lisp_cons(lisp_make_string2(text, ctx), lines, ctx);
   }
   lines = lisp_cons(lisp_make_string2("", ctx), lines, ctx);
-  lines = lisp_cons(lisp_make_string2("Change one with (define NAME value) in personal-config; "
-                                      "they're read at startup.", ctx),
+  lines = lisp_cons(lisp_make_string2("Change one with (define NAME value) in personal-config, "
+                                      "then CTRL-x c r (config-reload).", ctx),
                     lines, ctx);
   return lisp_list_reverse(lines);
 }

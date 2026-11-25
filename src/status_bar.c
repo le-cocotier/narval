@@ -66,6 +66,12 @@ static const char *const s_names[SEG_BUILTIN_COUNT] = {
 #define STATUS_MAX_CUSTOM 16
 #define STATUS_CUSTOM_REFRESH_MS 500
 
+// The layout a config starts from (statusBarReset() goes back to it).
+static const int s_default_left[] = {SEG_BUFFER, SEG_GIT,   SEG_DIAGNOSTICS, SEG_MACRO,
+                                     SEG_DEBUG,  SEG_MODE,  SEG_PANES,       SEG_BREADCRUMBS,
+                                     SEG_BUFFERS};
+static const int s_default_right[] = {SEG_KIND, SEG_POSITION, SEG_PERCENT};
+
 static int s_left[STATUS_MAX_SEGMENTS] = {SEG_BUFFER, SEG_GIT,   SEG_DIAGNOSTICS, SEG_MACRO,
                                           SEG_DEBUG,  SEG_MODE,  SEG_PANES,       SEG_BREADCRUMBS,
                                           SEG_BUFFERS};
@@ -93,6 +99,16 @@ static int segmentByName(const char *name) {
   return -1;
 }
 
+void statusBarReset(void) {
+  s_left_count = (int)(sizeof(s_default_left) / sizeof(s_default_left[0]));
+  memcpy(s_left, s_default_left, sizeof(s_default_left));
+  s_right_count = (int)(sizeof(s_default_right) / sizeof(s_default_right[0]));
+  memcpy(s_right, s_default_right, sizeof(s_default_right));
+  memset(s_custom, 0, sizeof(s_custom));
+  s_custom_count = 0;
+  s_custom_refreshed_ms = 0;
+}
+
 void statusBarVisitLispRoots(LispRootVisitor visit, LispContext ctx) {
   int i;
   for (i = 0; i < s_custom_count; i++)
@@ -116,7 +132,7 @@ static void refreshCustomSegments(void) {
     if (err != LISP_ERROR_NONE) {
       s_custom[i].failed = 1;
       s_custom[i].text[0] = '\0';
-      editorSetStatusMessage("status bar segment \"%s\" raised an error; it's off until restart",
+      editorSetStatusMessage("status bar segment \"%s\" raised an error; it's off until the config reloads (CTRL-x c r)",
                              s_custom[i].name);
       continue;
     }

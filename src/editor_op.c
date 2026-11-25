@@ -1,4 +1,5 @@
 #include "../include/editor_op.h"
+#include "../include/init.h"
 #include "../include/autosave.h"
 #include "../include/file_io.h"
 #include "../include/async_process.h"
@@ -304,7 +305,9 @@ void editorRunLoop(void) {
   last_cols = E.screencols;
 
   while (!E.exit_requested) {
-    // Between two ticks no Lisp value is held in a C local.
+    // Between two ticks no Lisp value is held in a C local, and no key
+    // binding is running: where (config-reload) does its work.
+    editorRunPendingConfigReload();
     lispGcMaybeCollect();
 
     if (getWindowSize(&rows, &cols) == 0 &&

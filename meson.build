@@ -259,6 +259,18 @@ foreach t : ['utf8', 'keys', 'buffer', 'ansi_parser', 'os', 'completion', 'packa
     link_args : link_args))
 endforeach
 
+# Reloading the config: initEditor() on a config of its own, kept in the
+# build directory (HOME too, for ~/.narval/projects and the Lisp log).
+reload_home = meson.current_build_dir() / 'config-reload-home'
+test('config_reload', executable('test_config_reload',
+    files('test/test_config_reload.c', 'test/test.c') + extra_sources,
+    c_args : core_args,
+    link_with : [core_lib, os_lib],
+    dependencies : [m],
+    link_args : link_args),
+  env : ['NARVAL_HOME=' + reload_home, 'NARVAL_DATA_DIR=' + reload_home,
+         'HOME=' + reload_home, 'USERPROFILE=' + reload_home])
+
 # Headless tests (POSIX), narval in a pseudo-terminal. The smoke test opens
 # a file, types, saves and quits; under a sanitizer build it fails on any
 # report, leaks included.

@@ -31,6 +31,10 @@ void lspInstallTick(void);
 // Releases the registrations (at exit, with the rest of the config).
 void lspInstallFree(void);
 
+// Forgets every (lsp-server-install ...) recipe, leaving an install that
+// is running alone (a config reload registers them again).
+void lspInstallClearRecipes(void);
+
 /**
  * @brief The shell command that would install `command` on `os` ("linux",
  * "darwin", "windows"): the first one registered for that os ("unix" ones

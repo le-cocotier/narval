@@ -212,6 +212,8 @@
 ;;   "buffer-killed" (name buffer-id)     - a buffer was killed (CTRL-x k)
 ;;   "after-init"    ()                   - all of the config has loaded and
 ;;                                          the startup files are open
+;;   "config-reloaded" ()                 - config-reload (CTRL-x c r) has
+;;                                          loaded the config again
 ;;
 ;; Example: log every save to the status bar.
 ;; (add-hook "after-save" (lambda (filename) (editor-set-prefix "no-prefix")))
@@ -566,6 +568,10 @@
 (map-key "p" '(dired-open (package-directory)) "config")
 (map-key "m" '(editor-open-file-path (string-append (package-directory "personal-config") "/init.lisp")) "config")
 (map-key "s" list-settings "config")
+;; Reload init.lisp and every package without restarting: what the config
+;; set up is forgotten first, so a line you took out stops having an
+;; effect too. Open files, panes, terminals and language servers stay.
+(map-key "r" config-reload "config")
 ;; Who calls the function at the cursor, as a tree: its callers indented
 ;; under it, theirs under them. Type to filter, ENTER jumps to the call.
 (define (lsp-call-hierarchy)

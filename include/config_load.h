@@ -1,6 +1,8 @@
 #ifndef CONFIG_LOAD_H_
 #define CONFIG_LOAD_H_
 
+#include "lisp.h"
+
 /**
  * Loading Lisp config files (config/init.lisp, every package's init.lisp)
  * one top-level form at a time, so a mistake in one form is reported with
@@ -38,5 +40,32 @@ void configShowErrors(void);
 
 /** Frees the recorded messages. */
 void configErrorsFree(void);
+
+/**
+ * While set, configReportError() only records an error (and logs it): a
+ * reload shows them all at the end with configShowErrors() instead of one
+ * status message per error.
+ */
+void configSetQuiet(int quiet);
+
+/**
+ * Remembers the global Lisp environment and macro table as they are before
+ * any config has run: the builtins and the Lisp library. Call once, after
+ * initBuiltins() and before init.lisp is loaded.
+ */
+void configSnapshotEnv(void);
+
+/**
+ * Puts the global environment and macro table back to that snapshot, so a
+ * reload starts from what a fresh start would: whatever the config
+ * (define)d is gone, and a builtin it redefined is the builtin again. The
+ * environment keeps its identity (closures, project envs, buffer locals
+ * still refer to it); only its table is replaced. Returns 0, or -1 when
+ * no snapshot was taken.
+ */
+int configRestoreEnv(void);
+
+/** The snapshot's tables, for the garbage collector (lisp_gc.c). */
+void configVisitLispRoots(LispRootVisitor visit, LispContext ctx);
 
 #endif // CONFIG_LOAD_H_

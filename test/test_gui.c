@@ -14,6 +14,7 @@
 #include "../include/terminal.h"
 #include "../include/utf8.h"
 #include "../src/gui/gui_draw.h"
+#include "../src/gui/gui_font.h"
 
 #include <SDL3/SDL.h>
 
@@ -335,6 +336,42 @@ static void testImages(void) {
   SDL_DestroySurface(big);
 }
 
+// A family's own faces for bold and italic, told by their style names.
+static void testFontFaces(void) {
+  static const char dejavu[] = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf";
+  GuiFace faces[GUI_FACES];
+  TTF_Font *first;
+
+  CHECK_INT(guiStyleScore("Regular", "Bold", 1, 0), 2);
+  CHECK_INT(guiStyleScore("Regular", "SemiBold", 1, 0), 0);
+  CHECK_INT(guiStyleScore("Regular", "Bold Italic", 1, 0), 0);
+  CHECK_INT(guiStyleScore("Regular", "Italic", 0, 1), 4);
+  CHECK_INT(guiStyleScore("Book", "Oblique", 0, 1), 3);  // DejaVu: an italic beats it
+  CHECK_INT(guiStyleScore("Light", "Light Italic", 0, 1), 4);
+  CHECK_INT(guiStyleScore("Medium", "Italic", 0, 1), 2);  // no Medium Italic: the plain one
+  CHECK_INT(guiStyleScore("Medium", "Light Italic", 0, 1), 0);
+  CHECK_INT(guiStyleScore("Regular", "Bold Italic", 1, 1), 2);
+  CHECK_INT(guiStyleScore("Regular", "BoldOblique", 1, 1), 1);
+  CHECK_INT(guiStyleScore("Regular", "Bold", 1, 1), 0);
+  CHECK_INT(guiStyleScore("Italic", "Bold Italic", 1, 1), 0);  // an italic isn't a regular
+  CHECK_INT(guiStyleScore(NULL, "Bold", 1, 0), 0);
+
+  // DejaVu Sans Mono's Bold, Oblique and Bold Oblique beside it, where
+  // the system has them.
+  first = TTF_OpenFont(dejavu, 12.0f);
+  if (!first)
+    return;
+  guiFindFaces(dejavu, first, 12.0f, faces);
+  CHECK(faces[0].path == NULL);  // a static font: its first face is the regular one
+  if (SDL_GetPathInfo("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", NULL))
+    CHECK(faces[1].path && strstr(faces[1].path, "DejaVuSansMono-Bold.ttf"));
+  if (SDL_GetPathInfo("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Oblique.ttf", NULL))
+    CHECK(faces[2].path && strstr(faces[2].path, "DejaVuSansMono-Oblique.ttf"));
+  guiFacesFree(faces);
+  CHECK(faces[1].path == NULL);
+  TTF_CloseFont(first);
+}
+
 static void writeStr(const char *s) {
   screenWrite(s, strlen(s));
 }
@@ -382,6 +419,7 @@ int main(const int argc, char **argv) {
   testDrawing();
   testCellGlyphs();
   testImages();
+  testFontFaces();
   testShapes();
   terminalRestore();  // closes the window
   CHECK_INT(guiCellPixel(0, 0), -1);

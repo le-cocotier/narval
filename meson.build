@@ -210,7 +210,7 @@ if gui_found
     dependencies : gui_os_deps)
   gui_deps += gui_os_deps
   gui_lib = static_library('narval-gui',
-    'src/gui/gui_sdl.c', 'src/gui/gui_draw.c',
+    'src/gui/gui_sdl.c', 'src/gui/gui_draw.c', 'src/gui/gui_font.c',
     c_args : core_args,
     link_with : gui_os_lib,
     dependencies : gui_deps)

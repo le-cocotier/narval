@@ -16,11 +16,13 @@
 
 #include "../../include/gui.h"
 #include "gui_draw.h"
+#include "gui_font.h"
 
 #include "../../include/ansi_parser.h"
 #include "../../include/buffer.h"
 #include "../../include/builtins.h"
 #include "../../include/data.h"
+#include "../../include/debug_log.h"
 #include "../../include/define.h"
 #include "../../include/editor_op.h"
 #include "../../include/galloc.h"
@@ -398,15 +400,37 @@ static void fontsClose(void)
 }
 
 /**
+ * @brief One style's font: its own face when the family has one (`face`,
+ * with `extra` drawn on top: a bold italic made from the italic), else
+ * the `regular` face with `style` drawn by SDL_ttf.
+ */
+static TTF_Font *styleOpen(const GuiFace *regular, const GuiFace *face, const int extra, const int style,
+                           const float px)
+{
+    const int own = face && face->path;
+    TTF_Font *font = own ? guiOpenFace(face->path, face->index, px)
+                         : guiOpenFace(regular->path, regular->index, px);
+
+    if (!font)
+        return NULL;
+    TTF_SetFontStyle(font, own ? extra : style);
+    TTF_SetFontHinting(font, TTF_HINTING_LIGHT_SUBPIXEL);
+    return font;
+}
+
+/**
  * @brief Opens `path` at G.font_size for the window's pixel scale, in the
- * four styles, and measures the cell. @return 0, -1 if it can't be opened
- * or isn't usable (no "M").
+ * four styles, and measures the cell. Bold, italic and bold italic are
+ * the family's own faces where it has them (gui_font.c: beside it, in its
+ * collection, a variable font's instances), else drawn from the regular
+ * one. @return 0, -1 if it can't be opened or isn't usable (no "M").
  */
 static int fontsOpen(const char *path)
 {
-    static const int styles[GUI_FONT_STYLES] = {
-        TTF_STYLE_NORMAL, TTF_STYLE_BOLD, TTF_STYLE_ITALIC, TTF_STYLE_BOLD | TTF_STYLE_ITALIC};
     TTF_Font *fonts[GUI_FONT_STYLES] = {NULL, NULL, NULL, NULL};
+    GuiFace faces[GUI_FACES];  // regular (if not path's first), bold, italic, bold italic
+    GuiFace first = {NULL, 0, 0};
+    const GuiFace *regular;
     const float px = G.font_size * G.scale;
     int advance = 0;
     int minx;
@@ -417,16 +441,36 @@ static int fontsOpen(const char *path)
 
     if (!path || !path[0])
         return -1;
-    for (i = 0; i < GUI_FONT_STYLES; i++)
+    first.path = (char *) path;
+    fonts[0] = styleOpen(&first, NULL, 0, TTF_STYLE_NORMAL, px);
+    if (!fonts[0])
+        return -1;
+    guiFindFaces(path, fonts[0], px, faces);
+    regular = faces[0].path ? &faces[0] : &first;
+    if (faces[0].path)
     {
-        fonts[i] = TTF_OpenFont(path, px);
-        if (!fonts[i])
-            break;
-        TTF_SetFontStyle(fonts[i], styles[i]);
-        TTF_SetFontHinting(fonts[i], TTF_HINTING_LIGHT_SUBPIXEL);
+        TTF_CloseFont(fonts[0]);
+        fonts[0] = styleOpen(regular, NULL, 0, TTF_STYLE_NORMAL, px);
     }
-    if (i < GUI_FONT_STYLES || !TTF_GetGlyphMetrics(fonts[0], 'M', &minx, &maxx, &miny, &maxy, &advance) ||
-        advance <= 0)
+    if (fonts[0] && TTF_GetGlyphMetrics(fonts[0], 'M', &minx, &maxx, &miny, &maxy, &advance) && advance > 0)
+    {
+        fonts[1] = styleOpen(regular, &faces[1], TTF_STYLE_NORMAL, TTF_STYLE_BOLD, px);
+        fonts[2] = styleOpen(regular, &faces[2], TTF_STYLE_NORMAL, TTF_STYLE_ITALIC, px);
+        // Bold italic: its own face, else the italic made bold (an
+        // italic's design matters more than a bold's), else the bold
+        // slanted.
+        fonts[3] = styleOpen(regular, faces[3].path ? &faces[3] : faces[2].path ? &faces[2] : &faces[1],
+                             faces[3].path ? TTF_STYLE_NORMAL : faces[2].path ? TTF_STYLE_BOLD : TTF_STYLE_ITALIC,
+                             TTF_STYLE_BOLD | TTF_STYLE_ITALIC, px);
+        logInfo("narval-gui font: %s %s; bold %s, italic %s, bold italic %s",
+                TTF_GetFontFamilyName(fonts[0]), TTF_GetFontStyleName(fonts[0]),
+                faces[1].path ? faces[1].path : "drawn", faces[2].path ? faces[2].path : "drawn",
+                faces[3].path ? faces[3].path : faces[2].path ? "the italic, drawn bold" : "drawn");
+    }
+    guiFacesFree(faces);
+    for (i = 0; i < GUI_FONT_STYLES && fonts[i]; i++)
+        ;
+    if (i < GUI_FONT_STYLES)
     {
         for (i = 0; i < GUI_FONT_STYLES; i++)
             if (fonts[i])

@@ -15,7 +15,8 @@
 // cursor's glide, the title bar in the theme's colour (os_window.c).
 //
 // Settings (init.lisp): GUI-FONT-SIZE (points, settings.c), and GUI-FONT,
-// a path to a .ttf/.ttc/.otf file. Without GUI-FONT the bundled DejaVu
+// a path to a .ttf/.ttc/.otf file; its family's bold and italic faces are
+// found beside it (gui_font.c). Without GUI-FONT the bundled DejaVu
 // Sans Mono (assets/fonts/) is used, else the system's monospace font.
 
 // Opens the window and makes it the screen. `font_path`: a font to try

@@ -192,7 +192,9 @@ Cmd+Q or the close button do what `CTRL-x CTRL-c` does, unsaved-changes warning 
 mouse wheel and clicks work as in a terminal with `MOUSE` on, and the wheel scrolls the way the
 system is set to (macOS's natural scrolling included; `MOUSE-REVERSE-SCROLL` turns it around). `GUI-FONT-SIZE` and `GUI-FONT` in
 `init.lisp` set the font (a path to a .ttf, .otf or .ttc file; `~/` is your home folder); the
-default is the bundled DejaVu Sans Mono (`assets/fonts/`). Characters the font hasn't got (emoji,
+default is the bundled DejaVu Sans Mono (`assets/fonts/`). Bold and italic use the family's own
+faces when they're beside it (`VictorMono-Italic.ttf` next to `VictorMono-Regular.ttf`, the faces
+of a `.ttc`, a variable font's weights), and are drawn from the regular face otherwise. Characters the font hasn't got (emoji,
 Chinese, Japanese, Korean, symbols) come from the system's fonts, as in a terminal, emoji in
 colour. HiDPI screens get it all at their full resolution.
 

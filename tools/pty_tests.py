@@ -1465,8 +1465,12 @@ def memory_inspector(binary, repo):
         site = re.search(r'(\S+):(\d+) \(', rows[first])
         assert site, rows[first]
         ed.keys(*([DOWN] * first), '\r', delay=0.6)
-        ed.wait_for('%s:%s' % (site.group(1), site.group(2)))
-        assert 'Ln %s/' % site.group(2) in ''.join(ed.text()), ed.text()[-2:]
+        # The status bar's file and line, not the "file:line" message: a
+        # notice can replace that one on the next tick (a checkout with a
+        # .narval/init.lisp: "has a project config: project-trust ...").
+        ed.wait_for('Ln %s/' % site.group(2))
+        status = next(row for row in ed.text() if 'Ln %s/' % site.group(2) in row)
+        assert os.path.basename(site.group(1)) in status, status
         ed.quit()
 
 TESTS = [

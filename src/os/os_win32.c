@@ -40,6 +40,7 @@
 #include <shlobj.h>
 #include <sddl.h>
 #include <tlhelp32.h>
+#include <psapi.h> // K32GetProcessMemoryInfo, in kernel32
 
 #include <errno.h>
 #include <fcntl.h>
@@ -3186,6 +3187,17 @@ int os_heap_in_use(long long *blocks, long long *bytes)
         *bytes = -1;
         return -1;
     }
+    return 0;
+}
+
+int os_process_memory(long long *bytes, const char **what)
+{
+    PROCESS_MEMORY_COUNTERS_EX counters;
+    *bytes = -1;
+    *what = "private bytes (Task Manager's Commit size)";
+    if (!K32GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS *) &counters, sizeof(counters)))
+        return -1;
+    *bytes = (long long) counters.PrivateUsage;
     return 0;
 }
 

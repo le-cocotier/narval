@@ -492,6 +492,16 @@ int os_replace_file(const char *tmp, const char *dest, char *err, size_t err_siz
  */
 int os_heap_in_use(long long *blocks, long long *bytes);
 
+/**
+ * The process's memory as the system's monitor shows it, heap or not (the
+ * program and its libraries, stacks, what malloc keeps after a free, the
+ * GPU's textures): macOS's physical footprint (Activity Monitor's Memory
+ * column), Linux's resident size (top's RES), Windows's private bytes
+ * (Task Manager's Commit size). `what` names which, for a label. 0, or -1
+ * where the platform can't tell.
+ */
+int os_process_memory(long long *bytes, const char **what);
+
 // One process-wide lock, for galloc (src/gutils.c): narval-gui hands SDL's
 // allocator to galloc, and SDL can allocate from threads of its own. Not
 // recursive.

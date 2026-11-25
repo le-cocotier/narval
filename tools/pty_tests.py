@@ -1454,6 +1454,8 @@ def memory_inspector(binary, repo):
             raise Skip('not a debug build (APP_DEBUG)')
         ed.wait_for('per site')
         ed.wait_for('allocated at')
+        if sys.platform.startswith('linux') or sys.platform == 'darwin':
+            ed.wait_for('process: ')  # the figure the system's monitor shows
         ed.keys('b', delay=0.5)
         ed.wait_for('nothing changed since the baseline')
         ed.keys('v', delay=0.5)

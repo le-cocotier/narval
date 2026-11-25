@@ -427,6 +427,8 @@ static void render(Sink *sink) {
   long long base_total = 0;
   long long heap_blocks;
   long long heap_bytes;
+  long long process_bytes;
+  const char *process_what;
   char line[256];
   struct dataBlock_t *blocks = collectBlocks(&nblocks);
 
@@ -460,6 +462,13 @@ static void render(Sink *sink) {
     else
       snprintf(line, sizeof(line),
                "process heap: %lld bytes in use, tracked or not", heap_bytes);
+    emit(sink, line, NULL, 0);
+  }
+  // The number the system's monitor gives: the heap and the rest.
+  if (os_process_memory(&process_bytes, &process_what) == 0) {
+    snprintf(line, sizeof(line), "process: %lld bytes (%.1f MB), its %s",
+             process_bytes, (double)process_bytes / (1024.0 * 1024.0),
+             process_what);
     emit(sink, line, NULL, 0);
   }
   if (sink->buf) {

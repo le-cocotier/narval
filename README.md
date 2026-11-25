@@ -418,7 +418,10 @@ baseline). A debug build (`install.sh --debug`, `install.ps1 -DebugBuild`) also 
 still allocated at exit to `~/.narval/memory-at-exit.log`, grouped by allocation site. In narval-gui, SDL and SDL_ttf
 allocate through galloc too and show up as `SDL:0`. Both views also give galloc's own
 bookkeeping and the whole process heap, so what galloc can't see (libc's buffers, FreeType)
-is the difference between the two.
+is the difference between the two. The inspector's last figure is the one the system's monitor
+shows (Activity Monitor's Memory on macOS, top's RES on Linux, Task Manager's Commit size on
+Windows): the heap plus the program and its libraries, stacks, what malloc keeps after a free
+and, in narval-gui, the window's textures. That one is always the largest.
 
 
 ## License

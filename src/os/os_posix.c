@@ -45,6 +45,7 @@
 #include <sys/sysctl.h>  // KERN_PROC_UID
 #include <mach-o/dyld.h> // _NSGetExecutablePath
 #include <malloc/malloc.h> // malloc_zone_statistics
+#include <mach/mach.h>     // task_info: the physical footprint
 #include <util.h> // forkpty
 #else
 #include <pty.h> // forkpty (libutil on Linux)
@@ -1956,6 +1957,39 @@ int os_heap_in_use(long long *blocks, long long *bytes) {
 #else
   *blocks = -1;
   *bytes = -1;
+  return -1;
+#endif
+}
+
+int os_process_memory(long long *bytes, const char **what) {
+#if defined(__APPLE__)
+  task_vm_info_data_t info;
+  mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+  *bytes = -1;
+  *what = "footprint (Activity Monitor's Memory)";
+  if (task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&info, &count) != KERN_SUCCESS)
+    return -1;
+  *bytes = (long long)info.phys_footprint;
+  return 0;
+#elif defined(__linux__)
+  FILE *f = fopen("/proc/self/status", "r");
+  char line[256];
+  long long kb = -1;
+  *bytes = -1;
+  *what = "resident size (top's RES)";
+  if (!f)
+    return -1;
+  while (kb < 0 && fgets(line, sizeof(line), f))
+    if (sscanf(line, "VmRSS: %lld kB", &kb) != 1)
+      kb = -1;
+  fclose(f);
+  if (kb < 0)
+    return -1;
+  *bytes = kb * 1024;
+  return 0;
+#else
+  *bytes = -1;
+  *what = "";
   return -1;
 #endif
 }

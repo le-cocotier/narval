@@ -193,22 +193,10 @@ void * grealloc_impl(void * address, const size_t size, const char * file, const
   return new_data;
 }
 
-void gfree(void * data){
-  struct dataBlock_t * pBlock;
-  if (!data)
-    return;
-  gLock();
-  pBlock = findBlock(data);
-  if (!pBlock) {
-    // Not one of ours (calloc/strdup/asprintf/getline/...) -> defer to
-    // the real free() so nothing leaks just because it wasn't galloc'd.
-    gUnlock();
-    free(data);
-    return;
-  }
-
+// Takes `pBlock` off the list and the index and frees it (not the memory
+// it lists). Lock held.
+static void untrack(struct dataBlock_t * pBlock) {
   indexRemove(pBlock);
-  free(pBlock->address);
   blockAmount--;
   // If is the last allocated block
   if (!(pBlock->nextBlock)){
@@ -228,6 +216,60 @@ void gfree(void * data){
     g_index = NULL;
     g_index_size = 0;
   }
+}
+
+void gfree(void * data){
+  struct dataBlock_t * pBlock;
+  if (!data)
+    return;
+  gLock();
+  pBlock = findBlock(data);
+  if (!pBlock) {
+    // Not one of ours (calloc/strdup/asprintf/getline/...) -> defer to
+    // the real free() so nothing leaks just because it wasn't galloc'd.
+    gUnlock();
+    free(data);
+    return;
+  }
+  free(pBlock->address);
+  untrack(pBlock);
+  gUnlock();
+}
+
+void * gadopt_impl(void * data, const size_t size, const char * file, const int line, const char * func){
+  struct dataBlock_t * new_block;
+  if (!data)
+    return NULL;
+  gLock();
+  new_block = malloc(sizeof(struct dataBlock_t));
+  if (new_block) {
+    blockAmount++;
+    new_block->address = data;
+    new_block->size = size;
+    new_block->lastBlock = blocks;
+    new_block->nextBlock = NULL;
+    new_block->hashNext = NULL;
+    new_block->file = file;
+    new_block->line = line;
+    new_block->func = func;
+    new_block->seq = ++g_seq;
+    if (blocks)
+      blocks->nextBlock = new_block;
+    blocks = new_block;
+    indexInsert(new_block);
+  }
+  gUnlock();
+  return data;
+}
+
+void gforget(void * data){
+  struct dataBlock_t * pBlock;
+  if (!data)
+    return;
+  gLock();
+  pBlock = findBlock(data);
+  if (pBlock)
+    untrack(pBlock);
   gUnlock();
 }
 

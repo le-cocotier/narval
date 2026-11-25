@@ -15,6 +15,12 @@ void * grealloc_impl(void * address, size_t size, const char * file, int line, c
 void gfree(void * data);
 // strdup() through galloc, attributed to the caller like galloc().
 char * gstrdup_impl(const char * s, const char * file, int line, const char * func);
+// Memory got some other way (mmap) listed like a galloc block, so the
+// memory inspector and the exit report see it; gforget() takes it off the
+// list again before its owner gives it back. gfree() must not be called on
+// it. Returns `data`, which stays usable (just unlisted) if listing fails.
+void * gadopt_impl(void * data, size_t size, const char * file, int line, const char * func);
+void gforget(void * data);
 
 /**
  * Writes every block still tracked to `out`, grouped by the line that
@@ -29,6 +35,7 @@ int gReportMemory(FILE * out);
 #define gcalloc(num, size) gcalloc_impl((num), (size), __FILE__, __LINE__, __func__)
 #define grealloc(address, size) grealloc_impl((address), (size), __FILE__, __LINE__, __func__)
 #define gstrdup(s) gstrdup_impl((s), __FILE__, __LINE__, __func__)
+#define gadopt(data, size) gadopt_impl((data), (size), __FILE__, __LINE__, __func__)
 
 /*
   Struct that contains addresses of allocated memory.

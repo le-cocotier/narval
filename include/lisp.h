@@ -397,15 +397,40 @@ typedef struct Page {
   char buffer[];
 } Page;
 
+// narval: pages come straight from the system where it can (mmap), so a
+// collection's old pages go back to it at once. Through malloc they were
+// kept: macOS's allocator held on to ~7 MB of freed pages after start-up,
+// counted in the footprint. They're still listed in galloc (gadopt), for
+// the memory inspector. This doesn't follow LISP_NO_MMAP, which is about
+// reading files and which narval's build sets everywhere; Windows keeps
+// galloc (its heap hands blocks this size to VirtualAlloc anyway).
+#ifndef _WIN32
+#include <sys/mman.h>
+#define LISP_PAGES_MMAP
+#endif
+
 static Page *page_create(size_t capacity) {
+#ifdef LISP_PAGES_MMAP
+  void *mem = mmap(NULL, sizeof(Page) + capacity, PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | MAP_ANON, -1, 0);
+  Page *page = mem == MAP_FAILED ? NULL : gadopt(mem, sizeof(Page) + capacity);
+#else
   Page *page = galloc(sizeof(Page) + capacity);
+#endif
   page->capacity = capacity;
   page->size = 0;
   page->next = NULL;
   return page;
 }
 
-void page_destroy(Page *page) { gfree(page); }
+void page_destroy(Page *page) {
+#ifdef LISP_PAGES_MMAP
+  gforget(page);
+  munmap(page, sizeof(Page) + page->capacity);
+#else
+  gfree(page);
+#endif
+}
 
 typedef struct {
   Page *bottom;

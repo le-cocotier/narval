@@ -62,6 +62,8 @@ static Setting s_settings[] = {
      "Ask the terminal to report Ctrl+digit, Ctrl+punctuation and Ctrl+Shift+letter keys too."},
     {"GUI-FONT-SIZE", SETTING_INT, 14, 6, &E.constantes.GUI_FONT_SIZE,
      "narval-gui's font size, in points (GUI-FONT, a .ttf/.otf/.ttc path, picks the font)."},
+    {"TERMINAL-SCROLLBACK", SETTING_INT, 10000, 0, &E.constantes.TERMINAL_SCROLLBACK,
+     "Lines of output a terminal pane keeps above its screen (older ones are dropped); 0 keeps them all."},
 };
 
 #define SETTING_COUNT ((int)(sizeof(s_settings) / sizeof(s_settings[0])))

@@ -493,6 +493,15 @@ int os_replace_file(const char *tmp, const char *dest, char *err, size_t err_siz
 int os_heap_in_use(long long *blocks, long long *bytes);
 
 /**
+ * Hands the pages free()'d memory leaves behind back to the system, where
+ * the allocator would otherwise keep them for later (glibc's malloc_trim,
+ * macOS's pressure relief, the CRT's _heapmin). Worth it after freeing a
+ * lot at once: the Lisp heap after a collection, a terminal's dropped
+ * scrollback. Costs a walk of the free lists, a millisecond or so.
+ */
+void os_heap_release(void);
+
+/**
  * The process's memory as the system's monitor shows it, heap or not (the
  * program and its libraries, stacks, what malloc keeps after a free, the
  * GPU's textures): macOS's physical footprint (Activity Monitor's Memory

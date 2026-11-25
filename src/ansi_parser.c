@@ -294,6 +294,55 @@ static void scrollDown(struct buffer_t* buf, const int top, const int bottom, in
 static void lineFeed(struct buffer_t* buf);
 
 /**
+ * @brief A row leaving the top of the screen for the scrollback, where it
+ * won't change any more: plain text (most of a build's output) gives back
+ * its attributes, 12 bytes a character, NULL meaning all default.
+ */
+static void rowToScrollback(Row* row)
+{
+    int i;
+    const TermCellAttr* a;
+    if (!row->attrs) return;
+    for (i = 0; i < row->size; i++) // attrs[size] isn't always set
+    {
+        a = &row->attrs[i];
+        if (a->fg || a->bg || a->bold || a->underline || a->reverse || a->italic || a->dim)
+            return;
+    }
+    gfree(row->attrs);
+    row->attrs = NULL;
+}
+
+/**
+ * @brief Drops the oldest rows once the scrollback is past
+ * ts->scrollback_max, a batch at a time (each drop moves every row left).
+ * Every row index the parser keeps moves up with them; buf->x/y are the
+ * caller's to set again, and ts->rows_dropped tells it by how much.
+ */
+static void trimScrollback(struct buffer_t* buf)
+{
+    TermParserState* ts = &buf->term_state;
+    const int max = ts->scrollback_max;
+    const int slack = max / 8 > 64 ? max / 8 : 64;
+    int n;
+    int i;
+    if (max <= 0 || ts->alt_screen || ts->screen_top_row <= max + slack)
+        return;
+    n = ts->screen_top_row - max;
+    if (n > buf->numrows) n = buf->numrows;
+    for (i = 0; i < n; i++)
+        bufferFreeRow(&buf->row[i]);
+    memmove(&buf->row[0], &buf->row[n], (size_t) (buf->numrows - n) * sizeof(Row));
+    buf->numrows -= n;
+    ts->screen_top_row -= n;
+    ts->cursor_y -= n;
+    ts->col_cache_y -= n;
+    buf->y = buf->y >= n ? buf->y - n : 0;
+    buf->mark_y = buf->mark_y >= n ? buf->mark_y - n : 0;
+    ts->rows_dropped += n;
+}
+
+/**
  * @brief Write one decoded Utf8Char at the cursor, with the current SGR
  * attribute, then move the cursor past it (one or two columns; a combining
  * mark joins the character before it and doesn't move it).
@@ -381,12 +430,22 @@ static void lineFeed(struct buffer_t* buf)
 {
     TermParserState* ts = &buf->term_state;
     const int height = screenHeight(ts);
+    int top;
     ts->wrap_pending = 0;
     if (!ts->alt_screen && regionIsWholeScreen(ts) && ts->cursor_y >= regionBottom(ts))
     {
         ts->cursor_y++;
         if (ts->cursor_y >= ts->screen_top_row + height)
-            ts->screen_top_row = ts->cursor_y - height + 1;
+        {
+            top = ts->cursor_y - height + 1;
+            while (ts->screen_top_row < top)
+            {
+                if (ts->screen_top_row < buf->numrows)
+                    rowToScrollback(&buf->row[ts->screen_top_row]);
+                ts->screen_top_row++;
+            }
+            trimScrollback(buf);
+        }
         return;
     }
     if (ts->cursor_y == regionBottom(ts))

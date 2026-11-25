@@ -3190,6 +3190,11 @@ int os_heap_in_use(long long *blocks, long long *bytes)
     return 0;
 }
 
+void os_heap_release(void)
+{
+    _heapmin();
+}
+
 int os_process_memory(long long *bytes, const char **what)
 {
     PROCESS_MEMORY_COUNTERS_EX counters;

@@ -257,6 +257,48 @@ static void testScrollbackOnNormalScreen(void) {
   bufferFree(buf);
 }
 
+static void testScrollbackLimit(void) {
+  // Past scrollback_max rows above the screen, the oldest go, a batch at
+  // a time; every row index moves up with them.
+  Buffer *buf = terminalBuffer();
+  char line[32];
+  char *first;
+  int i;
+  buf->term_state.scrollback_max = 100;
+  for (i = 0; i < 500; i++) {
+    snprintf(line, sizeof(line), "line %d\r\n", i);
+    feed(buf, line);
+  }
+  CHECK(buf->term_state.rows_dropped > 0);
+  CHECK(buf->term_state.screen_top_row >= 100);
+  CHECK(buf->term_state.screen_top_row <= 100 + 64);
+  // 500 rows written; the cursor is on the next one, not made yet.
+  CHECK_INT((int)buf->term_state.rows_dropped + buf->numrows, 500);
+  CHECK_INT(buf->term_state.cursor_y, buf->numrows);
+  snprintf(line, sizeof(line), "line %ld", buf->term_state.rows_dropped);
+  first = rowText(buf, 0);
+  CHECK_STR(first, line);
+  gfree(first);
+  CHECK_ROW(buf, buf->numrows - 1, "line 499");
+  bufferFree(buf);
+}
+
+static void testScrollbackDropsPlainAttrs(void) {
+  // A row scrolled off the screen keeps its colours only if it has any.
+  Buffer *buf = terminalBuffer();
+  int i;
+  feed(buf, "\x1b[31mred\x1b[0m\r\n\x1b[1m\x1b[0mplain\r\n");
+  CHECK(buf->row[1].attrs != NULL);
+  for (i = 0; i < 10; i++)
+    feed(buf, "x\r\n");
+  CHECK_INT(buf->term_state.screen_top_row, 3);
+  CHECK(buf->row[0].attrs != NULL);
+  CHECK(buf->row[0].attrs[0].fg != 0);
+  CHECK(buf->row[1].attrs == NULL);
+  CHECK_ROW(buf, 1, "plain");
+  bufferFree(buf);
+}
+
 static void testWrap(void) {
   // At the pane's width a line goes on to the next row, xterm style: the
   // cursor waits on the last column until the next character.
@@ -321,6 +363,8 @@ int main(void) {
   testScrollRegion();
   testInsertDeleteLines();
   testScrollbackOnNormalScreen();
+  testScrollbackLimit();
+  testScrollbackDropsPlainAttrs();
   testWrap();
   testWrapScrolls();
   return testDone();

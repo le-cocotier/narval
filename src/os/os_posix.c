@@ -1961,6 +1961,14 @@ int os_heap_in_use(long long *blocks, long long *bytes) {
 #endif
 }
 
+void os_heap_release(void) {
+#if defined(__APPLE__)
+  malloc_zone_pressure_relief(NULL, 0); // NULL: every zone; 0: all it can
+#elif defined(__GLIBC__)
+  malloc_trim(0);
+#endif
+}
+
 int os_process_memory(long long *bytes, const char **what) {
 #if defined(__APPLE__)
   task_vm_info_data_t info;

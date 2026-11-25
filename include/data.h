@@ -167,6 +167,7 @@ struct const_t
     int MOUSE_REVERSE_SCROLL; // (define MOUSE-REVERSE-SCROLL #f) — the wheel scrolls the other way
     int EXTENDED_KEYS;      // (define EXTENDED-KEYS #t) — ask for modifyOtherKeys (Ctrl+1, Ctrl+.)
     int GUI_FONT_SIZE;      // (define GUI-FONT-SIZE 14) — narval-gui's font size, points
+    int TERMINAL_SCROLLBACK; // (define TERMINAL-SCROLLBACK 10000) — rows a terminal pane keeps; 0 = all
 };
 
 /**
@@ -586,6 +587,11 @@ typedef struct term_parser_state_t
     Row* main_rows;
     int main_numrows;
     int main_top_row;
+    // Scrollback kept above the screen, in rows: older ones are dropped
+    // (0: no limit). rows_dropped counts every row dropped so far, for
+    // whoever keeps row numbers into this buffer (a pane's scroll).
+    int scrollback_max;
+    long rows_dropped;
     // Where the last character went: the cursor's column, on row
     // col_cache_y, starts at character col_cache_idx (see putChar()).
     int col_cache_valid;

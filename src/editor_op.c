@@ -177,11 +177,27 @@ void editorWatchStreams(RunLoopWatch *w, OsStream **streams, int *n_streams,
   *n_streams += asyncProcessStreams(streams + *n_streams, max - *n_streams);
 }
 
+// A terminal dropped its oldest `n` rows (TERMINAL-SCROLLBACK): the panes
+// showing it keep their place in what's left.
+static void panesRowsDropped(const struct buffer_t *b, const int n) {
+  EditorPane *pane;
+  int i;
+  for (i = 0; i < E.layout.num_panes; i++) {
+    pane = &E.layout.panes[i];
+    if (pane->buffer_id == b->buffer_id)
+      pane->y_offset = pane->y_offset > n ? pane->y_offset - n : 0;
+    if (pane->saved_buffer_id == b->buffer_id)
+      pane->saved_y = pane->saved_y > n ? pane->saved_y - n : 0;
+  }
+  os_heap_release(); // the dropped rows' memory, a batch at a time
+}
+
 void editorHandleStreams(const RunLoopWatch *w, const int *ready) {
   struct buffer_t *b;
   unsigned char chunk[4096];
   long n;
   int i;
+  long dropped;
   int n_exited = 0;
   char *exited_names[RUN_LOOP_MAX_TERMINALS];
   int exited_codes[RUN_LOOP_MAX_TERMINALS];
@@ -190,11 +206,15 @@ void editorHandleStreams(const RunLoopWatch *w, const int *ready) {
     if (!ready[w->first_terminal + i])
       continue;
     b = w->terminals[i];
+    b->term_state.scrollback_max = E.constantes.TERMINAL_SCROLLBACK;
+    dropped = b->term_state.rows_dropped;
     while ((n = os_stream_read(ptySessionOutput(b), chunk, sizeof(chunk), 0)) > 0) {
       ansiParserFeed(b, chunk, (size_t)n);
       b->x = ansiParserCursorIndex(b);
       b->y = b->term_state.cursor_y;
     }
+    if (b->term_state.rows_dropped != dropped)
+      panesRowsDropped(b, (int)(b->term_state.rows_dropped - dropped));
     // The shell has exited: release it. The buffer keeps showing what
     // it last drew. "terminal-exited" hears of it once every terminal is
     // read: a hook may open or close terminals, which w->terminals holds.

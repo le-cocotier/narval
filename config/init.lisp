@@ -68,6 +68,12 @@
 (define GUI-FONT-SIZE 14)
 ;; (define GUI-FONT "/System/Library/Fonts/Menlo.ttc")
 
+;; Lines of output a terminal pane keeps above its screen: older ones are
+;; dropped, so a long build or a chatty server doesn't grow narval's memory
+;; without end (each line costs about 1 KB). 0 keeps them all. Omitting
+;; this means 10000.
+(define TERMINAL-SCROLLBACK 10000)
+
 ;; Every AUTOSAVE-INTERVAL seconds, files with unsaved changes are copied to
 ;; ~/.narval/autosave/. Saving (or killing the buffer) removes the copy; after
 ;; a crash or a closed terminal, opening the file again offers to recover it.

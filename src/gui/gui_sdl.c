@@ -682,6 +682,9 @@ static void gridMeasure(void)
     if (G.rows < 4) G.rows = 4;
     G.screen.term_state.pane_width = G.cols;
     G.screen.term_state.pane_height = G.rows;
+    // Only the screen is ever drawn: a line narval's output scrolls off
+    // its top isn't kept.
+    G.screen.term_state.scrollback_max = 1;
 }
 
 // The window's scale changed (moved to another screen): same font, its

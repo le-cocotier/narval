@@ -31,6 +31,10 @@
 ;; Terminal.app). Omitting this leaves it on.
 (define MOUSE #t)
 
+;; The wheel and the trackpad scroll the way the system is set to (macOS's
+;; natural scrolling included). #t turns that around, in narval only.
+(define MOUSE-REVERSE-SCROLL #f)
+
 ;; Keys with modifiers. Every Alt/Option and Ctrl combination has a name
 ;; for map-key, modifiers in the order CTRL-ALT-SHIFT-:
 ;;   "ALT-x" "ALT-X" (Alt+Shift+x) "ALT-1" "ALT-." "ALT-ENTER" "ALT-SPACE"
@@ -208,6 +212,8 @@
 ;;   "buffer-killed" (name buffer-id)     - a buffer was killed (CTRL-x k)
 ;;   "after-init"    ()                   - all of the config has loaded and
 ;;                                          the startup files are open
+;;   "config-reloaded" ()                 - config-reload (CTRL-x c r) has
+;;                                          loaded the config again
 ;;
 ;; Example: log every save to the status bar.
 ;; (add-hook "after-save" (lambda (filename) (editor-set-prefix "no-prefix")))
@@ -562,6 +568,10 @@
 (map-key "p" '(dired-open (package-directory)) "config")
 (map-key "m" '(editor-open-file-path (string-append (package-directory "personal-config") "/init.lisp")) "config")
 (map-key "s" list-settings "config")
+;; Reload init.lisp and every package without restarting: what the config
+;; set up is forgotten first, so a line you took out stops having an
+;; effect too. Open files, panes, terminals and language servers stay.
+(map-key "r" config-reload "config")
 ;; Who calls the function at the cursor, as a tree: its callers indented
 ;; under it, theirs under them. Type to filter, ENTER jumps to the call.
 (define (lsp-call-hierarchy)
@@ -617,7 +627,8 @@
 (map-key "PAGE-DOWN" move-cursor-page-down "search")
 (map-key "CTRL-x" '(editor-set-prefix "user") "search")
 
-;; memory (debug builds only — CTRL-x m to open, r refresh, s sort, w export, CTRL-x to leave)
+;; memory (debug builds only — CTRL-x m to open; ENTER source, v sites/blocks,
+;; s sort, b baseline, B clear it, r refresh, w export, CTRL-x to leave)
 (if (app-debug?)
   (begin
     (map-key "ARROW-UP" '(move-cursor "up") "memory")
@@ -627,6 +638,10 @@
     (map-key "r" memory-inspector-refresh "memory")
     (map-key "s" memory-inspector-sort "memory")
     (map-key "w" memory-inspector-export "memory")
+    (map-key "v" memory-inspector-view "memory")
+    (map-key "b" memory-inspector-baseline "memory")
+    (map-key "B" memory-inspector-clear-baseline "memory")
+    (map-key "ENTER" memory-inspector-goto "memory")
     (map-key "CTRL-x" '(editor-set-prefix "user") "memory")))
 
 ;; Your own modifications, kept out of this file so an update can replace it

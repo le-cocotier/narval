@@ -492,6 +492,12 @@ int os_replace_file(const char *tmp, const char *dest, char *err, size_t err_siz
  */
 int os_heap_in_use(long long *blocks, long long *bytes);
 
+// One process-wide lock, for galloc (src/gutils.c): narval-gui hands SDL's
+// allocator to galloc, and SDL can allocate from threads of its own. Not
+// recursive.
+void os_alloc_lock(void);
+void os_alloc_unlock(void);
+
 /***********************************************************************************************************************
  *
  *                                                 Clipboard

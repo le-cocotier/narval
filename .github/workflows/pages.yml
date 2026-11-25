@@ -21,9 +21,11 @@ permissions:
   pages: write
   id-token: write
 
+# A newer push waits for the running deployment instead of cancelling it
+# halfway, which can leave Pages with a deployment stuck in progress.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -51,8 +53,14 @@ jobs:
           if grep -rl '__[A-Z_]*__' _site; then echo "unfilled placeholder" >&2; exit 1; fi
 
       - uses: actions/configure-pages@v5
+      # Named after the attempt: a re-run ("Re-run jobs") keeps the artifacts
+      # of the earlier attempts in the same run, and deploy-pages refuses to
+      # pick between two artifacts with the same name.
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+          name: github-pages-${{ github.run_attempt }}
       - id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}

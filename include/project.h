@@ -39,6 +39,13 @@ void projectInit(void);
 // Frees the project list. Called from deInitEditor().
 void projectFree(void);
 
+// For a config reload (init.c): forgets the (project-add-marker ...)
+// names, then, once init.lisp has loaded again, re-evaluates the
+// .narval/init.lisp of each project opened this session and re-reads
+// every project's settings.
+void projectClearMarkers(void);
+void projectReloadConfigs(void);
+
 // Resolves `buffer`'s project (once) and makes it current. editorOpen()
 // calls it before a file is read, so the file already loads with its
 // project's settings (TAB-LENGTH expands tabs while loading).

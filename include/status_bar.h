@@ -13,6 +13,9 @@ void editorDrawStatusBar(struct abuf *ab);
 // Registers status-bar-segments and status-bar-add-segment.
 void statusBarRegisterBuiltins(void);
 
+// Back to the built-in layout, with no Lisp segments (a config reload).
+void statusBarReset(void);
+
 // The Lisp functions of the added segments, for the garbage collector.
 void statusBarVisitLispRoots(LispRootVisitor visit, LispContext ctx);
 

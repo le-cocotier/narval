@@ -9,6 +9,10 @@
 #include "../include/galloc.h"
 #include "../include/utils.h"
 
+#ifndef _WIN32
+#include <pthread.h>
+#endif
+
 static void testStrdup(void) {
   char *s;
 
@@ -156,6 +160,48 @@ static void testAppendBuffer(void) {
   abFree(&ab);
 }
 
+#ifndef _WIN32
+// narval-gui routes SDL's allocator through galloc, and SDL may allocate
+// from its own threads: galloc's list and index must survive that.
+static void *gallocWorker(void *arg) {
+  void *held[64] = {0};
+  int i;
+  int slot;
+  (void)arg;
+  for (i = 0; i < 20000; i++) {
+    slot = i % 64;
+    if (held[slot] && i % 3 == 0) {
+      held[slot] = grealloc(held[slot], (size_t)(i % 200) + 1);
+    } else {
+      gfree(held[slot]);
+      held[slot] = (i % 2) ? galloc((size_t)(i % 100) + 1)
+                           : gcalloc(1, (size_t)(i % 50) + 1);
+    }
+  }
+  for (i = 0; i < 64; i++)
+    gfree(held[i]);
+  return NULL;
+}
+
+static void testGallocThreads(void) {
+  pthread_t threads[4];
+  const int before = gBlockCount();
+  struct dataBlock_t snap[8];
+  int i;
+  for (i = 0; i < 4; i++)
+    CHECK(pthread_create(&threads[i], NULL, gallocWorker, NULL) == 0);
+  // The main thread allocates and inspects at the same time.
+  for (i = 0; i < 2000; i++) {
+    gfree(gstrdup("main"));
+    gSnapshot(snap, 8);
+  }
+  for (i = 0; i < 4; i++)
+    pthread_join(threads[i], NULL);
+  CHECK_INT(gBlockCount(), before);
+  CHECK(gTrackerOverhead() >= (size_t)before * sizeof(struct dataBlock_t));
+}
+#endif
+
 int main(void) {
   testInit();
   testStrdup();
@@ -166,5 +212,8 @@ int main(void) {
   testPathIsUnder();
   testRecalloc();
   testAppendBuffer();
+#ifndef _WIN32
+  testGallocThreads();
+#endif
   return testDone();
 }

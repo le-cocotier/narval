@@ -1,5 +1,6 @@
 #include "../include/lisp_gc.h"
 #include "../include/async_process.h"
+#include "../include/config_load.h"
 #include "../include/daemon.h"
 #include "../include/status_bar.h"
 
@@ -53,6 +54,7 @@ static void visitRoots(LispRootVisitor visit, LispContext ctx) {
   asyncProcessVisitLispRoots(visit, ctx);
   statusBarVisitLispRoots(visit, ctx);
   daemonVisitLispRoots(visit, ctx);
+  configVisitLispRoots(visit, ctx);
 }
 
 void lispGcInit(void) { lisp_set_roots(visitRoots, E.ctx); }

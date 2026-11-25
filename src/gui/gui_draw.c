@@ -1,7 +1,8 @@
 /**
  * @file gui_draw.c
  * @brief See gui_draw.h: box drawing, block elements, rounded boxes and
- * shadows, drawn for narval-gui instead of taken from the font.
+ * shadows, drawn for narval-gui instead of taken from the font; and the
+ * image helpers for characters from other fonts (emoji).
  * @details A font draws "│" or "▎" no taller than its own line, so with
  * any line spacing a pane divider is a dotted line and the git gutter a
  * column of dashes. Drawn here they fill the cell, and a line in one cell
@@ -488,4 +489,106 @@ SDL_Surface *guiShadow(const int radius, const int blur)
             m.a[y * size + x] = (Uint8) (t * t * 255.0f + 0.5f);
         }
     return maskSurface(&m);
+}
+
+/***********************************************************************************************************************
+ *
+ *                                                 Images
+ *
+ **********************************************************************************************************************/
+
+int guiHasColor(SDL_Surface *image)
+{
+    SDL_Surface *rgba;
+    const Uint8 *p;
+    int found = 0;
+    int x;
+    int y;
+
+    if (!image)
+        return 0;
+    rgba = SDL_ConvertSurface(image, SDL_PIXELFORMAT_RGBA32);
+    if (!rgba)
+        return 0;
+    for (y = 0; y < rgba->h && !found; y++)
+        for (x = 0; x < rgba->w && !found; x++)
+        {
+            p = (const Uint8 *) rgba->pixels + y * rgba->pitch + x * 4;
+            found = p[3] > 0 && (p[0] != p[1] || p[1] != p[2]);
+        }
+    SDL_DestroySurface(rgba);
+    return found;
+}
+
+SDL_Surface *guiShrink(SDL_Surface *image, const int w, const int h)
+{
+    SDL_Surface *in;
+    SDL_Surface *out;
+    const Uint8 *p;
+    Uint8 *q;
+    float sx;
+    float sy;
+    float x0;
+    float y0;
+    float wy;
+    float weight;
+    float alpha;
+    float sum[4];  // colour times alpha, and alpha, times the area covered
+    float area;
+    int x;
+    int y;
+    int i;
+    int j;
+    int i1;
+    int j1;
+    int k;
+
+    if (!image || w <= 0 || h <= 0)
+        return NULL;
+    in = SDL_ConvertSurface(image, SDL_PIXELFORMAT_RGBA32);
+    out = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_RGBA32);
+    if (!in || !out)
+    {
+        SDL_DestroySurface(in);
+        SDL_DestroySurface(out);
+        return NULL;
+    }
+    sx = (float) in->w / (float) w;
+    sy = (float) in->h / (float) h;
+    for (y = 0; y < h; y++)
+    {
+        y0 = (float) y * sy;
+        j1 = (int) ceilf(y0 + sy);
+        if (j1 > in->h) j1 = in->h;
+        for (x = 0; x < w; x++)
+        {
+            // Every source pixel under this one, weighted by how much of it
+            // is: colours by alpha too, so transparent pixels add no colour.
+            x0 = (float) x * sx;
+            i1 = (int) ceilf(x0 + sx);
+            if (i1 > in->w) i1 = in->w;
+            memset(sum, 0, sizeof(sum));
+            area = 0.0f;
+            for (j = (int) y0; j < j1; j++)
+            {
+                wy = fminf(y0 + sy, (float) j + 1.0f) - fmaxf(y0, (float) j);
+                for (i = (int) x0; i < i1; i++)
+                {
+                    weight = wy * (fminf(x0 + sx, (float) i + 1.0f) - fmaxf(x0, (float) i));
+                    p = (const Uint8 *) in->pixels + j * in->pitch + i * 4;
+                    alpha = (float) p[3] * weight;
+                    for (k = 0; k < 3; k++)
+                        sum[k] += (float) p[k] * alpha;
+                    sum[3] += alpha;
+                    area += weight;
+                }
+            }
+            q = (Uint8 *) out->pixels + y * out->pitch + x * 4;
+            for (k = 0; k < 3; k++)
+                q[k] = sum[3] > 0.0f ? (Uint8) (sum[k] / sum[3] + 0.5f) : 0;
+            q[3] = area > 0.0f ? (Uint8) (sum[3] / area + 0.5f) : 0;
+        }
+    }
+    SDL_DestroySurface(in);
+    return out;
 }

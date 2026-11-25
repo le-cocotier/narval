@@ -594,11 +594,37 @@ void projectFree(void) {
   E.number_of_projects = 0;
   E.current_project = -1;
   s_loaded = 0;
+  projectClearMarkers();
+}
+
+void projectClearMarkers(void) {
+  int i;
   for (i = 0; i < s_marker_count; i++)
     gfree(s_markers[i]);
   gfree(s_markers);
   s_markers = NULL;
   s_marker_count = 0;
+}
+
+void projectReloadConfigs(void) {
+  int i;
+  Project *p;
+  for (i = 0; i < E.number_of_projects; i++) {
+    p = &E.projects[i];
+    if (p->removed)
+      continue;
+    // A project opened this session gets its .narval/init.lisp evaluated
+    // again, on top of the reloaded global env (and picks up its edits);
+    // the others only take the new init.lisp settings, as they would at
+    // their first open anyway.
+    if (p->opened)
+      loadConfig(p);
+    else
+      p->constantes = E.global_constantes;
+  }
+  E.constantes = E.current_project >= 0 && !E.projects[E.current_project].removed
+                     ? E.projects[E.current_project].constantes
+                     : E.global_constantes;
 }
 
 void projectActivateForBuffer(Buffer *buffer) {

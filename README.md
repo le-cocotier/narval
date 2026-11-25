@@ -95,6 +95,13 @@ Windows; `NARVAL_HOME` moves it). Put your own settings in
 With a package manager, the bundled packages stay in the install and upgrade with narval; a copy
 of one in `~/.narval/packages/` takes precedence.
 
+After an edit, `CTRL-x c r` (`config-reload`) loads the config again without restarting. What
+the old config set up is forgotten first (definitions, key bindings, hooks, the theme, language
+server and syntax registrations, the status bar layout, the loaded packages), so a line you took
+out stops having an effect too; open files, panes, terminals and running language servers stay.
+Mistakes are reported in `*config-errors*` as at startup. A hook on `"config-reloaded"` runs
+after each reload.
+
 ## Getting started
 
 ```sh
@@ -182,9 +189,14 @@ the ones most terminals can't send: `CTRL-1`, `CTRL-.`, `CTRL-SHIFT-a`, `CTRL-AL
 Alt (Option) key is Alt/Meta (`ALT-x` is M-x) and the right one types characters (AltGr, Option+e
 on a Mac). Cmd+V (Super+V) pastes the clipboard as typed text, and
 Cmd+Q or the close button do what `CTRL-x CTRL-c` does, unsaved-changes warning included. The
-mouse wheel and clicks work as in a terminal with `MOUSE` on. `GUI-FONT-SIZE` and `GUI-FONT` in
-`init.lisp` set the font; the default is the bundled DejaVu Sans Mono (`assets/fonts/`). HiDPI
-screens get it at their full resolution.
+mouse wheel and clicks work as in a terminal with `MOUSE` on, and the wheel scrolls the way the
+system is set to (macOS's natural scrolling included; `MOUSE-REVERSE-SCROLL` turns it around). `GUI-FONT-SIZE` and `GUI-FONT` in
+`init.lisp` set the font (a path to a .ttf, .otf or .ttc file; `~/` is your home folder); the
+default is the bundled DejaVu Sans Mono (`assets/fonts/`). Bold and italic use the family's own
+faces when they're beside it (`VictorMono-Italic.ttf` next to `VictorMono-Regular.ttf`, the faces
+of a `.ttc`, a variable font's weights), and are drawn from the regular face otherwise. Characters the font hasn't got (emoji,
+Chinese, Japanese, Korean, symbols) come from the system's fonts, as in a terminal, emoji in
+colour. HiDPI screens get it all at their full resolution.
 
 How it works: the window is one more screen driver (`include/terminal.h`), like a daemon
 client's. Frames go through the same ANSI parser terminal panes use into a grid of cells, which
@@ -312,7 +324,7 @@ lines are written. The commit each one is at goes to `personal-config/packages.l
 folder on another machine, `narval --sync-packages` installs exactly the same commits without
 opening the editor. `CTRL-x c l` lists every package (version, commit, loaded or not) and
 installs (`i`), updates after showing the new commits (`u`, `U` for all), rolls back (`r`) and
-removes (`d`) them. Updates apply at the next start.
+removes (`d`) them. Updates apply at the next start, or at `CTRL-x c r`.
 
 A package can describe itself in a `package.lisp` next to its `init.lisp` (read, never run):
 
@@ -398,10 +410,15 @@ Everything outside `src/os/` is the same code on every platform, so Linux or mac
 most problems. For the Windows layer, do the same from an MSYS2 **CLANG64** shell (gcc has no
 AddressSanitizer on Windows), and run `build-asan\narval.exe` with `C:\msys64\clang64\bin` on
 `PATH` (the sanitizer runtime is a DLL). Dr. Memory doesn't start on Windows 11 24H2.
-Leaks: every `galloc` is tracked. `CTRL-x m` (memory inspector) lists the live blocks with
-the file and line that allocated them, and a debug build (`install.sh --debug`,
-`install.ps1 -DebugBuild`) writes what is still allocated at exit to
-`~/.narval/memory-at-exit.log`, grouped by allocation site.
+Leaks: every `galloc` is tracked. `CTRL-x m` (memory inspector) lists the live blocks grouped
+by the file and line that allocated them (`v` for one row per block, `s` to sort, `ENTER` opens
+that line). To find a leak, press `b` to mark a baseline, do the thing that leaks (open and close
+a file, say), then `r`: only the sites that changed since are listed, with by how much (`B` drops the
+baseline). A debug build (`install.sh --debug`, `install.ps1 -DebugBuild`) also writes what is
+still allocated at exit to `~/.narval/memory-at-exit.log`, grouped by allocation site. In narval-gui, SDL and SDL_ttf
+allocate through galloc too and show up as `SDL:0`. Both views also give galloc's own
+bookkeeping and the whole process heap, so what galloc can't see (libc's buffers, FreeType)
+is the difference between the two.
 
 
 ## License

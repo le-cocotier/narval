@@ -3,7 +3,8 @@
 
 // narval-gui's drawn shapes (gui_draw.c): what a window draws better than
 // a font does. Each is a white image whose alpha is the shape, tinted when
-// drawn, as the font's glyphs are.
+// drawn, as the font's glyphs are. And two helpers for the characters
+// other fonts draw (emoji): telling colour from grey, shrinking.
 
 #include <SDL3/SDL.h>
 
@@ -26,5 +27,13 @@ SDL_Surface *guiRoundedRect(int radius);
 // `blur` pixels around it: `2 * (radius + blur) + 1` pixels square, for
 // SDL_RenderTexture9Grid() too.
 SDL_Surface *guiShadow(int radius, int blur);
+
+// Whether `image` has a pixel that isn't grey: a colour emoji, which is
+// drawn in its own colours instead of tinted.
+int guiHasColor(SDL_Surface *image);
+// `image` shrunk to `w` x `h` pixels, each the average of the pixels it
+// covers (an emoji font's 128 px bitmaps, to a cell). NULL if it can't be
+// made. Free it with SDL_DestroySurface().
+SDL_Surface *guiShrink(SDL_Surface *image, int w, int h);
 
 #endif // GUI_DRAW_H_

@@ -48,7 +48,9 @@ else
     c_args : ['-D_GNU_SOURCE'],
     # forkpty() lives in libutil on Linux; on macOS/BSD it is in libc and
     # this lookup simply finds nothing, which is why it is not `required`.
-    dependencies : [cc.find_library('util', required : false)])
+    # pthreads: galloc's lock (os_alloc_lock).
+    dependencies : [cc.find_library('util', required : false),
+                    dependency('threads')])
 endif
 
 # ─── The editor ───────────────────────────────────────────────────────────────
@@ -61,6 +63,9 @@ core_args = [
   '-Werror=implicit-function-declaration',
   # lisp.h maps files with mmap() unless told not to; stdio is portable.
   '-DLISP_NO_MMAP',
+  # Where __FILE__ paths (relative to the build directory) start from, so
+  # the memory inspector can open the line that allocated a block.
+  '-DNARVAL_BUILD_DIR="' + meson.current_build_dir().replace('\\', '/') + '"',
 ]
 link_args = []
 extra_sources = []
@@ -205,7 +210,7 @@ if gui_found
     dependencies : gui_os_deps)
   gui_deps += gui_os_deps
   gui_lib = static_library('narval-gui',
-    'src/gui/gui_sdl.c', 'src/gui/gui_draw.c',
+    'src/gui/gui_sdl.c', 'src/gui/gui_draw.c', 'src/gui/gui_font.c',
     c_args : core_args,
     link_with : gui_os_lib,
     dependencies : gui_deps)
@@ -218,7 +223,10 @@ if gui_found
     link_args : is_windows ? [] : link_args,
     win_subsystem : 'windows',
     install : true)
-  # The window with SDL's offscreen video driver: keys in, cells drawn.
+  # The window with SDL's dummy video driver: keys in, cells drawn. Not
+  # the offscreen one: on macOS SDL gives its windows OpenGL by default,
+  # which offscreen only has through EGL, and macOS has no EGL ("Could
+  # not initialize OpenGL / GLES library").
   test('gui', executable('test_gui',
     files('test/test_gui.c', 'test/test.c') + extra_sources,
     c_args : core_args,
@@ -226,7 +234,7 @@ if gui_found
     dependencies : gui_deps,
     link_args : is_windows ? [] : link_args),
     args : [meson.current_source_dir() / 'assets/fonts/DejaVuSansMono.ttf'],
-    env : ['SDL_VIDEO_DRIVER=offscreen'])
+    env : ['SDL_VIDEO_DRIVER=dummy'])
   # Linux and the BSDs: in the desktop's app launcher and search, with its
   # icon. macOS gets Narval.app instead (packaging/macos/make-app.sh, run
   # by install.sh), Windows a Start menu shortcut (install.ps1).
@@ -253,6 +261,18 @@ foreach t : ['utf8', 'keys', 'buffer', 'ansi_parser', 'os', 'completion', 'packa
     dependencies : [m],
     link_args : link_args))
 endforeach
+
+# Reloading the config: initEditor() on a config of its own, kept in the
+# build directory (HOME too, for ~/.narval/projects and the Lisp log).
+reload_home = meson.current_build_dir() / 'config-reload-home'
+test('config_reload', executable('test_config_reload',
+    files('test/test_config_reload.c', 'test/test.c') + extra_sources,
+    c_args : core_args,
+    link_with : [core_lib, os_lib],
+    dependencies : [m],
+    link_args : link_args),
+  env : ['NARVAL_HOME=' + reload_home, 'NARVAL_DATA_DIR=' + reload_home,
+         'HOME=' + reload_home, 'USERPROFILE=' + reload_home])
 
 # Headless tests (POSIX), narval in a pseudo-terminal. The smoke test opens
 # a file, types, saves and quits; under a sanitizer build it fails on any

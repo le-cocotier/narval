@@ -1268,6 +1268,42 @@ def debug_log_buffer(binary, repo):
         ed.quit()
 
 
+def config_reload(binary, repo):
+    """CTRL-x c r reloads the config: a setting personal-config now sets
+    applies, one it no longer sets is back to its default, and a mistake
+    is reported without losing the keys."""
+    with Narval(binary, repo, rows=30, cols=100) as ed:
+        personal = ed.path('.narval/packages/personal-config/init.lisp')
+        with open(personal) as f:
+            original = f.read()
+        with open(ed.path('d.txt'), 'w') as f:
+            f.write('reload me\n')
+        ed.start('d.txt')
+        ed.wait_for('reload me')
+        assert any(re.match(r'\s*1\s+reload me', line) for line in ed.text()), ed.text()
+
+        with open(personal, 'w') as f:
+            f.write(original + '\n(define LINE-NUMBERS #f)\n')
+        ed.keys(CTRL_X, 'c', 'r', delay=0.5)
+        ed.wait_for('Config reloaded')
+        # No gutter: the text starts at the left margin.
+        assert any(re.match(r'\s{0,2}reload me', line) for line in ed.text()), ed.text()
+        assert 'Config reloaded (' in ed.text()[-1] and 'ms)' in ed.text()[-1], ed.text()
+
+        with open(personal, 'w') as f:
+            f.write(original + '\n(this-is-not-defined)\n')
+        ed.keys(CTRL_X, 'c', 'r', delay=0.5)
+        ed.wait_for('Config error')
+        ed.wait_for('this-is-not-defined')
+        assert any(re.match(r'\s*1\s+reload me', line) for line in ed.text()), ed.text()
+
+        with open(personal, 'w') as f:
+            f.write(original)
+        ed.keys(CTRL_X, 'c', 'r', delay=0.5)   # the keys still work
+        ed.wait_for('Config reloaded')
+        ed.quit()
+
+
 DASHBOARD_MAIN = """int main(void) {
   /* TODO: read the arguments */
   return 0;
@@ -1402,6 +1438,41 @@ def dashboard_extended(binary, repo):
         ed.quit()
 
 
+
+def memory_inspector(binary, repo):
+    """CTRL-x m lists the allocation sites; b marks a baseline, after which
+    nothing has changed; v shows blocks; ENTER on a site opens its source
+    line. Debug builds only (APP_DEBUG): skipped otherwise."""
+    with Narval(binary, repo, rows=40, cols=140) as ed:
+        with open(ed.path('t.c'), 'w') as f:
+            f.write('int main(void) { return 0; }\n')
+        ed.start('t.c')
+        ed.wait_for('main')
+        ed.keys(CTRL_X, 'm', delay=0.6)
+        ed.pump(0.3)
+        if 'tracked block' not in ''.join(ed.text()):
+            raise Skip('not a debug build (APP_DEBUG)')
+        ed.wait_for('per site')
+        ed.wait_for('allocated at')
+        ed.keys('b', delay=0.5)
+        ed.wait_for('nothing changed since the baseline')
+        ed.keys('v', delay=0.5)
+        ed.wait_for('per block')
+        ed.keys('B', 'v', delay=0.5)
+        ed.wait_for('per site')
+        rows = ed.text()
+        first = next(i for i, row in enumerate(rows) if 'allocated at' in row) + 1
+        site = re.search(r'(\S+):(\d+) \(', rows[first])
+        assert site, rows[first]
+        ed.keys(*([DOWN] * first), '\r', delay=0.6)
+        # The status bar's file and line, not the "file:line" message: a
+        # notice can replace that one on the next tick (a checkout with a
+        # .narval/init.lisp: "has a project config: project-trust ...").
+        ed.wait_for('Ln %s/' % site.group(2))
+        status = next(row for row in ed.text() if 'Ln %s/' % site.group(2) in row)
+        assert os.path.basename(site.group(1)) in status, status
+        ed.quit()
+
 TESTS = [
     ('breakpoint-gutter', breakpoint_gutter),
     ('pane-cursors', pane_cursors),
@@ -1443,9 +1514,11 @@ TESTS = [
     ('stm32-project-settings', stm32_project_settings),
     ('stm32-debug', stm32_debug),
     ('debug-log-buffer', debug_log_buffer),
+    ('config-reload', config_reload),
     ('dashboard-on-start', dashboard_on_start),
     ('dashboard-on-switch', dashboard_on_switch),
     ('dashboard-extended', dashboard_extended),
+    ('memory-inspector', memory_inspector),
 ]
 
 

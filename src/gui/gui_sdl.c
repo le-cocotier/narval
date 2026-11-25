@@ -16,11 +16,13 @@
 
 #include "../../include/gui.h"
 #include "gui_draw.h"
+#include "gui_font.h"
 
 #include "../../include/ansi_parser.h"
 #include "../../include/buffer.h"
 #include "../../include/builtins.h"
 #include "../../include/data.h"
+#include "../../include/debug_log.h"
 #include "../../include/define.h"
 #include "../../include/editor_op.h"
 #include "../../include/galloc.h"
@@ -50,6 +52,7 @@ extern EditorConfig E;
 #define GUI_MIN_FRAME_MS 12    // while keys are queued (a paste), at most ~80 frames a second
 #define GUI_STREAM_SLICE_MS 8  // how often other streams are polled while waiting on the window
 #define GUI_FONT_STYLES 4      // regular, bold, italic, bold italic
+#define GUI_MAX_FALLBACKS 12   // fonts for the characters the font hasn't got
 #define GUI_MAX_DROPPED 64     // files opened at once (dropped, or from Finder's Open With)
 #define GUI_CURSOR_GLIDE_MS 70 // the cursor's glide to where it jumped
 #define GUI_FRAME_MS 8         // between a glide's frames, at most (vsync paces them)
@@ -59,9 +62,12 @@ typedef struct
     Uint32 codepoint;  // 0: empty slot
     int style;
     SDL_Texture *texture;  // NULL: the font has nothing to draw for it
+    int x;  // where it is drawn, from the top left of the font's line
+    int y;
     int w;
     int h;
-    int cell;  // drawn to fill the cell (gui_draw.c), not from the font
+    int cell;   // drawn to fill the cell (gui_draw.c), not from the font
+    int color;  // in its own colours (an emoji), not tinted
 } Glyph;
 
 typedef struct
@@ -70,6 +76,14 @@ typedef struct
     SDL_Renderer *renderer;
     TTF_Font *fonts[GUI_FONT_STYLES];
     char *font_path;     // galloc'd: what fonts[] were opened from
+    int font_configured; // fonts[] are GUI-FONT's (not the default search's)
+    // The system's fonts for what fonts[] haven't got (emoji, Chinese,
+    // Japanese, Korean, symbols), as a terminal borrows them: opened at
+    // fonts[]'s size when a character is first missing.
+    TTF_Font *fallbacks[GUI_MAX_FALLBACKS];
+    int fallback_emoji[GUI_MAX_FALLBACKS];  // a colour emoji font
+    int n_fallbacks;
+    int fallbacks_tried;
     float font_size;     // points, as asked (GUI-FONT-SIZE)
     float scale;         // pixels per logical pixel
     int cell_w;          // pixels
@@ -379,18 +393,44 @@ static void fontsClose(void)
             TTF_CloseFont(G.fonts[i]);
         G.fonts[i] = NULL;
     }
+    for (i = 0; i < G.n_fallbacks; i++)
+        TTF_CloseFont(G.fallbacks[i]);
+    G.n_fallbacks = 0;
+    G.fallbacks_tried = 0;
+}
+
+/**
+ * @brief One style's font: its own face when the family has one (`face`,
+ * with `extra` drawn on top: a bold italic made from the italic), else
+ * the `regular` face with `style` drawn by SDL_ttf.
+ */
+static TTF_Font *styleOpen(const GuiFace *regular, const GuiFace *face, const int extra, const int style,
+                           const float px)
+{
+    const int own = face && face->path;
+    TTF_Font *font = own ? guiOpenFace(face->path, face->index, px)
+                         : guiOpenFace(regular->path, regular->index, px);
+
+    if (!font)
+        return NULL;
+    TTF_SetFontStyle(font, own ? extra : style);
+    TTF_SetFontHinting(font, TTF_HINTING_LIGHT_SUBPIXEL);
+    return font;
 }
 
 /**
  * @brief Opens `path` at G.font_size for the window's pixel scale, in the
- * four styles, and measures the cell. @return 0, -1 if it can't be opened
- * or isn't usable (no "M").
+ * four styles, and measures the cell. Bold, italic and bold italic are
+ * the family's own faces where it has them (gui_font.c: beside it, in its
+ * collection, a variable font's instances), else drawn from the regular
+ * one. @return 0, -1 if it can't be opened or isn't usable (no "M").
  */
 static int fontsOpen(const char *path)
 {
-    static const int styles[GUI_FONT_STYLES] = {
-        TTF_STYLE_NORMAL, TTF_STYLE_BOLD, TTF_STYLE_ITALIC, TTF_STYLE_BOLD | TTF_STYLE_ITALIC};
     TTF_Font *fonts[GUI_FONT_STYLES] = {NULL, NULL, NULL, NULL};
+    GuiFace faces[GUI_FACES];  // regular (if not path's first), bold, italic, bold italic
+    GuiFace first = {NULL, 0, 0};
+    const GuiFace *regular;
     const float px = G.font_size * G.scale;
     int advance = 0;
     int minx;
@@ -401,16 +441,36 @@ static int fontsOpen(const char *path)
 
     if (!path || !path[0])
         return -1;
-    for (i = 0; i < GUI_FONT_STYLES; i++)
+    first.path = (char *) path;
+    fonts[0] = styleOpen(&first, NULL, 0, TTF_STYLE_NORMAL, px);
+    if (!fonts[0])
+        return -1;
+    guiFindFaces(path, fonts[0], px, faces);
+    regular = faces[0].path ? &faces[0] : &first;
+    if (faces[0].path)
     {
-        fonts[i] = TTF_OpenFont(path, px);
-        if (!fonts[i])
-            break;
-        TTF_SetFontStyle(fonts[i], styles[i]);
-        TTF_SetFontHinting(fonts[i], TTF_HINTING_LIGHT_SUBPIXEL);
+        TTF_CloseFont(fonts[0]);
+        fonts[0] = styleOpen(regular, NULL, 0, TTF_STYLE_NORMAL, px);
     }
-    if (i < GUI_FONT_STYLES || !TTF_GetGlyphMetrics(fonts[0], 'M', &minx, &maxx, &miny, &maxy, &advance) ||
-        advance <= 0)
+    if (fonts[0] && TTF_GetGlyphMetrics(fonts[0], 'M', &minx, &maxx, &miny, &maxy, &advance) && advance > 0)
+    {
+        fonts[1] = styleOpen(regular, &faces[1], TTF_STYLE_NORMAL, TTF_STYLE_BOLD, px);
+        fonts[2] = styleOpen(regular, &faces[2], TTF_STYLE_NORMAL, TTF_STYLE_ITALIC, px);
+        // Bold italic: its own face, else the italic made bold (an
+        // italic's design matters more than a bold's), else the bold
+        // slanted.
+        fonts[3] = styleOpen(regular, faces[3].path ? &faces[3] : faces[2].path ? &faces[2] : &faces[1],
+                             faces[3].path ? TTF_STYLE_NORMAL : faces[2].path ? TTF_STYLE_BOLD : TTF_STYLE_ITALIC,
+                             TTF_STYLE_BOLD | TTF_STYLE_ITALIC, px);
+        logInfo("narval-gui font: %s %s; bold %s, italic %s, bold italic %s",
+                TTF_GetFontFamilyName(fonts[0]), TTF_GetFontStyleName(fonts[0]),
+                faces[1].path ? faces[1].path : "drawn", faces[2].path ? faces[2].path : "drawn",
+                faces[3].path ? faces[3].path : faces[2].path ? "the italic, drawn bold" : "drawn");
+    }
+    guiFacesFree(faces);
+    for (i = 0; i < GUI_FONT_STYLES && fonts[i]; i++)
+        ;
+    if (i < GUI_FONT_STYLES)
     {
         for (i = 0; i < GUI_FONT_STYLES; i++)
             if (fonts[i])
@@ -482,6 +542,128 @@ static int fontsFind(const char *first)
             return 0;
     }
     return -1;
+}
+
+static void fallbackAdd(const char *path, const int emoji)
+{
+    TTF_Font *font;
+
+    if (G.n_fallbacks >= GUI_MAX_FALLBACKS)
+        return;
+    font = TTF_OpenFont(path, G.font_size * G.scale);
+    if (!font)
+        return;
+    TTF_SetFontHinting(font, TTF_HINTING_LIGHT_SUBPIXEL);
+    G.fallback_emoji[G.n_fallbacks] = emoji;
+    G.fallbacks[G.n_fallbacks++] = font;
+}
+
+/**
+ * @brief Opens the system's fonts that have what monospace fonts lack, in
+ * the order they're asked: symbols, then emoji, then Chinese, Japanese
+ * and Korean. The ones missing on this system are skipped. A "*" before a
+ * name marks a colour emoji font.
+ */
+static void fallbacksOpen(void)
+{
+    static const char *const system_fonts[] = {
+        // macOS
+        "/System/Library/Fonts/Apple Symbols.ttf",
+        "*/System/Library/Fonts/Apple Color Emoji.ttc",
+        "/System/Library/Fonts/Hiragino Sans GB.ttc",
+        "/System/Library/Fonts/\xe3\x83\x92\xe3\x83\xa9\xe3\x82\xae\xe3\x83\x8e\xe8\xa7\x92\xe3\x82\xb4"
+        "\xe3\x82\xb7\xe3\x83\x83\xe3\x82\xaf W3.ttc",  // Hiragino Kaku Gothic, Japanese
+        "/System/Library/Fonts/AppleSDGothicNeo.ttc",
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+        // Linux: DejaVu Sans (symbols), Noto Color Emoji, Noto Sans CJK or
+        // WenQuanYi, Droid Sans Fallback; where Debian, Fedora and Arch
+        // put them.
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        "/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf",
+        "*/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
+        "*/usr/share/fonts/noto/NotoColorEmoji.ttf",
+        "*/usr/share/fonts/google-noto-emoji/NotoColorEmoji.ttf",
+        "*/usr/share/fonts/google-noto-color-emoji-fonts/NotoColorEmoji.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+        "/usr/share/fonts/wenquanyi/wqy-zenhei/wqy-zenhei.ttc",
+        "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+    };
+    // Windows: Segoe UI Symbol and Emoji, Microsoft YaHei, Yu Gothic,
+    // Malgun Gothic.
+    static const char *const windows_fonts[] = {"seguisym.ttf", "*seguiemj.ttf", "msyh.ttc", "YuGothR.ttc",
+                                                "malgun.ttf"};
+    const char *windir = getenv("WINDIR");
+    char path[OS_PATH_MAX];
+    size_t i;
+
+    G.fallbacks_tried = 1;
+    for (i = 0; i < sizeof(system_fonts) / sizeof(system_fonts[0]); i++)
+        fallbackAdd(system_fonts[i] + (system_fonts[i][0] == '*'), system_fonts[i][0] == '*');
+    for (i = 0; windir && i < sizeof(windows_fonts) / sizeof(windows_fonts[0]); i++)
+    {
+        snprintf(path, sizeof(path), "%s/Fonts/%s", windir, windows_fonts[i] + (windows_fonts[i][0] == '*'));
+        fallbackAdd(path, windows_fonts[i][0] == '*');
+    }
+}
+
+// The font that draws `codepoint` in `style`: fonts[]'s, else the first
+// fallback that has it (an emoji font first for the pictographs from
+// U+1F000, which symbol fonts have in black and white), else fonts[]'s
+// anyway (its box for "missing").
+static TTF_Font *glyphFont(const Uint32 codepoint, const int style)
+{
+    int i;
+
+    if (TTF_FontHasGlyph(G.fonts[style], codepoint))
+        return G.fonts[style];
+    if (!G.fallbacks_tried)
+        fallbacksOpen();
+    for (i = 0; codepoint >= 0x1F000 && i < G.n_fallbacks; i++)
+        if (G.fallback_emoji[i] && TTF_FontHasGlyph(G.fallbacks[i], codepoint))
+            return G.fallbacks[i];
+    for (i = 0; i < G.n_fallbacks; i++)
+        if (TTF_FontHasGlyph(G.fallbacks[i], codepoint))
+            return G.fallbacks[i];
+    return G.fonts[style];
+}
+
+/**
+ * @brief Fits a fallback font's character to the `span` cells it covers:
+ * on fonts[]'s baseline when it fits, else shrunk to fit and centred (an
+ * emoji font's characters are 128 px bitmaps whatever the size asked).
+ * @return The surface to draw, `surface` or its shrunk copy (`surface`
+ * is then freed).
+ */
+static SDL_Surface *glyphFit(SDL_Surface *surface, TTF_Font *font, const int span, Glyph *glyph)
+{
+    const int box_w = span * G.cell_w;
+    const int box_h = G.text_h;
+    SDL_Surface *small;
+    float k;
+    int w;
+    int h;
+
+    glyph->color = guiHasColor(surface);
+    if (surface->w <= box_w + box_w / 8 && surface->h <= box_h + box_h / 8)
+    {
+        glyph->y = G.ascent - TTF_GetFontAscent(font);
+        return surface;
+    }
+    k = fminf((float) box_w / (float) surface->w, (float) box_h / (float) surface->h);
+    w = (int) ((float) surface->w * k + 0.5f);
+    h = (int) ((float) surface->h * k + 0.5f);
+    small = guiShrink(surface, w > 0 ? w : 1, h > 0 ? h : 1);
+    if (!small)
+        return surface;
+    SDL_DestroySurface(surface);
+    glyph->x = (box_w - small->w) / 2;
+    glyph->y = (box_h - small->h) / 2;
+    return small;
 }
 
 // Rows and columns that fit the window now; the parser wraps and clamps
@@ -619,12 +801,14 @@ static int glyphCacheGrow(void)
     return 0;
 }
 
-// The texture for a character in a style, rendered white the first time.
-static const Glyph *glyphGet(const Uint32 codepoint, const int style)
+// The texture for a character in a style, over `span` cells, rendered
+// white the first time.
+static const Glyph *glyphGet(const Uint32 codepoint, const int style, const int span)
 {
     static const SDL_Color white = {255, 255, 255, 255};
     unsigned int slot;
     SDL_Surface *surface;
+    TTF_Font *font;
     Glyph *glyph;
 
     if ((G.glyph_count + 1) * 10 > G.glyph_cap * 7 && glyphCacheGrow() != 0)
@@ -641,8 +825,15 @@ static const Glyph *glyphGet(const Uint32 codepoint, const int style)
     glyph->style = style;
     G.glyph_count++;
     glyph->cell = guiIsCellGlyph(codepoint);
-    surface = glyph->cell ? guiCellGlyph(codepoint, G.cell_w, G.cell_h)
-                          : TTF_RenderGlyph_Blended(G.fonts[style], codepoint, white);
+    if (glyph->cell)
+        surface = guiCellGlyph(codepoint, G.cell_w, G.cell_h);
+    else
+    {
+        font = glyphFont(codepoint, style);
+        surface = TTF_RenderGlyph_Blended(font, codepoint, white);
+        if (surface && font != G.fonts[style])
+            surface = glyphFit(surface, font, span, glyph);
+    }
     if (!surface)
         return glyph;
     glyph->texture = SDL_CreateTextureFromSurface(G.renderer, surface);
@@ -663,14 +854,17 @@ static void drawGlyph(const Utf8Char *c, const int row, const int col, const int
 
     if (codepoint <= ' ' || codepoint == 0x7F)
         return;
-    glyph = glyphGet(codepoint, style);
+    glyph = glyphGet(codepoint, style, utf8CharWidth(c) > 1 ? 2 : 1);
     if (!glyph || !glyph->texture)
         return;
-    dst.x = (float) (G.pad + col * G.cell_w);
-    dst.y = (float) (G.pad + row * G.cell_h + (glyph->cell ? 0 : G.text_y));
+    dst.x = (float) (G.pad + col * G.cell_w + glyph->x);
+    dst.y = (float) (G.pad + row * G.cell_h + (glyph->cell ? 0 : G.text_y + glyph->y));
     dst.w = (float) glyph->w;
     dst.h = (float) glyph->h;
-    SDL_SetTextureColorMod(glyph->texture, (Uint8) (rgb >> 16), (Uint8) (rgb >> 8), (Uint8) rgb);
+    if (glyph->color)
+        SDL_SetTextureColorMod(glyph->texture, 255, 255, 255);
+    else
+        SDL_SetTextureColorMod(glyph->texture, (Uint8) (rgb >> 16), (Uint8) (rgb >> 8), (Uint8) rgb);
     SDL_RenderTexture(G.renderer, glyph->texture, NULL, &dst);
 }
 
@@ -833,7 +1027,7 @@ static void stretchEdge(const int row, const int col, const int across, const in
     codepoint = utf8CharCodepoint(&line->characters[index]);
     if (codepoint < 0x2500 || codepoint > 0x257F)
         return;
-    glyph = glyphGet(codepoint, 0);
+    glyph = glyphGet(codepoint, 0, 1);
     if (!glyph || !glyph->texture)
         return;
     if (line->attrs)
@@ -1217,7 +1411,10 @@ static void handleEvent(const SDL_Event *ev)
                        ev->type == SDL_EVENT_MOUSE_BUTTON_DOWN);
         break;
     case SDL_EVENT_MOUSE_WHEEL:
-        G.wheel += ev->wheel.direction == SDL_MOUSEWHEEL_FLIPPED ? -ev->wheel.y : ev->wheel.y;
+        // As the system is set to scroll: SDL's y already has macOS's
+        // natural scrolling applied (FLIPPED only says so), as a
+        // terminal's wheel reports do.
+        G.wheel += ev->wheel.y;
         while (G.wheel >= 1.0f || G.wheel <= -1.0f)
         {
             queueMouse(G.wheel > 0 ? 64 : 65, ev->wheel.mouse_x, ev->wheel.mouse_y, 1);
@@ -1531,10 +1728,39 @@ static void startInHome(void)
 
 static const ScreenDriver s_gui_driver = {guiWrite, guiReadKeys, guiSize, guiWait, guiClose, 1};
 
+// SDL's allocator, routed through galloc so the memory inspector and the
+// exit report see what SDL and SDL_ttf hold (window, renderer, fonts, glyph
+// surfaces), grouped under one "SDL" site. galloc is a macro that records
+// the caller, hence the _impl calls with a fixed site. gutils' lock covers
+// SDL's own threads. Anything SDL allocated before the switch (SDL_main's
+// argument handling on some platforms) is not tracked, and gfree/grealloc
+// hand such pointers to the C library's free/realloc, which allocated them.
+static void *SDLCALL sdlMalloc(size_t size)
+{
+    return galloc_impl(size, "SDL", 0, "SDL_malloc");
+}
+
+static void *SDLCALL sdlCalloc(size_t num, size_t size)
+{
+    return gcalloc_impl(num, size, "SDL", 0, "SDL_calloc");
+}
+
+static void *SDLCALL sdlRealloc(void *mem, size_t size)
+{
+    return grealloc_impl(mem, size, "SDL", 0, "SDL_realloc");
+}
+
+static void SDLCALL sdlFree(void *mem)
+{
+    gfree(mem);
+}
+
 int guiOpen(const char *font_path)
 {
     memset(&G, 0, sizeof(G));
     G.font_size = GUI_DEFAULT_FONT_SIZE;
+    // Before anything else allocates through SDL. Fails only on NULL hooks.
+    SDL_SetMemoryFunctions(sdlMalloc, sdlCalloc, sdlRealloc, sdlFree);
     SDL_SetAppMetadata("narval", NARVAL_VERSION, "dev.narval.editor");
     if (!SDL_Init(SDL_INIT_VIDEO))
     {
@@ -1588,31 +1814,69 @@ int guiOpen(const char *font_path)
     return 0;
 }
 
+// GUI-FONT's path, "~/" read as the home folder (galloc'd), NULL if unset.
+static char *configuredFont(void)
+{
+    int present = 0;
+    Lisp font;
+    const char *path;
+    char *home;
+    char *full;
+    size_t len;
+
+    font = lisp_env_lookup(lisp_env(E.ctx), lisp_make_symbol("GUI-FONT", E.ctx), &present);
+    if (!present || lisp_type(font) != LISP_STRING || !lisp_string(font)[0])
+        return NULL;
+    path = lisp_string(font);
+    if (path[0] != '~' || (path[1] != '/' && path[1] != '\\'))
+        return gstrdup(path);
+    home = os_home_dir();
+    if (!home)
+        return NULL;
+    len = strlen(home) + strlen(path);
+    full = galloc(len);
+    if (full)
+        snprintf(full, len, "%s%s", home, path + 1);
+    gfree(home);
+    return full;
+}
+
 void guiConfigure(void)
 {
     const float size = (float) (E.constantes.GUI_FONT_SIZE > 0 ? E.constantes.GUI_FONT_SIZE
                                                                 : GUI_DEFAULT_FONT_SIZE);
-    int present = 0;
-    Lisp font;
-    const char *wanted = NULL;
+    char *wanted;
     char *path;
 
     if (!G.open)
         return;
-    font = lisp_env_lookup(lisp_env(E.ctx), lisp_make_symbol("GUI-FONT", E.ctx), &present);
-    if (present && lisp_type(font) == LISP_STRING && lisp_string(font)[0])
-        wanted = lisp_string(font);
-    if (size == G.font_size && (!wanted || (G.font_path && !strcmp(wanted, G.font_path))))
+    wanted = configuredFont();
+    // Nothing to do when the size is the same and the font is GUI-FONT's
+    // already, or there's no GUI-FONT and none was set before either. A
+    // GUI-FONT taken out of the config (and reloaded) goes back to the
+    // default font.
+    if (size == G.font_size &&
+        (wanted ? G.font_configured && G.font_path && !strcmp(wanted, G.font_path)
+                : !G.font_configured))
+    {
+        gfree(wanted);
         return;
+    }
     G.font_size = size;
     if (wanted && fontsOpen(wanted) == 0)
     {
+        G.font_configured = 1;
+        gfree(wanted);
         gridMeasure();
         return;
     }
     if (wanted)
         editorSetStatusMessage("GUI-FONT: can't open %s", wanted);
-    path = G.font_path ? gstrdup(G.font_path) : NULL;
+    gfree(wanted);
+    // The font in use, at the new size; or, when it was GUI-FONT's and
+    // GUI-FONT is gone, the default search's.
+    path = G.font_path && !G.font_configured ? gstrdup(G.font_path) : NULL;
+    G.font_configured = 0;
     fontsFind(path);
     gfree(path);
     gridMeasure();

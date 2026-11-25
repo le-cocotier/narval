@@ -170,6 +170,13 @@ Lisp lspRegisterServer(Lisp args, LispError *e, LispContext ctx);
 
 void bFree_structs(void);
 
+// For a config reload (init.c): forget what the config registered. Key
+// bindings and hooks; (lsp-server ...) entries; (syntax-define-language
+// ...) languages.
+void keyBindsClear(void);
+void lspServersClear(void);
+void languagesClear(void);
+
 // Hooks
 //
 // (add-hook "event-name" fn) registers fn (a lambda or function symbol —
@@ -189,6 +196,8 @@ void bFree_structs(void);
 //                                            project-switch; a hook that
 //                                            shows a buffer replaces the
 //                                            find-file that follows
+//   "config-reloaded" ()                  — (config-reload) loaded the
+//                                            config again (init.c)
 //   "terminal-exited" (name, exit-code)   — a terminal pane's program ended
 //                                            (-1: code unknown); see
 //                                            terminal-run
@@ -299,6 +308,10 @@ Lisp l_memoryInspectorRefresh(Lisp args, LispError *e, LispContext ctx);
 Lisp l_memoryInspectorCycleSort(Lisp args, LispError *e, LispContext ctx);
 // (memory-inspector-export) — prompts for a path, writes the snapshot to it.
 Lisp l_memoryInspectorExport(Lisp args, LispError *e, LispContext ctx);
+Lisp l_memoryInspectorToggleView(Lisp args, LispError *e, LispContext ctx);
+Lisp l_memoryInspectorMarkBaseline(Lisp args, LispError *e, LispContext ctx);
+Lisp l_memoryInspectorClearBaseline(Lisp args, LispError *e, LispContext ctx);
+Lisp l_memoryInspectorGoto(Lisp args, LispError *e, LispContext ctx);
 #endif
 
 // Buffer text from Lisp (builtins_edit.c)

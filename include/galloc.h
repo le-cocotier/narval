@@ -44,15 +44,36 @@ struct dataBlock_t {
   int line;             // __LINE__ at the (re)allocation call site
   const char * func;    // __func__ at the (re)allocation call site
   struct dataBlock_t * hashNext; // gutils.c's address index; not for inspection
+  unsigned long long seq; // allocation order, from 1; kept across grealloc
 };
 
 // Most-recently-allocated tracked block, or NULL. Walk older blocks via
-// ->lastBlock. For read-only inspection (e.g. a memory-usage buffer) —
-// nothing about the list itself is safe to mutate through this pointer.
+// ->lastBlock, holding gLock(). For read-only inspection — nothing about
+// the list itself is safe to mutate through this pointer.
 struct dataBlock_t * gBlocks(void);
 
 // Number of blocks currently tracked (galloc/grealloc calls not yet
 // matched by a gfree).
 int gBlockCount(void);
+
+// Copies up to `max` tracked blocks into `out`, newest first, under the
+// lock, and returns how many it copied. Use this rather than walking
+// gBlocks() when another thread may be allocating (narval-gui: SDL's
+// allocations come through galloc too, see gui_sdl.c). The copies'
+// list pointers are not meant to be followed.
+int gSnapshot(struct dataBlock_t * out, int max);
+
+// Bytes galloc spends on its own bookkeeping (a dataBlock_t per block and
+// the address index), which no block's size includes.
+size_t gTrackerOverhead(void);
+
+// The `seq` the next allocation will get minus one: blocks with a bigger
+// `seq` were allocated after this call (the memory inspector's baseline).
+unsigned long long gSequence(void);
+
+// The lock every galloc call takes. Hold it to walk gBlocks() safely, and
+// don't allocate or free while holding it.
+void gLock(void);
+void gUnlock(void);
 
 #endif

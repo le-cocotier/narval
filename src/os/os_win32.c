@@ -3188,3 +3188,9 @@ int os_heap_in_use(long long *blocks, long long *bytes)
     }
     return 0;
 }
+
+static SRWLOCK s_alloc_lock = SRWLOCK_INIT;
+
+void os_alloc_lock(void) { AcquireSRWLockExclusive(&s_alloc_lock); }
+
+void os_alloc_unlock(void) { ReleaseSRWLockExclusive(&s_alloc_lock); }

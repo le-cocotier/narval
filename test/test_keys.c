@@ -6,6 +6,7 @@
 #include "test.h"
 #include "../include/define.h"
 #include "../include/builtins.h"
+#include "../include/data.h"
 #include "../include/galloc.h"
 #include "../include/lisp.h"
 #include "../include/lisp_lib.h"
@@ -148,6 +149,21 @@ static void testExtendedReports(void) {
   CHECK_KEY("\x1b[27u", "ESCAPE");
   CHECK_KEY("\x1b[97:65;6u", "CTRL-SHIFT-a"); // kitty's sub-parameters
   CHECK_KEY("\x1b[233;5u", "\xc3\xa9");
+}
+
+// The wheel in xterm's SGR mouse reports, and MOUSE-REVERSE-SCROLL
+// turning it around.
+static void testWheel(void) {
+  E.constantes.MOUSE_REVERSE_SCROLL = 0;
+  CHECK_KEY("\x1b[<64;10;5M", "WHEEL-UP");
+  CHECK_KEY("\x1b[<65;10;5M", "WHEEL-DOWN");
+  CHECK_INT(E.mouse_col, 9);
+  CHECK_INT(E.mouse_row, 4);
+  E.constantes.MOUSE_REVERSE_SCROLL = 1;
+  CHECK_KEY("\x1b[<64;1;1M", "WHEEL-DOWN");
+  CHECK_KEY("\x1b[<65;1;1M", "WHEEL-UP");
+  CHECK_KEY("\x1b[<0;1;1M", "MOUSE-LEFT");  // clicks don't turn round
+  E.constantes.MOUSE_REVERSE_SCROLL = 0;
 }
 
 static void testCanonicalNames(void) {
@@ -299,6 +315,7 @@ int main(void) {
   testAltPrefix();
   testModifiedSpecialKeys();
   testExtendedReports();
+  testWheel();
   testCanonicalNames();
   testFallback();
   testEscapeSequences();

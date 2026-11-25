@@ -4,9 +4,19 @@
 #include <string.h>
 
 #include "../include/galloc.h"
+#include "../include/os.h"
 
 static struct dataBlock_t * blocks = NULL;
 static int blockAmount = 0;
+static unsigned long long g_seq = 0; // the last block's dataBlock_t.seq
+
+// ─── Lock ───────────────────────────────────────────────────────────────────
+// narval itself allocates from one thread, but narval-gui hands SDL's
+// allocator to galloc (gui_sdl.c), and SDL can allocate from threads of its
+// own. Every public entry point below takes this lock; the static helpers
+// assume it is held. Uncontended, it costs a few nanoseconds per call.
+void gLock(void) { os_alloc_lock(); }
+void gUnlock(void) { os_alloc_unlock(); }
 
 // ─── Address index ──────────────────────────────────────────────────────────
 // The list above is kept for ordered inspection (gBlocks(), the memory
@@ -41,7 +51,7 @@ static void indexGrow(void) {
     p->hashNext = table[slot];
     table[slot] = p;
   }
-  gfree(g_index);
+  free(g_index); // raw, like `table`; gfree() would take the held lock
   g_index = table;
   g_index_size = new_size;
 }
@@ -107,6 +117,7 @@ static void * track(void * data, const size_t size, const char * file, const int
   new_block->file = file;
   new_block->line = line;
   new_block->func = func;
+  new_block->seq = ++g_seq;
 
   if (!blocks) // First allocation
     blocks = new_block;
@@ -121,11 +132,19 @@ static void * track(void * data, const size_t size, const char * file, const int
 }
 
 void * galloc_impl(const size_t size, const char * file, const int line, const char * func){
-  return track(malloc(size), size, file, line, func);
+  void * data = malloc(size);
+  gLock();
+  data = track(data, size, file, line, func);
+  gUnlock();
+  return data;
 }
 
 void * gcalloc_impl(const size_t num, const size_t size, const char * file, const int line, const char * func){
-  return track(calloc(num, size), num * size, file, line, func);
+  void * data = calloc(num, size);
+  gLock();
+  data = track(data, num * size, file, line, func);
+  gUnlock();
+  return data;
 }
 
 char * gstrdup_impl(const char * s, const char * file, const int line, const char * func){
@@ -145,16 +164,21 @@ void * grealloc_impl(void * address, const size_t size, const char * file, const
   if (!address)
     return galloc_impl(size, file, line, func);
 
+  gLock();
   data_block = findBlock(address);
   // Not one of ours (calloc/strdup/asprintf/getline/...) -> defer to the
   // real allocator so the existing data is preserved; it stays untracked
   // afterwards, same as before this call.
-  if (!data_block)
+  if (!data_block) {
+    gUnlock();
     return realloc(address, size);
+  }
 
   new_data = realloc(data_block->address, size);
-  if (!new_data)
+  if (!new_data) {
+    gUnlock();
     return NULL;
+  }
   if (new_data != data_block->address) {
     indexRemove(data_block); // keyed by the old address
     data_block->address = new_data;
@@ -164,15 +188,21 @@ void * grealloc_impl(void * address, const size_t size, const char * file, const
   data_block->file = file;
   data_block->line = line;
   data_block->func = func;
+  gUnlock();
 
   return new_data;
 }
 
 void gfree(void * data){
-  struct dataBlock_t * pBlock = data ? findBlock(data) : NULL;
+  struct dataBlock_t * pBlock;
+  if (!data)
+    return;
+  gLock();
+  pBlock = findBlock(data);
   if (!pBlock) {
-    // Not one of ours (calloc/strdup/asprintf/getline/NULL/...) -> defer to
-    // the real gfree() so nothing leaks just because it wasn't galloc'd.
+    // Not one of ours (calloc/strdup/asprintf/getline/...) -> defer to
+    // the real free() so nothing leaks just because it wasn't galloc'd.
+    gUnlock();
     free(data);
     return;
   }
@@ -198,6 +228,14 @@ void gfree(void * data){
     g_index = NULL;
     g_index_size = 0;
   }
+  gUnlock();
+}
+
+// What tracking itself costs, outside every block's own size: one
+// dataBlock_t per block plus the address index. Lock held.
+static size_t trackerOverhead(void) {
+  return (size_t) blockAmount * sizeof(struct dataBlock_t) +
+         g_index_size * sizeof(*g_index);
 }
 
 // One allocation site in gReportMemory()'s summary.
@@ -233,7 +271,10 @@ int gReportMemory(FILE * out) {
   size_t i;
   const struct dataBlock_t * p;
   struct allocSite * grown;
+  int amount;
+  size_t overhead;
 
+  gLock();
   for (p = blocks; p; p = p->lastBlock) {
     total += p->size;
     for (i = 0; i < nsites && !sameSite(&sites[i], p); i++)
@@ -256,6 +297,9 @@ int gReportMemory(FILE * out) {
     sites[i].count++;
     sites[i].bytes += p->size;
   }
+  amount = blockAmount;
+  overhead = trackerOverhead();
+  gUnlock();
   if (sites)
     qsort(sites, nsites, sizeof(*sites), bySizeDescending);
 
@@ -264,10 +308,12 @@ int gReportMemory(FILE * out) {
     fprintf(out, "%8lu %12lu  %s:%d (%s)\n", (unsigned long) sites[i].count,
             (unsigned long) sites[i].bytes, sites[i].file, sites[i].line,
             sites[i].func);
-  fprintf(out, "%8d %12lu  total, from %lu allocation sites\n", blockAmount,
+  fprintf(out, "%8d %12lu  total, from %lu allocation sites\n", amount,
           (unsigned long) total, (unsigned long) nsites);
+  fprintf(out, "%8s %12lu  galloc's own bookkeeping (not in the total)\n", "",
+          (unsigned long) overhead);
   free(sites);
-  return blockAmount;
+  return amount;
 }
 
 struct dataBlock_t * gBlocks(void) {
@@ -275,5 +321,35 @@ struct dataBlock_t * gBlocks(void) {
 }
 
 int gBlockCount(void) {
-  return blockAmount;
+  int amount;
+  gLock();
+  amount = blockAmount;
+  gUnlock();
+  return amount;
+}
+
+int gSnapshot(struct dataBlock_t * out, const int max) {
+  const struct dataBlock_t * p;
+  int n = 0;
+  gLock();
+  for (p = blocks; p && n < max; p = p->lastBlock)
+    out[n++] = *p;
+  gUnlock();
+  return n;
+}
+
+unsigned long long gSequence(void) {
+  unsigned long long seq;
+  gLock();
+  seq = g_seq;
+  gUnlock();
+  return seq;
+}
+
+size_t gTrackerOverhead(void) {
+  size_t overhead;
+  gLock();
+  overhead = trackerOverhead();
+  gUnlock();
+  return overhead;
 }

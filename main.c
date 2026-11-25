@@ -246,6 +246,7 @@ int main(const int argc, char *argv[]) {
   initEditor();
 #ifdef NARVAL_GUI
   guiConfigure();
+  editorSetConfigReloadListener(guiConfigure); // (config-reload)
 #endif
   // A message init.lisp left (a package that couldn't load, a failed
   // use-package, ...) is worth more than the help line below: keep it.

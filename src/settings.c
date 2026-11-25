@@ -56,6 +56,8 @@ static Setting s_settings[] = {
      "While the debugger is paused, show the variables' values after the lines that use them."},
     {"MOUSE", SETTING_BOOL, 1, 0, &E.constantes.MOUSE,
      "Mouse wheel scrolls the pane under the pointer, a left click places the cursor."},
+    {"MOUSE-REVERSE-SCROLL", SETTING_BOOL, 0, 0, &E.constantes.MOUSE_REVERSE_SCROLL,
+     "Scroll the other way from the wheel or trackpad (else the way the system is set to)."},
     {"EXTENDED-KEYS", SETTING_BOOL, 1, 0, &E.constantes.EXTENDED_KEYS,
      "Ask the terminal to report Ctrl+digit, Ctrl+punctuation and Ctrl+Shift+letter keys too."},
     {"GUI-FONT-SIZE", SETTING_INT, 14, 6, &E.constantes.GUI_FONT_SIZE,
@@ -163,7 +165,7 @@ Lisp describeVariable(Lisp args, LispError *e, LispContext ctx) {
     snprintf(text, sizeof(text), "Set it in personal-config: (define %s %s)", s->name,
              s->type == SETTING_BOOL ? (*s->target ? "#f" : "#t") : current);
     lines = lisp_cons(lisp_make_string2(text, ctx), lines, ctx);
-    lines = lisp_cons(lisp_make_string2("Settings are read at startup.", ctx), lines, ctx);
+    lines = lisp_cons(lisp_make_string2("Settings are read at startup and by config-reload (CTRL-x c r).", ctx), lines, ctx);
     return lisp_list_reverse(lines);
   }
   val = lisp_env_lookup(lisp_env(ctx), lisp_make_symbol(name, ctx), &present);
@@ -208,8 +210,8 @@ Lisp settingsList(Lisp args, LispError *e, LispContext ctx) {
     lines = lisp_cons(lisp_make_string2(text, ctx), lines, ctx);
   }
   lines = lisp_cons(lisp_make_string2("", ctx), lines, ctx);
-  lines = lisp_cons(lisp_make_string2("Change one with (define NAME value) in personal-config; "
-                                      "they're read at startup.", ctx),
+  lines = lisp_cons(lisp_make_string2("Change one with (define NAME value) in personal-config, "
+                                      "then CTRL-x c r (config-reload).", ctx),
                     lines, ctx);
   return lisp_list_reverse(lines);
 }

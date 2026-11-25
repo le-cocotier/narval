@@ -22,6 +22,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <poll.h>
+#include <pthread.h>
 #include <pwd.h>
 #include <signal.h>
 #include <stdio.h>
@@ -2018,3 +2019,9 @@ int os_clipboard_set(const char *text, const size_t len) {
   ok = fwrite(text, 1, len, pipe) == len;
   return (pclose(pipe) == 0 && ok) ? 0 : -1;
 }
+
+static pthread_mutex_t s_alloc_lock = PTHREAD_MUTEX_INITIALIZER;
+
+void os_alloc_lock(void) { pthread_mutex_lock(&s_alloc_lock); }
+
+void os_alloc_unlock(void) { pthread_mutex_unlock(&s_alloc_lock); }

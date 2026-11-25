@@ -15,13 +15,29 @@ void memoryInspectorOpen(void);
 // changing pane focus. No-op if the buffer isn't open.
 void memoryInspectorRefresh(void);
 
-// Cycles the display sort order (recency -> size, largest first ->
-// file:line/func location -> back to recency) and re-renders. The
-// underlying gutils list itself is never reordered.
+// Cycles the display sort order (size, largest first -> count -> recency ->
+// file:line/func location -> back to size) and re-renders. The underlying
+// gutils list itself is never reordered.
 void memoryInspectorCycleSort(void);
 
-// Prompts for a file path (ESC cancels) and writes the current sorted
-// snapshot to it as plain text.
+// Switches between one row per allocation site (the default) and one row
+// per block.
+void memoryInspectorToggleView(void);
+
+// Marks a baseline: from then on the sites view shows only the sites whose
+// blocks or bytes changed since, with the change, and the blocks view only
+// the blocks allocated since and still alive.
+void memoryInspectorMarkBaseline(void);
+
+// Drops the baseline.
+void memoryInspectorClearBaseline(void);
+
+// Opens the source line that allocated the block or site under the cursor,
+// in the other pane when the screen is split.
+void memoryInspectorGoto(void);
+
+// Prompts for a file path (ESC cancels) and writes the current view to it
+// as plain text.
 void memoryInspectorExport(void);
 
 #endif

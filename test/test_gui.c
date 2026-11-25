@@ -1,9 +1,9 @@
 /**
  * @file test_gui.c
- * @brief narval-gui's window (src/gui/gui_sdl.c), with SDL's offscreen
- * video driver: key presses in as the keys narval reads, frames out as
- * the cells drawn.
- * @details Run by meson with SDL_VIDEO_DRIVER=offscreen and the bundled
+ * @brief narval-gui's window (src/gui/gui_sdl.c), with SDL's dummy video
+ * driver: key presses in as the keys narval reads, frames out as the
+ * cells drawn.
+ * @details Run by meson with SDL_VIDEO_DRIVER=dummy and the bundled
  * font as its argument.
  */
 
@@ -411,7 +411,7 @@ int main(const int argc, char **argv) {
   testInit();
   testKeyBytes();
   if (guiOpen(argc > 1 ? argv[1] : NULL) != 0) {
-    fprintf(stderr, "test_gui: no window (SDL_VIDEO_DRIVER=offscreen?)\n");
+    fprintf(stderr, "test_gui: no window (SDL_VIDEO_DRIVER=dummy?)\n");
     return 1;
   }
   testEvents();

@@ -223,7 +223,10 @@ if gui_found
     link_args : is_windows ? [] : link_args,
     win_subsystem : 'windows',
     install : true)
-  # The window with SDL's offscreen video driver: keys in, cells drawn.
+  # The window with SDL's dummy video driver: keys in, cells drawn. Not
+  # the offscreen one: on macOS SDL gives its windows OpenGL by default,
+  # which offscreen only has through EGL, and macOS has no EGL ("Could
+  # not initialize OpenGL / GLES library").
   test('gui', executable('test_gui',
     files('test/test_gui.c', 'test/test.c') + extra_sources,
     c_args : core_args,
@@ -231,7 +234,7 @@ if gui_found
     dependencies : gui_deps,
     link_args : is_windows ? [] : link_args),
     args : [meson.current_source_dir() / 'assets/fonts/DejaVuSansMono.ttf'],
-    env : ['SDL_VIDEO_DRIVER=offscreen'])
+    env : ['SDL_VIDEO_DRIVER=dummy'])
   # Linux and the BSDs: in the desktop's app launcher and search, with its
   # icon. macOS gets Narval.app instead (packaging/macos/make-app.sh, run
   # by install.sh), Windows a Start menu shortcut (install.ps1).
